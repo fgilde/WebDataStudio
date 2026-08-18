@@ -43,7 +43,7 @@ public static class SchemaEndpoints
             {
                 var (driver, session) = await factory.OpenAsync(conn, ct);
                 await using (session)
-                    return Results.Ok(await driver.DescribeAsync(session, ParseRef(objectRef), ct));
+                    return Results.Ok(await driver.DescribeAsync(session, ParseObjectRef(objectRef), ct));
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
@@ -55,6 +55,6 @@ public static class SchemaEndpoints
     /// slash cannot silently split a segment. Object references contain slashes, so put them back —
     /// and only them, since decoding the whole value again would corrupt a name containing a literal
     /// percent sign.
-    private static SchemaNodeRef ParseRef(string value) =>
+    internal static SchemaNodeRef ParseObjectRef(string value) =>
         SchemaNodeRef.Parse(value.Replace("%2F", "/", StringComparison.OrdinalIgnoreCase));
 }

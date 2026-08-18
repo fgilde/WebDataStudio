@@ -6,12 +6,13 @@ import { nodeIcon } from "./nodeIcons";
 
 export interface ExplorerSelection { connectionId: string; node: SchemaNodeDto }
 
-export type ExplorerAction = "select" | "new-query" | "copy-name" | "show-ddl" | "export" | "import" | "copy-table";
+export type ExplorerAction = "select" | "open-data" | "new-query" | "copy-name" | "show-ddl" | "export" | "import" | "copy-table";
 
 // Actions that only make sense on a real object, not on a folder.
 const OBJECT_KINDS = ["Table", "View", "MaterializedView"];
 
 const CONTEXT_ITEMS: { action: ExplorerAction; label: string }[] = [
+  { action: "open-data", label: "Open data" },
   { action: "new-query", label: "New query (SELECT *)" },
   { action: "show-ddl", label: "Show DDL" },
   { action: "copy-name", label: "Copy name" },
@@ -62,6 +63,9 @@ function TreeLevel({ conn, parent, depth, filter, onSelect, onAction }: {
                 onClick={() => {
                   if (node.hasChildren) setOpen(o => ({ ...o, [node.ref]: !o[node.ref] }));
                   onSelect({ connectionId: conn, node });
+                }}
+                onDoubleClick={() => {
+                  if (OBJECT_KINDS.includes(node.kind)) onAction("open-data", { connectionId: conn, node });
                 }}
                 onContextMenu={e => {
                   if (!OBJECT_KINDS.includes(node.kind)) return;

@@ -49,6 +49,7 @@ builder.Services.AddSingleton<DriverRegistry>();
 builder.Services.AddSingleton<SessionFactory>();
 builder.Services.AddSingleton<QueryRunner>();
 builder.Services.AddSingleton<ExporterRegistry>();
+builder.Services.AddMemoryCache();
 builder.Services.AddSingleton(sp => new WorkspaceStore(
     sp.GetRequiredService<IConfiguration>()["DB_PATH"] ?? "/data/webdatastudio.db"));
 
@@ -91,6 +92,7 @@ app.MapQueryEndpoints();
 app.MapWorkspaceEndpoints();
 app.MapExportEndpoints();
 app.MapImportEndpoints();
+app.MapDataEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();

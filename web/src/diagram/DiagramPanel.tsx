@@ -153,8 +153,11 @@ function Canvas({ connectionId, onOpenTable }: CanvasProps) {
       {error ? <Alert color="red" variant="light" m={4}>{error}</Alert> : null}
 
       <div style={{ flex: 1, minHeight: 0 }}>
+        {/* react-flow binds Space and Delete on the document while it is mounted, which would
+            swallow those keys in the SQL editor of any other tab. */}
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes}
-          onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} fitView minZoom={0.1}>
+          onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} fitView minZoom={0.1}
+          panActivationKeyCode={null} deleteKeyCode={null} multiSelectionKeyCode={null}>
           <Background />
           <Controls showInteractive={false} />
           <MiniMap pannable zoomable maskColor="rgba(0,0,0,.25)"

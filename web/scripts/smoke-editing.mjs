@@ -15,12 +15,14 @@ await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByText("DEMO", { exact: true }).click();
 await page.getByText("Tables", { exact: true }).click();
 
-const tableNode = page.getByText("people", { exact: true }).first();
+// Scoped to the explorer: a restored query tab can hold the word "people" in its SQL.
+const tableNode = page.locator(".mantine-UnstyledButton-root")
+  .filter({ hasText: /^people$/ }).first();
 await tableNode.waitFor({ timeout: 15000 });
 await tableNode.dblclick();
 
 // The data tab shows the editing toolbar and the seeded rows.
-await page.getByRole("button", { name: "Save" }).waitFor({ timeout: 15000 });
+await page.getByRole("button", { name: "Save", exact: true }).waitFor({ timeout: 15000 });
 const cell = page.locator("td").filter({ hasText: /^ada/ }).first();
 await cell.waitFor({ timeout: 15000 });
 
@@ -31,7 +33,7 @@ await page.keyboard.press("Control+a");
 await page.keyboard.type(fresh);
 await page.keyboard.press("Enter");
 
-await page.getByRole("button", { name: "Save" }).click();
+await page.getByRole("button", { name: "Save", exact: true }).click();
 await page.getByText("Review changes").waitFor({ timeout: 10000 });
 // The script arrives one request after the modal opens, so wait for it rather than reading now.
 await page.getByText(/UPDATE/).first().waitFor({ timeout: 10000 });

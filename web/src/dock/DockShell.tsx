@@ -1,8 +1,11 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DockviewReact } from "dockview-react";
 import type { DockviewApi, DockviewReadyEvent, DockviewGroupPanel, IDockviewPanelProps } from "dockview-react";
 import { ActionIcon, Group, Text, Tooltip } from "@mantine/core";
-import { IconHistory, IconSettingsCog, IconSitemap, IconSquarePlus, IconGitCompare } from "@tabler/icons-react";
+import {
+  IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconLayoutBoard, IconSettingsCog,
+  IconSitemap, IconSquarePlus, IconTable,
+} from "@tabler/icons-react";
 import "dockview-react/dist/styles/dockview.css";
 import "../editor/dockview-mantine.css";
 import { useAppTheme } from "../ThemeProvider";
@@ -16,6 +19,13 @@ import { TableDesigner } from "../designer/TableDesigner";
 import { DiagramPanel } from "../diagram/DiagramPanel";
 import { AdminPanel } from "../admin/AdminPanel";
 import { ComparePanel } from "../compare/ComparePanel";
+import { QueryDesigner } from "../designer/QueryDesigner";
+import { SavedQueriesPanel } from "../query/SavedQueriesPanel";
+import { SnippetManager } from "../editor/SnippetManager";
+import { CommandPalette, ShortcutsHelp } from "../shell/CommandPalette";
+import { LayoutPresetsModal } from "../shell/LayoutPresets";
+import { buildCommands } from "../shell/commands";
+import { buildDeepLink, parseDeepLink } from "../shell/deepLink";
 import { describeObject, listConnections, loadTabs, saveTabs, type Connection, type ForeignKeyDto } from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
@@ -44,6 +54,7 @@ interface ShellState {
   followForeignKey: (from: DataTabState, fk: ForeignKeyDto, value: unknown) => void;
   runStatement: (connectionId: string, sql: string) => void;
   openData: (connectionId: string, objectRef: string, tableName: string) => void;
+  dialectOf: (connectionId: string) => DialectId;
 }
 
 const ShellContext = createContext<ShellState | null>(null);
@@ -125,7 +136,32 @@ function HealthDockPanel() {
 }
 
 function HistoryDockPanel() {
-  return <HistoryPanel onOpen={() => { /* opening into a tab lands in P9's command palette work */ }} />;
+  const shell = useShell();
+  const connectionId = shell.selection?.connectionId ?? shell.tabs[0]?.connectionId ?? "";
+
+  return <HistoryPanel onOpen={entry =>
+    shell.runStatement(entry.connectionId || connectionId, entry.sql)} />;
+}
+
+function SavedQueriesDockPanel() {
+  const shell = useShell();
+  const current = shell.tabs[shell.tabs.length - 1];
+
+  return (
+    <SavedQueriesPanel currentSql={current?.sql} currentConnectionId={current?.connectionId}
+      onOpen={query => shell.runStatement(
+        query.connectionId ?? current?.connectionId ?? "", query.sql)} />
+  );
+}
+
+function QueryDesignerDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+  const shell = useShell();
+  const connection = props.params.connectionId;
+
+  return (
+    <QueryDesigner connectionId={connection} dialect={shell.dialectOf(connection)}
+      onOpenInTab={sql => shell.runStatement(connection, sql)} />
+  );
 }
 
 function DiagramDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
@@ -153,7 +189,41 @@ const components = {
   structure: StructurePanel, query: QueryPanel, history: HistoryDockPanel, welcome: WelcomePanel,
   data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel, designer: DesignerPanel,
   diagram: DiagramDockPanel, admin: AdminDockPanel, compare: CompareDockPanel,
+  saved: SavedQueriesDockPanel, builder: QueryDesignerDockPanel,
 };
+
+/// The default arrangement, in one place: the initial layout and the reset command must produce
+/// the same thing, or reset becomes its own surprise.
+function buildDefaultLayout(
+  api: DockviewApi, centerGroup: React.MutableRefObject<DockviewGroupPanel | null>) {
+  const welcome = api.addPanel({ id: "welcome", component: "welcome", title: "Start" });
+  centerGroup.current = welcome.group;
+
+  const structure = api.addPanel({
+    id: "structure", component: "structure", title: "Structure",
+    position: { referencePanel: welcome.id, direction: "right" },
+    initialWidth: 340,
+  });
+  api.addPanel({
+    id: "plan", component: "plan", title: "Plan",
+    position: { referencePanel: structure.id, direction: "within" },
+  });
+  api.addPanel({
+    id: "health", component: "health", title: "Health",
+    position: { referencePanel: structure.id, direction: "within" },
+  });
+  api.addPanel({
+    id: "history", component: "history", title: "History",
+    position: { referencePanel: structure.id, direction: "below" },
+  });
+  api.addPanel({
+    id: "saved", component: "saved", title: "Saved",
+    position: { referencePanel: "history", direction: "within" },
+  });
+
+  api.getPanel("structure")?.api.setActive();
+  welcome.api.setActive();
+}
 
 export function DockShell() {
   const { current } = useAppTheme();
@@ -168,6 +238,11 @@ export function DockShell() {
   const [exportTarget, setExportTarget] = useState<ExportTarget | null>(null);
   const [importTarget, setImportTarget] = useState<ImportTarget | null>(null);
   const [copySource, setCopySource] = useState<{ connectionId: string; objectRef: string; label: string } | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [snippetsOpen, setSnippetsOpen] = useState(false);
+  const [layoutsOpen, setLayoutsOpen] = useState(false);
+  const [explorerNonce, setExplorerNonce] = useState(0);
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, []);
 
@@ -208,30 +283,7 @@ export function DockShell() {
 
   const onReady = (event: DockviewReadyEvent) => {
     api.current = event.api;
-
-    const welcome = event.api.addPanel({ id: "welcome", component: "welcome", title: "Start" });
-    centerGroup.current = welcome.group;
-
-    const structure = event.api.addPanel({
-      id: "structure", component: "structure", title: "Structure",
-      position: { referencePanel: welcome.id, direction: "right" },
-      initialWidth: 340,
-    });
-    event.api.addPanel({
-      id: "plan", component: "plan", title: "Plan",
-      position: { referencePanel: structure.id, direction: "within" },
-    });
-    event.api.addPanel({
-      id: "health", component: "health", title: "Health",
-      position: { referencePanel: structure.id, direction: "within" },
-    });
-    event.api.addPanel({
-      id: "history", component: "history", title: "History",
-      position: { referencePanel: structure.id, direction: "below" },
-    });
-    event.api.getPanel("structure")?.api.setActive();
-
-    welcome.api.setActive();
+    buildDefaultLayout(event.api, centerGroup);
   };
 
   // Restore the tabs the server remembers, once dockview and the connection list are both ready.
@@ -360,6 +412,9 @@ export function DockShell() {
   const exportQuery = useCallback((connectionId: string, sql: string) =>
     setExportTarget({ connectionId, sql, defaultName: "result", scopes: ["result"] }), []);
 
+  const dialectOf = useCallback((connectionId: string) =>
+    dialectFor(connections.find(c => c.id === connectionId)?.engine ?? "postgresql"), [connections]);
+
   const activeConnection = selection?.connectionId ?? connections[0]?.id ?? "";
 
   // One panel per tool and connection: clicking the button again focuses the panel that is
@@ -376,8 +431,83 @@ export function DockShell() {
     });
   }, []);
 
+  const resetLayout = useCallback(() => {
+    // The way back from a layout with every panel closed: rebuild the default arrangement.
+    api.current?.clear();
+    if (api.current) buildDefaultLayout(api.current, centerGroup);
+  }, []);
+
+  const commands = useMemo(() => buildCommands({
+    newQuery: () => newTab(activeConnection),
+    runCurrent: () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "F5" })),
+    cancelCurrent: () => document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "c", ctrlKey: true, shiftKey: true })),
+    formatCurrent: () => document.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "f", ctrlKey: true, shiftKey: true })),
+    openConnections: () => { window.location.hash = "#/connections"; },
+    addConnection: () => { window.location.hash = "#/connections?add=1"; },
+    refreshExplorer: () => setExplorerNonce(n => n + 1),
+    openDiagram: () => openTool("diagram", "Diagram", activeConnection),
+    openHealth: () => api.current?.getPanel("health")?.api.setActive(),
+    openAdmin: () => openTool("admin", "Admin", activeConnection),
+    openCompare: () => openTool("compare", "Compare", activeConnection),
+    openHistory: () => api.current?.getPanel("history")?.api.setActive(),
+    openSavedQueries: () => api.current?.getPanel("saved")?.api.setActive(),
+    saveCurrentQuery: () => api.current?.getPanel("saved")?.api.setActive(),
+    exportResult: () => {
+      const tab = tabs[tabs.length - 1];
+      if (tab) exportQuery(tab.connectionId, tab.sql);
+    },
+    openSnippets: () => setSnippetsOpen(true),
+    switchTheme: () => document.dispatchEvent(new CustomEvent("wds:cycle-theme")),
+    saveLayout: () => setLayoutsOpen(true),
+    resetLayout,
+    copyLink: () => {
+      if (!selection) return;
+      const link = buildDeepLink({
+        kind: "object", connectionId: selection.connectionId, objectRef: selection.node.ref,
+      });
+      void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}${link}`);
+    },
+    showShortcuts: () => setShortcutsOpen(true),
+  }), [activeConnection, newTab, openTool, resetLayout, selection, tabs, exportQuery]);
+
+  // Ctrl+K everywhere, "?" only outside a text field — otherwise it eats a question mark.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const typing = target?.closest("input, textarea, .monaco-editor") !== null;
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
+      if (event.key === "?" && !typing) {
+        event.preventDefault();
+        setShortcutsOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // A deep link opens its target once the connections are known.
+  const followedLink = useRef(false);
+  useEffect(() => {
+    if (followedLink.current || connections.length === 0) return;
+    followedLink.current = true;
+
+    const link = parseDeepLink(window.location.hash);
+    if (!link || !connections.some(c => c.id === link.connectionId)) return;
+
+    if (link.kind === "object")
+      void openData(link.connectionId, link.objectRef, link.objectRef.split("/").pop() ?? "table");
+  }, [connections, openData]);
+
   return (
-    <ShellContext.Provider value={{ selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement, openData }}>
+    <ShellContext.Provider value={{ selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement, openData, dialectOf }}>
       <div style={{ display: "flex", height: "100%" }}>
         <div style={{
           width: 280, flexShrink: 0, display: "flex", flexDirection: "column",
@@ -416,10 +546,34 @@ export function DockShell() {
                   <IconSettingsCog size={15} />
                 </ActionIcon>
               </Tooltip>
+              <Tooltip label="Query builder">
+                <ActionIcon size="sm" variant="subtle" aria-label="Query builder" disabled={!activeConnection}
+                  onClick={() => openTool("builder", "Builder", activeConnection)}>
+                  <IconTable size={15} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Saved queries">
+                <ActionIcon size="sm" variant="subtle" aria-label="Saved queries"
+                  onClick={() => api.current?.getPanel("saved")?.api.setActive()}>
+                  <IconBookmarks size={15} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Layout presets">
+                <ActionIcon size="sm" variant="subtle" aria-label="Layout presets"
+                  onClick={() => setLayoutsOpen(true)}>
+                  <IconLayoutBoard size={15} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Command palette (Ctrl+K)">
+                <ActionIcon size="sm" variant="subtle" aria-label="Command palette"
+                  onClick={() => setPaletteOpen(true)}>
+                  <IconCommand size={15} />
+                </ActionIcon>
+              </Tooltip>
             </Group>
           </Group>
           <div style={{ flex: 1, minHeight: 0 }}>
-            <ExplorerTree onSelect={setSelection} onAction={handleAction} />
+            <ExplorerTree key={explorerNonce} onSelect={setSelection} onAction={handleAction} />
           </div>
         </div>
 
@@ -432,6 +586,15 @@ export function DockShell() {
       <ImportDialog target={importTarget} onClose={() => setImportTarget(null)} />
       <CopyTableDialog source={copySource} connections={connections}
         onClose={() => setCopySource(null)} />
+
+      <CommandPalette commands={commands} opened={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <ShortcutsHelp commands={commands} opened={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <SnippetManager opened={snippetsOpen} onClose={() => setSnippetsOpen(false)} />
+      <LayoutPresetsModal opened={layoutsOpen} onClose={() => setLayoutsOpen(false)}
+        connectionId={activeConnection || null}
+        capture={() => api.current?.toJSON()}
+        apply={layout => { try { api.current?.fromJSON(layout as never); } catch { resetLayout(); } }}
+        reset={resetLayout} />
     </ShellContext.Provider>
   );
 }

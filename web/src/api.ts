@@ -4,10 +4,18 @@ export interface Me { anonymous: boolean; authenticated: boolean; username: stri
 export interface Connection {
   id: string; name: string; engine: string; readOnly: boolean;
   color: string | null; group: string | null; source: "Environment" | "Stored"; summary: string;
+  tunnelled: boolean;
 }
+export interface TunnelInput {
+  host: string; port: number; user: string;
+  password?: string | null; privateKey?: string | null; passphrase?: string | null;
+}
+
 export interface ConnectionInput {
   name: string; engine: string; connectionString: string;
   readOnly: boolean; color?: string | null; group?: string | null;
+  /// Omitted on an edit keeps the stored tunnel: the private key never travels back to the browser.
+  tunnel?: TunnelInput | null;
 }
 
 let onUnauthorized: () => void = () => {};
@@ -354,3 +362,34 @@ export const compareData = (body: {
   keyColumns: string[]; maxRows?: number;
 }): Promise<DataComparisonDto> =>
   fetch(`${base}/compare/data`, json("POST", body)).then(r => ok<DataComparisonDto>(r));
+
+// --- workspace items (snippets, layout presets) --------------------------------
+export const loadWorkspaceItem = <T>(key: string): Promise<T | null> =>
+  fetch(`${base}/workspace/item/${encodeURIComponent(key)}`).then(r => ok<T | null>(r));
+
+export const saveWorkspaceItem = (key: string, value: unknown): Promise<void> =>
+  fetch(`${base}/workspace/item/${encodeURIComponent(key)}`, {
+    method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(value),
+  }).then(r => ok<void>(r));
+
+// --- saved queries ---------------------------------------------------------------
+export interface SavedQueryDto {
+  id: string; name: string; folder: string | null; sql: string;
+  connectionId: string | null; updatedAt: string;
+}
+
+export const listSavedQueries = (): Promise<SavedQueryDto[]> =>
+  fetch(`${base}/saved-queries`).then(r => ok<SavedQueryDto[]>(r));
+
+export const createSavedQuery = (body: {
+  name: string; folder?: string | null; sql: string; connectionId?: string | null;
+}): Promise<SavedQueryDto> =>
+  fetch(`${base}/saved-queries`, json("POST", body)).then(r => ok<SavedQueryDto>(r));
+
+export const updateSavedQuery = (id: string, body: {
+  name: string; folder?: string | null; sql: string; connectionId?: string | null;
+}): Promise<SavedQueryDto> =>
+  fetch(`${base}/saved-queries/${id}`, json("PUT", body)).then(r => ok<SavedQueryDto>(r));
+
+export const deleteSavedQuery = (id: string): Promise<void> =>
+  fetch(`${base}/saved-queries/${id}`, { method: "DELETE" }).then(r => ok<void>(r));

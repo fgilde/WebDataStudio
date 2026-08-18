@@ -10,7 +10,9 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="MiniExcel" />
     <PackageReference Include="MySqlConnector" />
+    <PackageReference Include="Parquet.Net" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Scalar.AspNetCore" />
   </ItemGroup>

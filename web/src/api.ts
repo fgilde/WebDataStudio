@@ -112,3 +112,10 @@ export const saveTabs = (tabs: unknown): Promise<void> =>
   fetch(`${base}/workspace/tabs`, {
     method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(tabs),
   }).then(r => ok<void>(r));
+
+export interface ExportFormatDto {
+  format: string; label: string; extension: string; contentType: string; supportsSchemaScope: boolean;
+}
+
+export const listExportFormats = (): Promise<ExportFormatDto[]> =>
+  fetch(`${base}/export/formats`).then(r => ok<ExportFormatDto[]>(r));

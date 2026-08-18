@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Menu, Text, TextInput } from "@mantine/core";
 import { IconFilter, IconSortAscending, IconSortDescending } from "@tabler/icons-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -9,7 +9,10 @@ import { summarizeSelection } from "./aggregate";
 
 const ROW_HEIGHT = 24;
 
-export function ResultGrid({ result }: { result: StatementResult }) {
+export function ResultGrid({ result, onSelectionChange }: {
+  result: StatementResult;
+  onSelectionChange?: (values: unknown[]) => void;
+}) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [sort, setSort] = useState<{ index: number; desc: boolean } | null>(null);
   const [filters, setFilters] = useState<Record<number, string>>({});
@@ -61,7 +64,13 @@ export function ResultGrid({ result }: { result: StatementResult }) {
     overscan: 20,
   });
 
-  const summary = summarizeSelection(selected.map(s => rows[s.row]?.[s.col]));
+  const selectedValues = selected.map(s => rows[s.row]?.[s.col]);
+  const summary = summarizeSelection(selectedValues);
+
+  useEffect(() => { onSelectionChange?.(selectedValues); },
+    // The array identity changes every render; its contents are what matter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [JSON.stringify(selectedValues), onSelectionChange]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>

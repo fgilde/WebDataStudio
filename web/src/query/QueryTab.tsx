@@ -10,7 +10,7 @@ import type { DialectId } from "../sql/splitStatements";
 
 export interface QueryTabState { connectionId: string; dialect: DialectId; sql: string }
 
-export function QueryTab({ tabId, connectionId, dialect, initialSql = "", onSqlChange, onOpenObject }: {
+export function QueryTab({ tabId, connectionId, dialect, initialSql = "", onSqlChange, onOpenObject, onExport }: {
   tabId: string;
   connectionId: string;
   dialect: DialectId;
@@ -19,6 +19,7 @@ export function QueryTab({ tabId, connectionId, dialect, initialSql = "", onSqlC
   // re-run the reporting effect on every render and loop through the parent's state.
   onSqlChange?: (tabId: string, sql: string) => void;
   onOpenObject?: (ref: string) => void;
+  onExport?: (sql: string) => void;
 }) {
   const [sql, setSql] = useState(initialSql);
   const [result, setResult] = useState<ResultState>(createResultState);
@@ -90,7 +91,7 @@ export function QueryTab({ tabId, connectionId, dialect, initialSql = "", onSqlC
         flex: 1, minHeight: 100,
         borderTop: "1px solid var(--mantine-color-default-border)",
       }}>
-        <ResultArea result={result} />
+        <ResultArea result={result} onExport={onExport ? () => onExport(sql) : undefined} />
       </div>
     </div>
   );

@@ -1,19 +1,36 @@
 import { useEffect, useState } from "react";
-import { ActionIcon, Badge, Group, Loader, Text, TextInput, UnstyledButton } from "@mantine/core";
+import { ActionIcon, Badge, Group, Loader, Popover, Stack, Text, TextInput, UnstyledButton } from "@mantine/core";
 import { IconChevronDown, IconChevronRight, IconRefresh, IconSearch } from "@tabler/icons-react";
 import { listConnections, listSchema, type Connection, type SchemaNodeDto } from "../api";
 import { nodeIcon } from "./nodeIcons";
 
 export interface ExplorerSelection { connectionId: string; node: SchemaNodeDto }
 
+export type ExplorerAction = "select" | "new-query" | "copy-name" | "show-ddl" | "export" | "import" | "copy-table";
+
+// Actions that only make sense on a real object, not on a folder.
+const OBJECT_KINDS = ["Table", "View", "MaterializedView"];
+
+const CONTEXT_ITEMS: { action: ExplorerAction; label: string }[] = [
+  { action: "new-query", label: "New query (SELECT *)" },
+  { action: "show-ddl", label: "Show DDL" },
+  { action: "copy-name", label: "Copy name" },
+  { action: "export", label: "Export…" },
+  { action: "import", label: "Import into this table…" },
+  { action: "copy-table", label: "Copy to another connection…" },
+];
+
 // One lazily loaded level. Children are fetched on first expand and cached until a manual refresh.
-function TreeLevel({ conn, parent, depth, filter, onSelect }: {
+function TreeLevel({ conn, parent, depth, filter, onSelect, onAction }: {
   conn: string; parent?: string; depth: number; filter: string;
   onSelect: (s: ExplorerSelection) => void;
+  onAction: (action: ExplorerAction, s: ExplorerSelection) => void;
 }) {
   const [nodes, setNodes] = useState<SchemaNodeDto[] | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  // Controlled, because an uncontrolled Menu would swallow the left click that navigates.
+  const [menuFor, setMenuFor] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,23 +51,50 @@ function TreeLevel({ conn, parent, depth, filter, onSelect }: {
     <>
       {visible.map(node => (
         <div key={node.ref}>
-          <UnstyledButton
-            w="100%" px={4} py={2}
-            style={{ paddingLeft: depth * 12 + 4 }}
-            onClick={() => {
-              if (node.hasChildren) setOpen(o => ({ ...o, [node.ref]: !o[node.ref] }));
-              onSelect({ connectionId: conn, node });
-            }}>
-            <Group gap={4} wrap="nowrap">
-              {node.hasChildren
-                ? (open[node.ref] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />)
-                : <span style={{ width: 12 }} />}
-              {nodeIcon(node.kind)}
-              <Text size="xs" truncate>{node.label}</Text>
-            </Group>
-          </UnstyledButton>
+          <Popover withinPortal shadow="md" position="right-start" opened={menuFor === node.ref}
+            onDismiss={() => setMenuFor(null)}>
+            {/* Popover, not Menu: Mantine's Menu.Target toggles on left click, which would fight
+                the click that selects a node. Here the menu opens on right click only. */}
+            <Popover.Target>
+              <UnstyledButton
+                w="100%" px={4} py={2}
+                style={{ paddingLeft: depth * 12 + 4 }}
+                onClick={() => {
+                  if (node.hasChildren) setOpen(o => ({ ...o, [node.ref]: !o[node.ref] }));
+                  onSelect({ connectionId: conn, node });
+                }}
+                onContextMenu={e => {
+                  if (!OBJECT_KINDS.includes(node.kind)) return;
+                  e.preventDefault();
+                  onSelect({ connectionId: conn, node });
+                  setMenuFor(node.ref);
+                }}>
+                <Group gap={4} wrap="nowrap">
+                  {node.hasChildren
+                    ? (open[node.ref] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />)
+                    : <span style={{ width: 12 }} />}
+                  {nodeIcon(node.kind)}
+                  <Text size="xs" truncate>{node.label}</Text>
+                </Group>
+              </UnstyledButton>
+            </Popover.Target>
+
+            <Popover.Dropdown p={4}>
+              <Stack gap={0}>
+                {CONTEXT_ITEMS.map(item => (
+                  <UnstyledButton key={item.action} px={8} py={4}
+                    onClick={() => { setMenuFor(null); onAction(item.action, { connectionId: conn, node }); }}
+                    style={{ borderRadius: 4 }}>
+                    <Text size="xs">{item.label}</Text>
+                  </UnstyledButton>
+                ))}
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
+
           {node.hasChildren && open[node.ref] && (
-            <TreeLevel conn={conn} parent={node.ref} depth={depth + 1} filter="" onSelect={onSelect} />
+            <TreeLevel conn={conn} parent={node.ref} depth={depth + 1} filter=""
+              onSelect={onSelect} onAction={onAction} />
           )}
         </div>
       ))}
@@ -58,7 +102,10 @@ function TreeLevel({ conn, parent, depth, filter, onSelect }: {
   );
 }
 
-export function ExplorerTree({ onSelect }: { onSelect: (s: ExplorerSelection) => void }) {
+export function ExplorerTree({ onSelect, onAction }: {
+  onSelect: (s: ExplorerSelection) => void;
+  onAction: (action: ExplorerAction, s: ExplorerSelection) => void;
+}) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState("");
@@ -85,7 +132,7 @@ export function ExplorerTree({ onSelect }: { onSelect: (s: ExplorerSelection) =>
               {c.readOnly && <Badge size="xs" variant="light" color="orange">RO</Badge>}
             </Group>
           </UnstyledButton>
-          {open[c.id] && <TreeLevel conn={c.id} depth={1} filter={filter} onSelect={onSelect} />}
+          {open[c.id] && <TreeLevel conn={c.id} depth={1} filter={filter} onSelect={onSelect} onAction={onAction} />}
         </div>
       ))}
     </div>

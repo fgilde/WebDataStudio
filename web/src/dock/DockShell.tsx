@@ -6,11 +6,13 @@ import { IconHistory, IconSquarePlus } from "@tabler/icons-react";
 import "dockview-react/dist/styles/dockview.css";
 import "../editor/dockview-mantine.css";
 import { useAppTheme } from "../ThemeProvider";
-import { ExplorerTree, type ExplorerSelection } from "../explorer/ExplorerTree";
+import { ExplorerTree, type ExplorerAction, type ExplorerSelection } from "../explorer/ExplorerTree";
 import { ObjectDetailPanel } from "../explorer/ObjectDetailPanel";
 import { QueryTab } from "../query/QueryTab";
 import { HistoryPanel } from "../query/HistoryPanel";
-import { listConnections, loadTabs, saveTabs, type Connection } from "../api";
+import { describeObject, listConnections, loadTabs, saveTabs, type Connection } from "../api";
+import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
+import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
 import type { DialectId } from "../sql/splitStatements";
 
 interface TabState { id: string; connectionId: string; dialect: DialectId; title: string; sql: string }
@@ -20,6 +22,7 @@ interface ShellState {
   tabs: TabState[];
   updateSql: (id: string, sql: string) => void;
   openObject: (ref: string) => void;
+  exportQuery: (connectionId: string, sql: string) => void;
 }
 
 const ShellContext = createContext<ShellState | null>(null);
@@ -53,7 +56,8 @@ function QueryPanel(props: IDockviewPanelProps<{ tabId: string }>) {
       dialect={tab.dialect}
       initialSql={seed.current}
       onSqlChange={shell.updateSql}
-      onOpenObject={shell.openObject} />
+      onOpenObject={shell.openObject}
+      onExport={sql => shell.exportQuery(tab.connectionId, sql)} />
   );
 }
 
@@ -81,6 +85,9 @@ export function DockShell() {
   const api = useRef<DockviewApi | null>(null);
   const centerGroup = useRef<DockviewGroupPanel | null>(null);
   const restored = useRef(false);
+  const [exportTarget, setExportTarget] = useState<ExportTarget | null>(null);
+  const [importTarget, setImportTarget] = useState<ImportTarget | null>(null);
+  const [copySource, setCopySource] = useState<{ connectionId: string; objectRef: string; label: string } | null>(null);
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, []);
 
@@ -158,10 +165,66 @@ export function DockShell() {
     return () => clearTimeout(timer);
   }, [tabs]);
 
+  // Qualifies an object the way its engine expects, so a generated SELECT runs as-is.
+  const qualify = useCallback((connectionId: string, ref: string) => {
+    const parsed = ref.split(":", 2)[1]?.split("/") ?? [];
+    const connection = connections.find(c => c.id === connectionId);
+    const multiSchema = connection && !["sqlite", "duckdb"].includes(connection.engine);
+    return multiSchema && parsed.length > 1 ? `${parsed[0]}.${parsed[parsed.length - 1]}` : parsed[parsed.length - 1];
+  }, [connections]);
+
+  const handleAction = useCallback(async (action: ExplorerAction, s: ExplorerSelection) => {
+    const name = qualify(s.connectionId, s.node.ref);
+
+    switch (action) {
+      case "new-query":
+        newTab(s.connectionId, `SELECT * FROM ${name}`);
+        break;
+
+      case "copy-name":
+        await navigator.clipboard.writeText(name);
+        break;
+
+      case "show-ddl": {
+        const detail = await describeObject(s.connectionId, s.node.ref).catch(() => null);
+        // Engines that do not hand out DDL still get something useful: the column list as a comment.
+        const columnList = detail?.columns.map(c => `-- ${c.name} ${c.dataType}`).join("\n")
+          ?? "-- no detail available";
+        const ddl = detail?.ddl ?? [`-- ${name}`, columnList].join("\n");
+        newTab(s.connectionId, ddl);
+        break;
+      }
+
+      case "import":
+        setImportTarget({ connectionId: s.connectionId, table: name });
+        break;
+
+      case "copy-table":
+        setCopySource({ connectionId: s.connectionId, objectRef: s.node.ref, label: s.node.label });
+        break;
+
+      case "export":
+        setExportTarget({
+          connectionId: s.connectionId,
+          objectRef: s.node.ref,
+          schema: s.node.ref.split(":", 2)[1]?.split("/")[0],
+          defaultName: s.node.label,
+          scopes: ["table", "schema"],
+        });
+        break;
+
+      default:
+        setSelection(s);
+    }
+  }, [newTab, qualify]);
+
+  const exportQuery = useCallback((connectionId: string, sql: string) =>
+    setExportTarget({ connectionId, sql, defaultName: "result", scopes: ["result"] }), []);
+
   const activeConnection = selection?.connectionId ?? connections[0]?.id ?? "";
 
   return (
-    <ShellContext.Provider value={{ selection, tabs, updateSql, openObject }}>
+    <ShellContext.Provider value={{ selection, tabs, updateSql, openObject, exportQuery }}>
       <div style={{ display: "flex", height: "100%" }}>
         <div style={{
           width: 280, flexShrink: 0, display: "flex", flexDirection: "column",
@@ -185,7 +248,7 @@ export function DockShell() {
             </Group>
           </Group>
           <div style={{ flex: 1, minHeight: 0 }}>
-            <ExplorerTree onSelect={setSelection} />
+            <ExplorerTree onSelect={setSelection} onAction={handleAction} />
           </div>
         </div>
 
@@ -193,6 +256,11 @@ export function DockShell() {
           <DockviewReact className={current.dockview} components={components} onReady={onReady} />
         </div>
       </div>
+
+      <ExportDialog target={exportTarget} onClose={() => setExportTarget(null)} />
+      <ImportDialog target={importTarget} onClose={() => setImportTarget(null)} />
+      <CopyTableDialog source={copySource} connections={connections}
+        onClose={() => setCopySource(null)} />
     </ShellContext.Provider>
   );
 }

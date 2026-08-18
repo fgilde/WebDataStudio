@@ -192,3 +192,32 @@ export const healthReport = (connectionId: string, schema?: string): Promise<{ f
 
 export const serverStats = (connectionId: string): Promise<ServerStatsDto> =>
   fetch(`${base}/stats/${connectionId}`).then(r => ok<ServerStatsDto>(r));
+
+import type { TableDefinition } from "./designer/definition";
+
+export interface DdlStatementDto { sql: string; destructive: boolean; description: string }
+export interface DdlPreviewDto {
+  hash: string; statements: DdlStatementDto[]; script: string;
+  destructive: boolean; transactional: boolean;
+}
+export interface DdlLoadDto { definition: TableDefinition; create: string | null; supported: boolean }
+export interface DependencyReportDto { dependsOn: string[]; usedBy: string[]; bestEffort: boolean }
+
+export const loadDdl = (conn: string, ref: string): Promise<DdlLoadDto> =>
+  fetch(`${base}/ddl/${conn}/${encodeURIComponent(ref)}`).then(r => ok<DdlLoadDto>(r));
+
+export const previewDdl = (conn: string, ref: string | null, after: TableDefinition): Promise<DdlPreviewDto> =>
+  fetch(`${base}/ddl/${conn}/preview`, json("POST", { objectRef: ref, after }))
+    .then(r => ok<DdlPreviewDto>(r));
+
+export const applyDdl = (conn: string, hash: string): Promise<void> =>
+  fetch(`${base}/ddl/${conn}/apply`, json("POST", { hash })).then(r => ok<void>(r));
+
+export const dependencies = (conn: string, ref: string): Promise<DependencyReportDto> =>
+  fetch(`${base}/ddl/${conn}/${encodeURIComponent(ref)}/dependencies`)
+    .then(r => ok<DependencyReportDto>(r));
+
+export const previewRename = (conn: string, ref: string, newName: string):
+  Promise<{ hash: string; script: string; dependencies: DependencyReportDto }> =>
+  fetch(`${base}/ddl/${conn}/rename`, json("POST", { objectRef: ref, newName }))
+    .then(r => ok<{ hash: string; script: string; dependencies: DependencyReportDto }>(r));

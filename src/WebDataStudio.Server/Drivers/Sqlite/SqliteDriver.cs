@@ -73,7 +73,11 @@ public sealed class SqliteDriver : AdoDriverBase
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
                 columns.Add(new ColumnInfo(
-                    reader.GetString(1), reader.GetString(2), reader.GetInt32(3) == 0,
+                    reader.GetString(1), reader.GetString(2),
+                    // PRAGMA reports notnull=0 for an INTEGER PRIMARY KEY, but a rowid alias can
+                    // never be null; reporting it as nullable would make the designer think the
+                    // column changed on every save.
+                    Nullable: reader.GetInt32(3) == 0 && reader.GetInt32(5) == 0,
                     reader.IsDBNull(4) ? null : reader.GetString(4),
                     reader.GetInt32(5) > 0, false, null, reader.GetInt32(0)));
         }
@@ -83,7 +87,9 @@ public sealed class SqliteDriver : AdoDriverBase
             cmd.CommandText = $"PRAGMA index_list({quoted})";
             await using var reader = await cmd.ExecuteReaderAsync(ct);
             while (await reader.ReadAsync(ct))
-                indexes.Add(new IndexInfo(reader.GetString(1), [], reader.GetInt32(2) == 1, false, null));
+                indexes.Add(new IndexInfo(reader.GetString(1), [], reader.GetInt32(2) == 1,
+                    // origin: 'pk' for the implicit primary key index, 'u' for UNIQUE, 'c' for CREATE INDEX
+                    Primary: reader.GetString(3) == "pk", null));
         }
 
         // index_list gives names only; a second pass fills the columns of each index.

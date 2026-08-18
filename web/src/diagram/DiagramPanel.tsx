@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background, Controls, MiniMap, ReactFlow, ReactFlowProvider,
-  type Edge, type Node, useEdgesState, useNodesState, useReactFlow,
+  type Edge, type Node, useEdgesState, useNodesInitialized, useNodesState, useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -24,6 +24,7 @@ interface CanvasProps {
 
 function Canvas({ connectionId, onOpenTable }: CanvasProps) {
   const flow = useReactFlow();
+  const initialised = useNodesInitialized();
   const { current } = useAppTheme();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -33,6 +34,7 @@ function Canvas({ connectionId, onOpenTable }: CanvasProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const graph = useRef<{ nodes: DiagramNodeDto[]; edges: DiagramEdgeDto[] }>({ nodes: [], edges: [] });
+  const canvas = useRef<HTMLDivElement>(null);
 
   const openTable = useCallback((table: DiagramNodeDto) => {
     const path = table.schema ? `${table.schema}/${table.name}` : table.name;
@@ -66,9 +68,25 @@ function Canvas({ connectionId, onOpenTable }: CanvasProps) {
         style: { stroke: "var(--mantine-color-dimmed)" },
       })));
 
-    // fitView on the component only sees the first, empty graph; refit once the boxes exist.
-    requestAnimationFrame(() => flow.fitView({ padding: 0.15 }));
-  }, [setNodes, setEdges, flow, openTable]);
+  }, [setNodes, setEdges, openTable]);
+
+  // fitView on the component only ever sees the first, empty graph. Refitting once react-flow
+  // reports the nodes measured is the only moment their real sizes are known.
+  // A dock panel has no size until it is shown, and fitView on a zero-height container does
+  // nothing. Watching the canvas catches both the first paint and every later resize.
+  useEffect(() => {
+    const element = canvas.current;
+    if (!element || !initialised || nodes.length === 0) return;
+
+    const fit = () => {
+      if (element.clientHeight > 80) flow.fitView({ padding: 0.15 });
+    };
+
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [initialised, nodes.length, flow]);
 
   const refresh = useCallback((force = false) => {
     setLoading(true);
@@ -152,7 +170,7 @@ function Canvas({ connectionId, onOpenTable }: CanvasProps) {
 
       {error ? <Alert color="red" variant="light" m={4}>{error}</Alert> : null}
 
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div ref={canvas} style={{ flex: 1, minHeight: 0 }}>
         {/* react-flow binds Space and Delete on the document while it is mounted, which would
             swallow those keys in the SQL editor of any other tab. */}
         <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes}
@@ -160,9 +178,10 @@ function Canvas({ connectionId, onOpenTable }: CanvasProps) {
           panActivationKeyCode={null} deleteKeyCode={null} multiSelectionKeyCode={null}>
           <Background />
           <Controls showInteractive={false} />
-          <MiniMap pannable zoomable maskColor="rgba(0,0,0,.25)"
-            style={{ background: "var(--mantine-color-body)" }}
-            nodeColor="var(--mantine-color-default-hover)" />
+          <MiniMap pannable zoomable
+            maskColor={current.scheme === "dark" ? "rgba(0,0,0,.35)" : "rgba(255,255,255,.5)"}
+            style={{ background: current.scheme === "dark" ? "#1a1b1e" : "#f8f9fa" }}
+            nodeColor={current.scheme === "dark" ? "#4c6ef5" : "#adb5bd"} />
         </ReactFlow>
       </div>
     </div>

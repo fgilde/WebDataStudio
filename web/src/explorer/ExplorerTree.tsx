@@ -6,7 +6,7 @@ import { nodeIcon } from "./nodeIcons";
 
 export interface ExplorerSelection { connectionId: string; node: SchemaNodeDto }
 
-export type ExplorerAction = "select" | "open-data" | "new-query" | "copy-name" | "show-ddl" | "export" | "import" | "copy-table";
+export type ExplorerAction = "select" | "design" | "new-table" | "open-data" | "new-query" | "copy-name" | "show-ddl" | "export" | "import" | "copy-table";
 
 // Actions that only make sense on a real object, not on a folder.
 const OBJECT_KINDS = ["Table", "View", "MaterializedView"];
@@ -15,6 +15,8 @@ const CONTEXT_ITEMS: { action: ExplorerAction; label: string }[] = [
   { action: "open-data", label: "Open data" },
   { action: "new-query", label: "New query (SELECT *)" },
   { action: "show-ddl", label: "Show DDL" },
+  { action: "design", label: "Design table…" },
+  { action: "new-table", label: "New table here…" },
   { action: "copy-name", label: "Copy name" },
   { action: "export", label: "Export…" },
   { action: "import", label: "Import into this table…" },

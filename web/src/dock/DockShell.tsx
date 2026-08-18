@@ -12,12 +12,17 @@ import { QueryTab } from "../query/QueryTab";
 import { DataTab } from "../data/DataTab";
 import { HistoryPanel } from "../query/HistoryPanel";
 import { PlanPanel, HealthReportPanel } from "../plan/PlanPanel";
+import { TableDesigner } from "../designer/TableDesigner";
 import { describeObject, listConnections, loadTabs, saveTabs, type Connection, type ForeignKeyDto } from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
 import type { DialectId } from "../sql/splitStatements";
 
 interface TabState { id: string; connectionId: string; dialect: DialectId; title: string; sql: string }
+
+interface DesignerTabState {
+  id: string; connectionId: string; objectRef?: string; schema: string; title: string;
+}
 
 interface DataTabState {
   id: string; connectionId: string; objectRef: string; tableName: string; foreignKeys: ForeignKeyDto[];
@@ -27,6 +32,7 @@ interface ShellState {
   selection: ExplorerSelection | null;
   tabs: TabState[];
   dataTabs: DataTabState[];
+  designerTabs: DesignerTabState[];
   updateSql: (id: string, sql: string) => void;
   openObject: (ref: string) => void;
   exportQuery: (connectionId: string, sql: string) => void;
@@ -85,6 +91,14 @@ function DataPanel(props: IDockviewPanelProps<{ tabId: string }>) {
   );
 }
 
+function DesignerPanel(props: IDockviewPanelProps<{ tabId: string }>) {
+  const shell = useShell();
+  const tab = shell.designerTabs.find(t => t.id === props.params.tabId);
+  if (!tab) return <Text size="xs" c="dimmed" p="xs">This tab is gone.</Text>;
+
+  return <TableDesigner connectionId={tab.connectionId} objectRef={tab.objectRef} schema={tab.schema} />;
+}
+
 function PlanDockPanel() {
   const shell = useShell();
   // The plan follows whichever query tab is active; without one there is nothing to explain.
@@ -117,7 +131,7 @@ function WelcomePanel() {
 
 const components = {
   structure: StructurePanel, query: QueryPanel, history: HistoryDockPanel, welcome: WelcomePanel,
-  data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel,
+  data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel, designer: DesignerPanel,
 };
 
 export function DockShell() {
@@ -126,6 +140,7 @@ export function DockShell() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [dataTabs, setDataTabs] = useState<DataTabState[]>([]);
+  const [designerTabs, setDesignerTabs] = useState<DesignerTabState[]>([]);
   const api = useRef<DockviewApi | null>(null);
   const centerGroup = useRef<DockviewGroupPanel | null>(null);
   const restored = useRef(false);
@@ -218,6 +233,18 @@ export function DockShell() {
     return () => clearTimeout(timer);
   }, [tabs]);
 
+  const openDesigner = useCallback((connectionId: string, objectRef: string | undefined,
+    schema: string, title: string) => {
+    const tab: DesignerTabState = {
+      id: "s" + Date.now().toString(36), connectionId, objectRef, schema, title,
+    };
+    setDesignerTabs(list => [...list, tab]);
+    api.current?.addPanel({
+      id: tab.id, component: "designer", title, params: { tabId: tab.id },
+      position: centerGroup.current ? { referenceGroup: centerGroup.current } : undefined,
+    });
+  }, []);
+
   const openData = useCallback(async (connectionId: string, objectRef: string, tableName: string) => {
     const detail = await describeObject(connectionId, objectRef).catch(() => null);
     const tab: DataTabState = {
@@ -251,6 +278,16 @@ export function DockShell() {
     const name = qualify(s.connectionId, s.node.ref);
 
     switch (action) {
+      case "design":
+        openDesigner(s.connectionId, s.node.ref,
+          s.node.ref.split(":")[1]?.split("/")[0] ?? "", `design ${s.node.label}`);
+        break;
+
+      case "new-table":
+        openDesigner(s.connectionId, undefined,
+          s.node.ref.split(":")[1]?.split("/")[0] ?? "", "new table");
+        break;
+
       case "open-data":
         await openData(s.connectionId, s.node.ref, s.node.label);
         break;
@@ -294,7 +331,7 @@ export function DockShell() {
       default:
         setSelection(s);
     }
-  }, [newTab, openData, qualify]);
+  }, [newTab, openData, openDesigner, qualify]);
 
   const runStatement = useCallback((connectionId: string, sql: string) => newTab(connectionId, sql), [newTab]);
 
@@ -304,7 +341,7 @@ export function DockShell() {
   const activeConnection = selection?.connectionId ?? connections[0]?.id ?? "";
 
   return (
-    <ShellContext.Provider value={{ selection, tabs, dataTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement }}>
+    <ShellContext.Provider value={{ selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement }}>
       <div style={{ display: "flex", height: "100%" }}>
         <div style={{
           width: 280, flexShrink: 0, display: "flex", flexDirection: "column",

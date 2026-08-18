@@ -5,13 +5,18 @@ import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../expor
 import { ResultGrid } from "../grid/ResultGrid";
 import { RowFormView } from "../grid/RowFormView";
 import { DocumentResultArea } from "../documents/DocumentResultArea";
+import { TransposedView } from "../grid/TransposedView";
+import { ResultChart } from "../chart/ResultChart";
+import { ResultCompare, type NamedResult } from "../compare/ResultCompare";
 import type { ResultState } from "./resultStore";
+
+type View = "grid" | "form" | "transposed" | "chart" | "compare";
 
 export function ResultArea({ result, onExport }: {
   result: ResultState;
   onExport?: () => void;
 }) {
-  const [view, setView] = useState<"grid" | "form">("grid");
+  const [view, setView] = useState<View>("grid");
   const [formRow, setFormRow] = useState(0);
   const [selectedValues, setSelectedValues] = useState<unknown[]>([]);
 
@@ -57,8 +62,15 @@ export function ResultArea({ result, onExport }: {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
               <Group gap={6} px={4} pt={4}>
-                <SegmentedControl size="xs" value={view} onChange={v => setView(v as "grid" | "form")}
-                  data={[{ label: "Grid", value: "grid" }, { label: "Form", value: "form" }]} />
+                <SegmentedControl size="xs" value={view} onChange={v => setView(v as View)}
+                  data={[
+                    { label: "Grid", value: "grid" },
+                    { label: "Form", value: "form" },
+                    { label: "Transposed", value: "transposed" },
+                    { label: "Chart", value: "chart" },
+                    // Comparing needs a second result; the switch stays but says why it is empty.
+                    { label: "Compare", value: "compare" },
+                  ]} />
                 {s.running && <Text size="xs" c="dimmed">running… {s.rowsRead} rows</Text>}
                 <Group gap={4} ml="auto">
                   <Menu withinPortal>
@@ -87,9 +99,17 @@ export function ResultArea({ result, onExport }: {
                 </Group>
               </Group>
               <div style={{ flex: 1, minHeight: 0 }}>
-                {view === "grid"
-                  ? <ResultGrid result={s} onSelectionChange={onSelectionChange} />
-                  : <RowFormView result={s} index={formRow} onIndexChange={setFormRow} />}
+                {view === "grid" ? <ResultGrid result={s} onSelectionChange={onSelectionChange} />
+                  : view === "form" ? <RowFormView result={s} index={formRow} onIndexChange={setFormRow} />
+                  : view === "transposed" ? <TransposedView columns={s.columns} rows={s.rows} />
+                  : view === "chart" ? <ResultChart columns={s.columns} rows={s.rows} />
+                  : <ResultCompare initialLeft={`s${s.index}`} results={result.statements
+                      .filter(x => x.columns.length > 0)
+                      .map<NamedResult>(x => ({
+                        id: `s${x.index}`,
+                        label: `Result ${x.index + 1}`,
+                        result: { columns: x.columns.map(c => c.name), rows: x.rows },
+                      }))} />}
               </div>
             </div>
           )}

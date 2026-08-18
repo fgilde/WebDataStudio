@@ -6,6 +6,7 @@ import type { StatementResult } from "../query/resultStore";
 import { CellValue } from "./CellValue";
 import { CellViewerModal, type CellRef } from "./CellViewerModal";
 import { summarizeSelection } from "./aggregate";
+import { GroupedTable } from "./GroupedTable";
 
 const ROW_HEIGHT = 24;
 
@@ -20,6 +21,7 @@ export function ResultGrid({ result, onSelectionChange }: {
   const [hidden, setHidden] = useState<Set<number>>(new Set());
   const [selected, setSelected] = useState<{ row: number; col: number }[]>([]);
   const [viewing, setViewing] = useState<CellRef | null>(null);
+  const [groupBy, setGroupBy] = useState<number | null>(null);
 
   const visibleColumns = result.columns
     .map((c, index) => ({ ...c, index }))
@@ -86,6 +88,11 @@ export function ResultGrid({ result, onSelectionChange }: {
         </Text>
       </Group>
 
+      {groupBy !== null ? (
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <GroupedTable columns={visibleColumns} rows={rows} groupBy={groupBy} />
+        </div>
+      ) : (
       <div ref={parentRef} style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
         <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--mantine-color-default)" }}>
@@ -113,6 +120,10 @@ export function ResultGrid({ result, onSelectionChange }: {
                         <TextInput size="xs" placeholder="Filter" value={filters[c.index] ?? ""}
                           onChange={e => setFilters(f => ({ ...f, [c.index]: e.currentTarget.value }))} />
                       </Menu.Item>
+                      <Menu.Divider />
+                      <Menu.Item onClick={() => setGroupBy(c.index)}>Group by this column</Menu.Item>
+                      <Menu.Item disabled={groupBy === null}
+                        onClick={() => setGroupBy(null)}>Clear grouping</Menu.Item>
                       <Menu.Divider />
                       <Menu.Item onClick={() => setHidden(h => new Set(h).add(c.index))}>Hide column</Menu.Item>
                       <Menu.Item onClick={() => setHidden(new Set())}>Show all columns</Menu.Item>
@@ -154,6 +165,7 @@ export function ResultGrid({ result, onSelectionChange }: {
           </tbody>
         </table>
       </div>
+      )}
 
       {selected.length > 0 && (
         <Group gap={12} px={8} py={2} style={{ borderTop: "1px solid var(--mantine-color-default-border)" }}>

@@ -38,7 +38,12 @@ public class AuthOptionsTests
 public class AuthEndpointTests : IDisposable
 {
     private readonly string _dir = Directory.CreateTempSubdirectory("wds-auth").FullName;
-    public void Dispose() => Directory.Delete(_dir, recursive: true);
+
+    public void Dispose()
+    {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        Directory.Delete(_dir, recursive: true);
+    }
 
     private WebApplicationFactory<Program> Factory(params (string Key, string Value)[] env) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
@@ -55,7 +60,7 @@ public class AuthEndpointTests : IDisposable
         Assert.True(body!.Anonymous);
     }
 
-    [Fact(Skip = "enabled in Task 5")]
+    [Fact]
     public async Task Protected_endpoint_is_open_when_anonymous()
     {
         using var factory = Factory();
@@ -64,7 +69,7 @@ public class AuthEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    [Fact(Skip = "enabled in Task 5")]
+    [Fact]
     public async Task Protected_endpoint_returns_401_without_login()
     {
         using var factory = Factory(("WDS_USER", "admin"), ("WDS_PASSWORD", "s3cret"));
@@ -73,7 +78,7 @@ public class AuthEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    [Fact(Skip = "enabled in Task 5")]
+    [Fact]
     public async Task Login_with_correct_credentials_grants_access()
     {
         var ct = TestContext.Current.CancellationToken;

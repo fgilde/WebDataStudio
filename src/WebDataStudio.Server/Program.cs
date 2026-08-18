@@ -26,6 +26,20 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
+// Same reason as AuthOptions: DB_PATH is only final once the host has composed its configuration.
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var dbPath = config["DB_PATH"] ?? "/data/webdatastudio.db";
+    var dataDir = Path.GetDirectoryName(Path.GetFullPath(dbPath))!;
+    Directory.CreateDirectory(dataDir);
+    return new SecretProtector(dataDir, config["WDS_SECRET_KEY"]);
+});
+builder.Services.AddSingleton(sp => new ConnectionStore(
+    sp.GetRequiredService<IConfiguration>()["DB_PATH"] ?? "/data/webdatastudio.db",
+    sp.GetRequiredService<SecretProtector>()));
+builder.Services.AddSingleton<ConnectionRegistry>();
+
 var app = builder.Build();
 
 app.MapOpenApi();
@@ -59,6 +73,7 @@ app.Use(async (ctx, next) =>
 });
 
 app.MapAuthEndpoints();
+app.MapConnectionEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();

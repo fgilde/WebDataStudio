@@ -14,12 +14,19 @@ RUN dotnet publish src/WebDataStudio.Server -c Release -o /app
 # ---- runtime --------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 
-# Backup and restore shell out to the engines' own dump tools. mongodb-database-tools comes
-# from MongoDB's own repository; the others are in Debian. Missing tools are reported by the
+# Backup and restore shell out to the engines' own dump tools. pg_dump refuses to dump a server
+# newer than itself, so PostgreSQL's client comes from PostgreSQL's own repository rather than
+# Debian's older package; mongodb-database-tools likewise. A missing tool is reported by the
 # backup endpoint rather than crashing it, so a slimmer image still runs.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        postgresql-client default-mysql-client redis-tools ca-certificates curl gnupg \
+        default-mysql-client redis-tools ca-certificates curl gnupg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt \
+$(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-18 \
     && curl -fsSL https://pgp.mongodb.com/server-8.0.asc \
         | gpg --dearmor -o /usr/share/keyrings/mongodb.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/mongodb.gpg] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" \

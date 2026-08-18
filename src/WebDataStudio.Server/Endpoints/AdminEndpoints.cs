@@ -210,15 +210,24 @@ public static class AdminEndpoints
                     ctx.Response.Headers.ContentDisposition =
                         $"attachment; filename=\"backup-{DateTimeOffset.UtcNow:yyyyMMdd-HHmm}.{plan.Extension}\"";
 
+                    // A tool that fails before writing anything — a version mismatch, a refused
+                    // login — would otherwise arrive as an empty 200 that looks like an empty
+                    // database. Count the bytes so that case can still become a real error.
+                    await using var counted = new CountingStream(ctx.Response.Body);
                     var result = await ProcessRunner.RunAsync(plan.File, plan.Arguments, plan.Environment,
-                        ctx.Response.Body, ct);
+                        counted, ct);
 
-                    // The response has already started, so a late failure can only be logged.
-                    if (result.ExitCode != 0)
-                        app.Logger.LogWarning("backup tool {Tool} exited with {Code}: {Error}",
-                            plan.File, result.ExitCode, result.StandardError);
+                    if (result.ExitCode == 0) return Results.Empty;
 
-                    return Results.Empty;
+                    app.Logger.LogWarning("backup tool {Tool} exited with {Code}: {Error}",
+                        plan.File, result.ExitCode, result.StandardError);
+
+                    if (counted.Written > 0) return Results.Empty; // truncated, but already sent
+
+                    return Results.Json(new
+                    {
+                        message = $"{plan.File} failed: {result.StandardError.Trim()}",
+                    }, statusCode: 502);
                 }
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }

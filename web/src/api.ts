@@ -161,3 +161,34 @@ export const lookupValues = (conn: string, ref: string, column: string, search?:
   return fetch(`${base}/data/${conn}/${encodeURIComponent(ref)}/lookup?${query}`)
     .then(r => ok<LookupItemDto[]>(r));
 };
+
+export interface PlanNodeDto {
+  operation: string; detail: string | null;
+  estimatedCost: number | null; estimatedRows: number | null;
+  actualRows: number | null; actualMs: number | null;
+  children: PlanNodeDto[]; warnings: string[];
+}
+export interface FindingDto {
+  category: string; severity: string; title: string; detail: string; statement: string | null;
+}
+export interface AnalyzeResultDto {
+  plan: PlanNodeDto | null;
+  summary: { totalCost: number | null; maxNodeCost: number; nodeCount: number } | null;
+  planError: string | null;
+  findings: FindingDto[];
+}
+export interface ServerStatsDto {
+  metrics: { name: string; value: string; detail: string | null }[];
+  blocking: { sessionId: string; blockedBy: string; query: string; waitMs: number }[];
+}
+
+export const analyzeQuery = (connectionId: string, sql: string, actual = false): Promise<AnalyzeResultDto> =>
+  fetch(`${base}/query/analyze`, json("POST", { connectionId, sql, actual }))
+    .then(r => ok<AnalyzeResultDto>(r));
+
+export const healthReport = (connectionId: string, schema?: string): Promise<{ findings: FindingDto[] }> =>
+  fetch(`${base}/analyze/${connectionId}${schema ? `?schema=${encodeURIComponent(schema)}` : ""}`)
+    .then(r => ok<{ findings: FindingDto[] }>(r));
+
+export const serverStats = (connectionId: string): Promise<ServerStatsDto> =>
+  fetch(`${base}/stats/${connectionId}`).then(r => ok<ServerStatsDto>(r));

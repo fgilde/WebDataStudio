@@ -190,6 +190,10 @@ public sealed class MySqlDriver : AdoDriverBase
             triggers, rows, size, comment, null);
     }
 
+    public override Task<AnalyzeReport> AnalyzeAsync(IDbSession session, AnalyzeScope scope,
+        SchemaNodeRef? target, CancellationToken ct) =>
+        Analysis.MySqlAnalyzer.RunAsync(session, target?.Path.FirstOrDefault(), ct);
+
     public override async Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct)
     {
         // MySQL 8 returns a tree; ANALYZE adds measured timings.

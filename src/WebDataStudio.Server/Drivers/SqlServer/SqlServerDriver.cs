@@ -17,7 +17,9 @@ public sealed class SqlServerDriver : AdoDriverBase
         Sql = true, MultiSchema = true, MultiDatabase = true, Transactions = true, Ddl = true,
         EstimatedPlan = true, ActualPlan = true, StoredProcedures = true, Triggers = true,
         Views = true, Sequences = true, ForeignKeys = true, PartialIndexes = true,
-        IncludeColumns = true, Backup = true, Restore = true, UserManagement = true,
+        // BACKUP DATABASE writes to the server's own disk. RESTORE needs exclusive access to the
+        // database and the file already sitting there, so we do not offer it.
+        IncludeColumns = true, Backup = true, UserManagement = true,
         SessionList = true, KillSession = true, ServerStats = true, SlowQueryLog = true,
         SystemCommands = true,
     };

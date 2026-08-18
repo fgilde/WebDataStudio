@@ -43,6 +43,7 @@ interface ShellState {
   exportQuery: (connectionId: string, sql: string) => void;
   followForeignKey: (from: DataTabState, fk: ForeignKeyDto, value: unknown) => void;
   runStatement: (connectionId: string, sql: string) => void;
+  openData: (connectionId: string, objectRef: string, tableName: string) => void;
 }
 
 const ShellContext = createContext<ShellState | null>(null);
@@ -128,7 +129,8 @@ function HistoryDockPanel() {
 }
 
 function DiagramDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
-  return <DiagramPanel connectionId={props.params.connectionId} />;
+  const shell = useShell();
+  return <DiagramPanel connectionId={props.params.connectionId} onOpenTable={shell.openData} />;
 }
 
 function AdminDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
@@ -375,7 +377,7 @@ export function DockShell() {
   }, []);
 
   return (
-    <ShellContext.Provider value={{ selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement }}>
+    <ShellContext.Provider value={{ selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement, openData }}>
       <div style={{ display: "flex", height: "100%" }}>
         <div style={{
           width: 280, flexShrink: 0, display: "flex", flexDirection: "column",

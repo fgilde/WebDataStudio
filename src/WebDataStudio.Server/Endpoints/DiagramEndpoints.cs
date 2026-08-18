@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Memory;
 using WebDataStudio.Server.Ddl;
 using WebDataStudio.Server.Services;
 
@@ -9,15 +10,24 @@ public static class DiagramEndpoints
 {
     public static void MapDiagramEndpoints(this WebApplication app)
     {
-        app.MapGet("/api/diagram/{conn}", async (string conn, string? schema, SessionFactory factory,
-            CancellationToken ct) =>
+        app.MapGet("/api/diagram/{conn}", async (string conn, string? schema, bool? refresh,
+            SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
         {
             try
             {
                 var (driver, session) = await factory.OpenAsync(conn, ct);
                 await using (session)
                 {
-                    var tables = await CompareEndpoints.ReadSchemaAsync(driver, session, schema, ct);
+                    // Describing 200 tables is expensive and the shape rarely moves; a short cache
+                    // keeps panning and schema switching instant. The reload button bypasses it.
+                    var key = $"diagram:{conn}:{schema}";
+                    if (refresh == true) cache.Remove(key);
+
+                    var tables = await cache.GetOrCreateAsync(key, async entry =>
+                    {
+                        entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60);
+                        return await CompareEndpoints.ReadSchemaAsync(driver, session, schema, ct);
+                    }) ?? [];
                     var names = tables.Select(Qualified).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
                     var nodes = tables.Select(t => new

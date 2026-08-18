@@ -234,10 +234,15 @@ export interface DiagramEdgeDto {
   sourceColumns: string[]; targetColumns: string[]; resolved: boolean;
 }
 
-export const loadDiagram = (conn: string, schema?: string):
-  Promise<{ nodes: DiagramNodeDto[]; edges: DiagramEdgeDto[] }> =>
-  fetch(`${base}/diagram/${conn}${schema ? `?schema=${encodeURIComponent(schema)}` : ""}`)
+export const loadDiagram = (conn: string, schema?: string, refresh = false):
+  Promise<{ nodes: DiagramNodeDto[]; edges: DiagramEdgeDto[] }> => {
+  const query = new URLSearchParams();
+  if (schema) query.set("schema", schema);
+  if (refresh) query.set("refresh", "true");
+
+  return fetch(`${base}/diagram/${conn}${query.size ? `?${query}` : ""}`)
     .then(r => ok<{ nodes: DiagramNodeDto[]; edges: DiagramEdgeDto[] }>(r));
+};
 
 // --- administration ----------------------------------------------------------
 export interface SystemCommandDto {

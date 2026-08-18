@@ -36,6 +36,13 @@ describe("layout", () => {
     expect(placed).toHaveLength(1);
   });
 
+  it("survives a self-referencing foreign key", () => {
+    // A tree table pointing at its own parent column is a normal schema, not a cycle bug.
+    const placed = layout([table("categories")], [edge("categories", "categories")]);
+    expect(placed).toHaveLength(1);
+    expect(Number.isFinite(placed[0].x)).toBe(true);
+  });
+
   it("grows the box with the column count but caps it", () => {
     expect(heightOf(table("a", 3))).toBeLessThan(heightOf(table("a", 10)));
     expect(heightOf(table("a", 40))).toEqual(heightOf(table("a", 18)));

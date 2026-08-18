@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using WebDataStudio.Server.Drivers;
 using WebDataStudio.Server.Endpoints;
 using WebDataStudio.Server.Services;
 
@@ -39,6 +40,9 @@ builder.Services.AddSingleton(sp => new ConnectionStore(
     sp.GetRequiredService<IConfiguration>()["DB_PATH"] ?? "/data/webdatastudio.db",
     sp.GetRequiredService<SecretProtector>()));
 builder.Services.AddSingleton<ConnectionRegistry>();
+builder.Services.AddSingleton<DriverRegistry>();
+builder.Services.AddSingleton<SessionFactory>();
+builder.Services.AddSingleton<QueryRunner>();
 
 var app = builder.Build();
 
@@ -74,6 +78,8 @@ app.Use(async (ctx, next) =>
 
 app.MapAuthEndpoints();
 app.MapConnectionEndpoints();
+app.MapSchemaEndpoints();
+app.MapQueryEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();

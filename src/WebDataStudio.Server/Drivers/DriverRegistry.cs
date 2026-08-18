@@ -1,5 +1,10 @@
 using WebDataStudio.Server.Drivers.Abstractions;
+using WebDataStudio.Server.Drivers.ClickHouse;
+using WebDataStudio.Server.Drivers.DuckDb;
 using WebDataStudio.Server.Drivers.MySql;
+using WebDataStudio.Server.Drivers.MongoDb;
+using WebDataStudio.Server.Drivers.Oracle;
+using WebDataStudio.Server.Drivers.Redis;
 using WebDataStudio.Server.Drivers.PostgreSql;
 using WebDataStudio.Server.Drivers.Sqlite;
 using WebDataStudio.Server.Drivers.SqlServer;
@@ -18,6 +23,11 @@ public sealed class DriverRegistry
             new MySqlDriver(),
             new SqlServerDriver(),
             new SqliteDriver(),
+            new OracleDriver(),
+            new DuckDbDriver(),
+            new ClickHouseDriver(),
+            new MongoDbDriver(),
+            new RedisDriver(),
         ];
         _drivers = drivers.ToDictionary(d => d.Info.Id, StringComparer.OrdinalIgnoreCase);
     }

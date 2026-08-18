@@ -10,7 +10,12 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="ClickHouse.Client" />
+    <PackageReference Include="DuckDB.NET.Data.Full" />
     <PackageReference Include="MiniExcel" />
+    <PackageReference Include="MongoDB.Driver" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" />
+    <PackageReference Include="StackExchange.Redis" />
     <PackageReference Include="MySqlConnector" />
     <PackageReference Include="Parquet.Net" />
     <PackageReference Include="Npgsql" />

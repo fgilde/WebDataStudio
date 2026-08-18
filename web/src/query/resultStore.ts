@@ -6,6 +6,8 @@ export interface StatementResult {
   index: number;
   columns: QueryColumn[];
   rows: unknown[][];
+  /// Non-SQL engines answer with documents; a statement carries either rows or documents.
+  documents: unknown[];
   rowsAffected: number | null;
   elapsedMs: number | null;
   rowsRead: number;
@@ -25,7 +27,7 @@ export interface ResultState {
 export const createResultState = (): ResultState => ({ statements: [], messages: [], cancelled: false });
 
 const empty = (index: number): StatementResult => ({
-  index, columns: [], rows: [], rowsAffected: null, elapsedMs: null,
+  index, columns: [], rows: [], documents: [], rowsAffected: null, elapsedMs: null,
   rowsRead: 0, truncated: false, error: null, running: true,
 });
 
@@ -44,6 +46,10 @@ export function applyChunk(state: ResultState, chunk: QueryChunk): ResultState {
     case "rows":
       target.rows = target.rows.concat(chunk.rows);
       target.rowsRead = target.rows.length;
+      break;
+    case "documents":
+      target.documents = target.documents.concat(chunk.documents);
+      target.rowsRead = target.documents.length;
       break;
     case "progress":
       target.rowsRead = chunk.rowsRead;

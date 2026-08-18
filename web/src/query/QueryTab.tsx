@@ -10,10 +10,12 @@ import type { DialectId } from "../sql/splitStatements";
 
 export interface QueryTabState { connectionId: string; dialect: DialectId; sql: string }
 
-export function QueryTab({ tabId, connectionId, dialect, initialSql = "", onSqlChange, onOpenObject, onExport }: {
+export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", initialSql = "",
+  onSqlChange, onOpenObject, onExport }: {
   tabId: string;
   connectionId: string;
   dialect: DialectId;
+  engine?: string;
   initialSql?: string;
   // Must be referentially stable: this fires on every keystroke, and an inline closure here would
   // re-run the reporting effect on every render and loop through the parent's state.
@@ -85,6 +87,7 @@ export function QueryTab({ tabId, connectionId, dialect, initialSql = "", onSqlC
 
       <div style={{ flex: 1, minHeight: 100 }}>
         <QueryEditor value={sql} dialect={dialect} connectionId={connectionId} error={firstError}
+          language={engine === "mongodb" ? "javascript" : engine === "redis" ? "plaintext" : "sql"}
           onChange={setSql} onRun={execute} onRunAll={execute} onOpenObject={onOpenObject} />
       </div>
       <div style={{

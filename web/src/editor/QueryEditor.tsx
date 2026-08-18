@@ -8,9 +8,13 @@ import { formatSql } from "./formatSql";
 import { statementAt, type DialectId } from "../sql/splitStatements";
 import type { QueryError } from "../query/resultStore";
 
-export function QueryEditor({ value, dialect, connectionId, error, onChange, onRun, onRunAll, onOpenObject }: {
+export function QueryEditor({ value, dialect, language = "sql", connectionId, error,
+  onChange, onRun, onRunAll, onOpenObject }: {
   value: string;
   dialect: DialectId;
+  /// Non-SQL engines get a different editor language: MongoDB commands read as JavaScript, Redis
+  /// commands are plain text. Everything else in the tab stays the same.
+  language?: "sql" | "javascript" | "plaintext";
   connectionId: string;
   error: QueryError | null;
   onChange: (sql: string) => void;
@@ -27,7 +31,7 @@ export function QueryEditor({ value, dialect, connectionId, error, onChange, onR
     configureMonaco();
 
     const instance = monaco.editor.create(host.current, {
-      value, language: "sql", theme: current.monaco,
+      value, language, theme: current.monaco,
       automaticLayout: true, minimap: { enabled: false },
       fontSize: 13, scrollBeyondLastLine: false, renderWhitespace: "selection",
       tabSize: 2,
@@ -49,8 +53,9 @@ export function QueryEditor({ value, dialect, connectionId, error, onChange, onR
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
-  useActiveStatement(editor, dialect);
-  useSqlLanguageFeatures(connectionId, dialect, onOpenObject);
+  // Statement highlighting and schema completion only make sense for SQL.
+  useActiveStatement(language === "sql" ? editor : null, dialect);
+  useSqlLanguageFeatures(language === "sql" ? connectionId : "", dialect, onOpenObject);
 
   useEffect(() => { markErrors(editor, error); }, [editor, error]);
 

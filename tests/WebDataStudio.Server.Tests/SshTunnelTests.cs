@@ -99,8 +99,10 @@ public class SshTunnelTests(JumpHostFixture fixture) : IClassFixture<JumpHostFix
         var store = new ConnectionStore(Path.Combine(directory, "wds.db"), protector);
         var stored = store.Add(spec);
 
-        var registry = new ConnectionRegistry(new ConfigurationBuilder().Build(), store);
-        return (new SessionFactory(registry, new DriverRegistry(), tunnels), stored.Id);
+        var config = new ConfigurationBuilder().Build();
+        var registry = new ConnectionRegistry(config, store);
+        return (new SessionFactory(registry, new DriverRegistry(), tunnels, new SessionPool(config)),
+            stored.Id);
     }
 
     [Fact]

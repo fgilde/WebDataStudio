@@ -47,6 +47,7 @@ builder.Services.AddSingleton(sp => new ConnectionStore(
 builder.Services.AddSingleton<ConnectionRegistry>();
 builder.Services.AddSingleton<DriverRegistry>();
 builder.Services.AddSingleton<TunnelManager>();
+builder.Services.AddSingleton(sp => new SessionPool(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<SessionFactory>();
 builder.Services.AddSingleton<QueryRunner>();
 builder.Services.AddSingleton<ExporterRegistry>();

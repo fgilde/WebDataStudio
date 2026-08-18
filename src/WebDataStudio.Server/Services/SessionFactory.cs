@@ -22,14 +22,20 @@ internal sealed class TunnelledSession(
     }
 }
 
-public sealed class SessionFactory(ConnectionRegistry registry, DriverRegistry drivers, TunnelManager tunnels)
+public sealed class SessionFactory(
+    ConnectionRegistry registry, DriverRegistry drivers, TunnelManager tunnels, SessionPool pool)
 {
     public async Task<(IDbDriver Driver, IDbSession Session)> OpenAsync(string connectionId, CancellationToken ct)
     {
         var spec = registry.Find(connectionId) ?? throw new UnknownConnectionException(connectionId);
         var driver = drivers.Get(spec.Engine);
 
-        if (spec.Tunnel is not { } tunnel) return (driver, await driver.OpenAsync(spec, ct));
+        return (driver, await pool.RentAsync(connectionId, token => OpenRawAsync(spec, driver, token), ct));
+    }
+
+    private async Task<IDbSession> OpenRawAsync(ConnectionSpec spec, IDbDriver driver, CancellationToken ct)
+    {
+        if (spec.Tunnel is not { } tunnel) return await driver.OpenAsync(spec, ct);
 
         var (host, port) = ConnectionEndpoint.Of(spec.Engine, spec.ConnectionString);
         var local = tunnels.Ensure(tunnel, host, port);
@@ -46,7 +52,7 @@ public sealed class SessionFactory(ConnectionRegistry registry, DriverRegistry d
         try
         {
             var session = await driver.OpenAsync(tunnelled, ct);
-            return (driver, new TunnelledSession(session, tunnels, tunnel, host, port));
+            return new TunnelledSession(session, tunnels, tunnel, host, port);
         }
         catch (Exception)
         {

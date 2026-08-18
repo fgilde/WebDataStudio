@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { DockviewReact } from "dockview-react";
 import type { DockviewApi, DockviewReadyEvent, DockviewGroupPanel, IDockviewPanelProps } from "dockview-react";
 import { ActionIcon, Group, Text, Tooltip } from "@mantine/core";
-import { IconHistory, IconSquarePlus } from "@tabler/icons-react";
+import { IconHistory, IconSettingsCog, IconSitemap, IconSquarePlus, IconGitCompare } from "@tabler/icons-react";
 import "dockview-react/dist/styles/dockview.css";
 import "../editor/dockview-mantine.css";
 import { useAppTheme } from "../ThemeProvider";
@@ -13,6 +13,9 @@ import { DataTab } from "../data/DataTab";
 import { HistoryPanel } from "../query/HistoryPanel";
 import { PlanPanel, HealthReportPanel } from "../plan/PlanPanel";
 import { TableDesigner } from "../designer/TableDesigner";
+import { DiagramPanel } from "../diagram/DiagramPanel";
+import { AdminPanel } from "../admin/AdminPanel";
+import { ComparePanel } from "../compare/ComparePanel";
 import { describeObject, listConnections, loadTabs, saveTabs, type Connection, type ForeignKeyDto } from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
@@ -40,6 +43,7 @@ interface ShellState {
   exportQuery: (connectionId: string, sql: string) => void;
   followForeignKey: (from: DataTabState, fk: ForeignKeyDto, value: unknown) => void;
   runStatement: (connectionId: string, sql: string) => void;
+  openData: (connectionId: string, objectRef: string, tableName: string) => void;
 }
 
 const ShellContext = createContext<ShellState | null>(null);
@@ -124,6 +128,19 @@ function HistoryDockPanel() {
   return <HistoryPanel onOpen={() => { /* opening into a tab lands in P9's command palette work */ }} />;
 }
 
+function DiagramDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+  const shell = useShell();
+  return <DiagramPanel connectionId={props.params.connectionId} onOpenTable={shell.openData} />;
+}
+
+function AdminDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+  return <AdminPanel connectionId={props.params.connectionId} />;
+}
+
+function CompareDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+  return <ComparePanel connectionId={props.params.connectionId} />;
+}
+
 function WelcomePanel() {
   return (
     <Text size="sm" c="dimmed" p="md">
@@ -135,6 +152,7 @@ function WelcomePanel() {
 const components = {
   structure: StructurePanel, query: QueryPanel, history: HistoryDockPanel, welcome: WelcomePanel,
   data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel, designer: DesignerPanel,
+  diagram: DiagramDockPanel, admin: AdminDockPanel, compare: CompareDockPanel,
 };
 
 export function DockShell() {
@@ -344,8 +362,22 @@ export function DockShell() {
 
   const activeConnection = selection?.connectionId ?? connections[0]?.id ?? "";
 
+  // One panel per tool and connection: clicking the button again focuses the panel that is
+  // already open instead of stacking duplicates.
+  const openTool = useCallback((component: string, title: string, connectionId: string) => {
+    if (!connectionId) return;
+    const id = `${component}:${connectionId}`;
+    const existing = api.current?.getPanel(id);
+    if (existing) { existing.api.setActive(); return; }
+
+    api.current?.addPanel({
+      id, component, title, params: { connectionId },
+      position: centerGroup.current ? { referenceGroup: centerGroup.current } : undefined,
+    });
+  }, []);
+
   return (
-    <ShellContext.Provider value={{ selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement }}>
+    <ShellContext.Provider value={{ selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement, openData }}>
       <div style={{ display: "flex", height: "100%" }}>
         <div style={{
           width: 280, flexShrink: 0, display: "flex", flexDirection: "column",
@@ -364,6 +396,24 @@ export function DockShell() {
                 <ActionIcon size="sm" variant="subtle" aria-label="History"
                   onClick={() => api.current?.getPanel("history")?.api.setActive()}>
                   <IconHistory size={15} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Diagram">
+                <ActionIcon size="sm" variant="subtle" aria-label="Diagram" disabled={!activeConnection}
+                  onClick={() => openTool("diagram", "Diagram", activeConnection)}>
+                  <IconSitemap size={15} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Compare">
+                <ActionIcon size="sm" variant="subtle" aria-label="Compare" disabled={!activeConnection}
+                  onClick={() => openTool("compare", "Compare", activeConnection)}>
+                  <IconGitCompare size={15} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label="Administration">
+                <ActionIcon size="sm" variant="subtle" aria-label="Administration" disabled={!activeConnection}
+                  onClick={() => openTool("admin", "Admin", activeConnection)}>
+                  <IconSettingsCog size={15} />
                 </ActionIcon>
               </Tooltip>
             </Group>

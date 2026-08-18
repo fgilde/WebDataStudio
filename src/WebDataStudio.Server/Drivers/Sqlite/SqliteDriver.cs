@@ -12,6 +12,9 @@ public sealed class SqliteDriver : AdoDriverBase
     {
         Sql = true, Transactions = true, Ddl = true, Views = true, Triggers = true,
         ForeignKeys = true, PartialIndexes = true, EstimatedPlan = true, SystemCommands = true,
+        // VACUUM INTO makes a consistent copy without any external tool. Restoring means replacing
+        // the file underneath an open connection, so that stays off.
+        Backup = true,
     };
 
     public override SqlDialect Dialect { get; } = new SqliteDialect();

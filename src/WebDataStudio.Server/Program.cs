@@ -1,9 +1,14 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using WebDataStudio.Server.Drivers;
 using WebDataStudio.Server.Endpoints;
 using WebDataStudio.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
+
+// Enums travel as their names: "Table", not 8. The SPA switches on these strings.
+builder.Services.ConfigureHttpJsonOptions(o =>
+    o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 
 // Resolved from DI rather than from builder.Configuration: configuration sources added by a host
 // builder (WebApplicationFactory in tests, and anything layered on later) only land in the composed
@@ -39,6 +44,9 @@ builder.Services.AddSingleton(sp => new ConnectionStore(
     sp.GetRequiredService<IConfiguration>()["DB_PATH"] ?? "/data/webdatastudio.db",
     sp.GetRequiredService<SecretProtector>()));
 builder.Services.AddSingleton<ConnectionRegistry>();
+builder.Services.AddSingleton<DriverRegistry>();
+builder.Services.AddSingleton<SessionFactory>();
+builder.Services.AddSingleton<QueryRunner>();
 
 var app = builder.Build();
 
@@ -74,6 +82,8 @@ app.Use(async (ctx, next) =>
 
 app.MapAuthEndpoints();
 app.MapConnectionEndpoints();
+app.MapSchemaEndpoints();
+app.MapQueryEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();

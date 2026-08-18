@@ -1,3 +1,4 @@
+using WebDataStudio.Server.Drivers;
 using WebDataStudio.Server.Models;
 using WebDataStudio.Server.Services;
 
@@ -57,9 +58,23 @@ public static class ConnectionEndpoints
             return Results.NoContent();
         });
 
-        // P0 can only validate the shape; P1 replaces the body with a real driver probe.
-        api.MapPost("/test", (ConnectionRequest body) =>
-            Validate(body) ?? Results.Ok(new { ok = true, message = "connection definition is valid" }));
+        api.MapPost("/test", async (ConnectionRequest body, DriverRegistry drivers, CancellationToken ct) =>
+        {
+            if (Validate(body) is { } error) return error;
+            try
+            {
+                var driver = drivers.Get(body.Engine);
+                var spec = new ConnectionSpec("probe", body.Name, body.Engine, body.ConnectionString,
+                    true, null, null, ConnectionSource.Stored);
+                await using var session = await driver.OpenAsync(spec, ct);
+                return Results.Ok(new { ok = true, message = $"connected to {driver.Info.Label}" });
+            }
+            catch (Exception e)
+            {
+                // A failed probe is information, not a server fault: 200 with ok=false keeps the form simple.
+                return Results.Ok(new { ok = false, message = e.Message });
+            }
+        });
     }
 
     private static IResult EnvironmentIsReadOnly() =>

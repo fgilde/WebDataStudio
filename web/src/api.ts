@@ -52,3 +52,34 @@ export const deleteConnection = (id: string): Promise<void> =>
   fetch(`${base}/connections/${id}`, { method: "DELETE" }).then(r => ok<void>(r));
 export const testConnection = (body: ConnectionInput): Promise<{ ok: boolean; message: string }> =>
   fetch(`${base}/connections/test`, json("POST", body)).then(r => ok<{ ok: boolean; message: string }>(r));
+
+export interface SchemaNodeDto {
+  ref: string; kind: string; label: string; hasChildren: boolean; detail: string | null;
+}
+export interface ColumnDto {
+  name: string; dataType: string; nullable: boolean; default: string | null;
+  isPrimaryKey: boolean; isIdentity: boolean; comment: string | null; position: number;
+}
+export interface IndexDto { name: string; columns: string[]; unique: boolean; primary: boolean; filter: string | null }
+export interface ForeignKeyDto {
+  name: string; columns: string[]; referencedSchema: string; referencedTable: string;
+  referencedColumns: string[]; onDelete: string; onUpdate: string;
+}
+export interface TriggerDto { name: string; timing: string; event: string }
+export interface ObjectDetailDto {
+  columns: ColumnDto[]; indexes: IndexDto[]; foreignKeys: ForeignKeyDto[]; triggers: TriggerDto[];
+  rowCount: number | null; sizeBytes: number | null; comment: string | null; ddl: string | null;
+}
+export interface DriverDto {
+  info: { id: string; label: string; defaultPort: number; connectionStringTemplate: string };
+  caps: Record<string, boolean>;
+}
+
+export const listDrivers = (): Promise<DriverDto[]> => fetch(`${base}/drivers`).then(r => ok<DriverDto[]>(r));
+
+export const listSchema = (conn: string, parent?: string): Promise<SchemaNodeDto[]> =>
+  fetch(parent ? `${base}/schema/${conn}?parent=${encodeURIComponent(parent)}` : `${base}/schema/${conn}`)
+    .then(r => ok<SchemaNodeDto[]>(r));
+
+export const describeObject = (conn: string, ref: string): Promise<ObjectDetailDto> =>
+  fetch(`${base}/schema/${conn}/object/${encodeURIComponent(ref)}`).then(r => ok<ObjectDetailDto>(r));

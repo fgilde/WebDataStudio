@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 260" width="1000" height="260"
+     role="img" aria-label="WebDataStudio">
+  <defs>
+    <linearGradient id="lcyl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2b9bff"/>
+      <stop offset="100%" stop-color="#5b4bff"/>
+    </linearGradient>
+    <linearGradient id="lword" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2b8cff"/>
+      <stop offset="45%" stop-color="#22d3c5"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(20,40)">
+    <ellipse cx="58" cy="18" rx="58" ry="18" fill="url(#lcyl)"/>
+    <path d="M0 18v36a58 18 0 0 0 116 0V18a58 18 0 0 1-116 0z" fill="url(#lcyl)"/>
+    <path d="M0 64v36a58 18 0 0 0 116 0V64a58 18 0 0 1-116 0z" fill="url(#lcyl)"/>
+    <path d="M0 110v36a58 18 0 0 0 116 0v-36a58 18 0 0 1-116 0z" fill="url(#lcyl)"/>
+  </g>
+
+  <g transform="translate(96,58)">
+    <rect width="180" height="150" rx="12" fill="#1b2340" stroke="#2c3a63" stroke-width="2"/>
+    <rect width="180" height="24" rx="12" fill="#232c4e"/>
+    <rect y="12" width="180" height="12" fill="#232c4e"/>
+    <circle cx="20" cy="12" r="5" fill="#ef4444"/>
+    <circle cx="38" cy="12" r="5" fill="#f5c451"/>
+    <circle cx="56" cy="12" r="5" fill="#3ecf6b"/>
+
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13">
+      <text x="12" y="48" fill="#22d3c5">SELECT <tspan fill="#e6ecff">*</tspan></text>
+      <text x="12" y="68" fill="#22d3c5">FROM <tspan fill="#e6ecff">users</tspan></text>
+      <text x="12" y="88" fill="#22d3c5">WHERE <tspan fill="#e6ecff">active = </tspan><tspan fill="#c084fc">1;</tspan></text>
+    </g>
+
+    <g fill="#2b3559">
+      <rect x="12" y="100" width="40" height="11" rx="3"/>
+      <rect x="58" y="100" width="40" height="11" rx="3" fill="#22d3c5"/>
+      <rect x="104" y="100" width="40" height="11" rx="3" fill="#a855f7"/>
+      <rect x="12" y="118" width="40" height="8" rx="2"/>
+      <rect x="58" y="118" width="40" height="8" rx="2"/>
+      <rect x="104" y="118" width="40" height="8" rx="2"/>
+      <rect x="12" y="132" width="40" height="8" rx="2"/>
+      <rect x="58" y="132" width="40" height="8" rx="2"/>
+      <rect x="104" y="132" width="40" height="8" rx="2"/>
+    </g>
+  </g>
+
+  <text x="310" y="172" fill="url(#lword)"
+        font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="108" font-weight="800">
+    WebDataStudio
+  </text>
+</svg>

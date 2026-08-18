@@ -6,6 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- Set by the release workflow. A desktop build stores its data next to the binary and
+       opens a browser on start; the container build does neither. -->
+  <ItemGroup Condition="'$(WdsDesktop)' == 'true'">
+    <RuntimeHostConfigurationOption Include="Wds.Desktop" Value="true" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.Data.Sqlite" />

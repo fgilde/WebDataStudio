@@ -1,0 +1,109 @@
+name: Release binaries
+
+# Self-contained desktop builds of the same server. Run it and it opens a browser tab; the
+# container image stays the primary way to deploy WebDataStudio.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runtime: win-x64
+            os: windows-latest
+            archive: zip
+          - runtime: win-arm64
+            os: windows-latest
+            archive: zip
+          - runtime: linux-x64
+            os: ubuntu-latest
+            archive: tar
+          - runtime: linux-arm64
+            os: ubuntu-latest
+            archive: tar
+          - runtime: osx-x64
+            os: macos-latest
+            archive: tar
+          - runtime: osx-arm64
+            os: macos-latest
+            archive: tar
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+        working-directory: web
+      - run: npm run build
+        working-directory: web
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Self-contained so the download needs no .NET on the machine. Trimming stays off: the
+      # database drivers reach for types through reflection.
+      - name: Publish
+        run: >
+          dotnet publish src/WebDataStudio.Server
+          -c Release
+          -r ${{ matrix.runtime }}
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true
+          -p:WdsDesktop=true
+          -o publish/${{ matrix.runtime }}
+
+      - name: Default to opening a browser
+        shell: bash
+        run: |
+          cat > publish/${{ matrix.runtime }}/README.txt <<'TXT'
+          WebDataStudio — desktop build
+
+          Start the binary and it serves the studio on http://localhost:8080 and opens your
+          browser. Everything it stores lives next to the binary in ./data.
+
+          Set WDS_OPEN_BROWSER=false to keep the browser closed, ASPNETCORE_URLS to listen
+          somewhere else, and WDS_CONN_<NAME> to attach a connection at startup.
+          TXT
+
+      - name: Archive (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: Compress-Archive -Path publish/${{ matrix.runtime }}/* -DestinationPath webdatastudio-${{ matrix.runtime }}.zip
+
+      - name: Archive (tar)
+        if: matrix.archive == 'tar'
+        run: tar -czf webdatastudio-${{ matrix.runtime }}.tar.gz -C publish/${{ matrix.runtime }} .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: webdatastudio-${{ matrix.runtime }}
+          path: webdatastudio-${{ matrix.runtime }}.*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

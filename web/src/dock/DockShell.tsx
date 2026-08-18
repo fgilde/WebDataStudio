@@ -9,20 +9,27 @@ import { useAppTheme } from "../ThemeProvider";
 import { ExplorerTree, type ExplorerAction, type ExplorerSelection } from "../explorer/ExplorerTree";
 import { ObjectDetailPanel } from "../explorer/ObjectDetailPanel";
 import { QueryTab } from "../query/QueryTab";
+import { DataTab } from "../data/DataTab";
 import { HistoryPanel } from "../query/HistoryPanel";
-import { describeObject, listConnections, loadTabs, saveTabs, type Connection } from "../api";
+import { describeObject, listConnections, loadTabs, saveTabs, type Connection, type ForeignKeyDto } from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
 import type { DialectId } from "../sql/splitStatements";
 
 interface TabState { id: string; connectionId: string; dialect: DialectId; title: string; sql: string }
 
+interface DataTabState {
+  id: string; connectionId: string; objectRef: string; tableName: string; foreignKeys: ForeignKeyDto[];
+}
+
 interface ShellState {
   selection: ExplorerSelection | null;
   tabs: TabState[];
+  dataTabs: DataTabState[];
   updateSql: (id: string, sql: string) => void;
   openObject: (ref: string) => void;
   exportQuery: (connectionId: string, sql: string) => void;
+  followForeignKey: (from: DataTabState, fk: ForeignKeyDto, value: unknown) => void;
 }
 
 const ShellContext = createContext<ShellState | null>(null);
@@ -61,6 +68,21 @@ function QueryPanel(props: IDockviewPanelProps<{ tabId: string }>) {
   );
 }
 
+function DataPanel(props: IDockviewPanelProps<{ tabId: string }>) {
+  const shell = useShell();
+  const tab = shell.dataTabs.find(t => t.id === props.params.tabId);
+  if (!tab) return <Text size="xs" c="dimmed" p="xs">This tab is gone.</Text>;
+
+  return (
+    <DataTab
+      connectionId={tab.connectionId}
+      objectRef={tab.objectRef}
+      tableName={tab.tableName}
+      foreignKeys={tab.foreignKeys}
+      onFollowForeignKey={(fk, value) => shell.followForeignKey(tab, fk, value)} />
+  );
+}
+
 function HistoryDockPanel() {
   return <HistoryPanel onOpen={() => { /* opening into a tab lands in P9's command palette work */ }} />;
 }
@@ -75,6 +97,7 @@ function WelcomePanel() {
 
 const components = {
   structure: StructurePanel, query: QueryPanel, history: HistoryDockPanel, welcome: WelcomePanel,
+  data: DataPanel,
 };
 
 export function DockShell() {
@@ -82,6 +105,7 @@ export function DockShell() {
   const [selection, setSelection] = useState<ExplorerSelection | null>(null);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [tabs, setTabs] = useState<TabState[]>([]);
+  const [dataTabs, setDataTabs] = useState<DataTabState[]>([]);
   const api = useRef<DockviewApi | null>(null);
   const centerGroup = useRef<DockviewGroupPanel | null>(null);
   const restored = useRef(false);
@@ -165,6 +189,27 @@ export function DockShell() {
     return () => clearTimeout(timer);
   }, [tabs]);
 
+  const openData = useCallback(async (connectionId: string, objectRef: string, tableName: string) => {
+    const detail = await describeObject(connectionId, objectRef).catch(() => null);
+    const tab: DataTabState = {
+      id: "d" + Date.now().toString(36),
+      connectionId, objectRef, tableName,
+      foreignKeys: detail?.foreignKeys ?? [],
+    };
+    setDataTabs(list => [...list, tab]);
+    api.current?.addPanel({
+      id: tab.id, component: "data", title: tableName, params: { tabId: tab.id },
+      position: centerGroup.current ? { referenceGroup: centerGroup.current } : undefined,
+    });
+  }, []);
+
+  // Following a foreign key lands on the referenced row itself, not on the whole table.
+  const followForeignKey = useCallback((from: DataTabState, fk: ForeignKeyDto, value: unknown) => {
+    const literal = typeof value === "number" ? String(value) : "'" + String(value).replace(/'/g, "''") + "'";
+    newTab(from.connectionId,
+      "SELECT * FROM " + fk.referencedTable + " WHERE " + fk.referencedColumns[0] + " = " + literal);
+  }, [newTab]);
+
   // Qualifies an object the way its engine expects, so a generated SELECT runs as-is.
   const qualify = useCallback((connectionId: string, ref: string) => {
     const parsed = ref.split(":", 2)[1]?.split("/") ?? [];
@@ -177,6 +222,10 @@ export function DockShell() {
     const name = qualify(s.connectionId, s.node.ref);
 
     switch (action) {
+      case "open-data":
+        await openData(s.connectionId, s.node.ref, s.node.label);
+        break;
+
       case "new-query":
         newTab(s.connectionId, `SELECT * FROM ${name}`);
         break;
@@ -216,7 +265,7 @@ export function DockShell() {
       default:
         setSelection(s);
     }
-  }, [newTab, qualify]);
+  }, [newTab, openData, qualify]);
 
   const exportQuery = useCallback((connectionId: string, sql: string) =>
     setExportTarget({ connectionId, sql, defaultName: "result", scopes: ["result"] }), []);
@@ -224,7 +273,7 @@ export function DockShell() {
   const activeConnection = selection?.connectionId ?? connections[0]?.id ?? "";
 
   return (
-    <ShellContext.Provider value={{ selection, tabs, updateSql, openObject, exportQuery }}>
+    <ShellContext.Provider value={{ selection, tabs, dataTabs, updateSql, openObject, exportQuery, followForeignKey }}>
       <div style={{ display: "flex", height: "100%" }}>
         <div style={{
           width: 280, flexShrink: 0, display: "flex", flexDirection: "column",

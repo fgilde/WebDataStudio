@@ -119,3 +119,45 @@ export interface ExportFormatDto {
 
 export const listExportFormats = (): Promise<ExportFormatDto[]> =>
   fetch(`${base}/export/formats`).then(r => ok<ExportFormatDto[]>(r));
+
+export interface DataPageDto {
+  columns: { name: string; dataType: string; nullable: boolean }[];
+  rows: unknown[][];
+  editable: boolean;
+  keyColumns: string[];
+  reason: string | null;
+  totalEstimate: number | null;
+  offset: number;
+  limit: number;
+}
+export interface ChangePreviewDto {
+  hash: string; script: string; statementCount: number; destructive: boolean;
+}
+export interface LookupItemDto { value: unknown; label: unknown }
+
+export const browseData = (conn: string, ref: string,
+  params: { offset?: number; limit?: number; sort?: string; desc?: boolean;
+            filterColumn?: string; filter?: string } = {}): Promise<DataPageDto> => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params))
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  const suffix = query.toString();
+  return fetch(`${base}/data/${conn}/${encodeURIComponent(ref)}${suffix ? `?${suffix}` : ""}`)
+    .then(r => ok<DataPageDto>(r));
+};
+
+export const previewChanges = (conn: string, ref: string, changes: unknown[]): Promise<ChangePreviewDto> =>
+  fetch(`${base}/data/${conn}/${encodeURIComponent(ref)}/preview-changes`, json("POST", { changes }))
+    .then(r => ok<ChangePreviewDto>(r));
+
+export const applyChanges = (conn: string, ref: string, hash: string): Promise<void> =>
+  fetch(`${base}/data/${conn}/${encodeURIComponent(ref)}/apply-changes`, json("POST", { hash }))
+    .then(r => ok<void>(r));
+
+export const lookupValues = (conn: string, ref: string, column: string, search?: string):
+  Promise<LookupItemDto[]> => {
+  const query = new URLSearchParams({ column });
+  if (search) query.set("search", search);
+  return fetch(`${base}/data/${conn}/${encodeURIComponent(ref)}/lookup?${query}`)
+    .then(r => ok<LookupItemDto[]>(r));
+};

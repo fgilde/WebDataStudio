@@ -393,3 +393,8 @@ export const updateSavedQuery = (id: string, body: {
 
 export const deleteSavedQuery = (id: string): Promise<void> =>
   fetch(`${base}/saved-queries/${id}`, { method: "DELETE" }).then(r => ok<void>(r));
+
+export interface SlowQueryDto { query: string; calls: number; totalMs: number; meanMs: number }
+
+export const slowQueries = (conn: string): Promise<SlowQueryDto[]> =>
+  fetch(`${base}/stats/${conn}/slow-queries`).then(r => ok<SlowQueryDto[]>(r));

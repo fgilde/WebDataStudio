@@ -7,7 +7,8 @@ import { IconPlayerStop, IconRefresh, IconTrash } from "@tabler/icons-react";
 import {
   applyUserChange, createDatabase, downloadBackup, dropDatabase, killSession, listDatabases,
   listSessions, listUsers, previewUserChange, restoreBackup, runSystemCommand, serverLog,
-  systemCommands, type DatabaseDto, type SessionDto, type SystemCommandDto,
+  slowQueries, systemCommands, serverStats,
+  type DatabaseDto, type SessionDto, type SystemCommandDto,
 } from "../api";
 
 /// Every tab here is allowed to be empty or unavailable: the server tells us which of these an
@@ -331,6 +332,90 @@ function Backup({ connectionId, database }: { connectionId: string; database: st
   );
 }
 
+function SlowQueries({ connectionId }: { connectionId: string }) {
+  const { data, error, busy, reload } = useAsync(() => slowQueries(connectionId), [connectionId]);
+
+  if (busy) return <Loader size="xs" m="sm" />;
+  if (error) return <Alert color="yellow" variant="light" m="xs">{error}</Alert>;
+  if (!data?.length)
+    return (
+      <Text size="xs" c="dimmed" p="xs">
+        No slow-query source on this engine, or the extension that provides it is not installed.
+      </Text>
+    );
+
+  return (
+    <Stack gap={4} p="xs">
+      <ActionIcon size="sm" variant="subtle" aria-label="Reload slow queries" onClick={reload}>
+        <IconRefresh size={15} />
+      </ActionIcon>
+      <ScrollArea h={340}>
+        <Table striped fz="xs" stickyHeader>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>Query</Table.Th><Table.Th w={80}>Calls</Table.Th>
+              <Table.Th w={110}>Total ms</Table.Th><Table.Th w={110}>Mean ms</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {data.map((entry, index) => (
+              <Table.Tr key={index}>
+                <Table.Td style={{ fontFamily: "monospace" }}>{entry.query}</Table.Td>
+                <Table.Td>{entry.calls}</Table.Td>
+                <Table.Td>{Math.round(entry.totalMs)}</Table.Td>
+                <Table.Td>{Math.round(entry.meanMs * 100) / 100}</Table.Td>
+              </Table.Tr>
+            ))}
+          </Table.Tbody>
+        </Table>
+      </ScrollArea>
+    </Stack>
+  );
+}
+
+function ServerMetrics({ connectionId }: { connectionId: string }) {
+  const { data, error, busy, reload } = useAsync(() => serverStats(connectionId), [connectionId]);
+
+  if (busy) return <Loader size="xs" m="sm" />;
+  if (error) return <Alert color="yellow" variant="light" m="xs">{error}</Alert>;
+
+  return (
+    <Stack gap={4} p="xs">
+      <ActionIcon size="sm" variant="subtle" aria-label="Reload metrics" onClick={reload}>
+        <IconRefresh size={15} />
+      </ActionIcon>
+      <Table striped fz="xs">
+        <Table.Tbody>
+          {data?.metrics.map(metric => (
+            <Table.Tr key={metric.name}>
+              <Table.Td>{metric.name}</Table.Td>
+              <Table.Td>{metric.value}</Table.Td>
+              <Table.Td><Text size="10px" c="dimmed">{metric.detail}</Text></Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+
+      {data?.blocking.length ? (
+        <>
+          <Text size="xs" fw={600}>Blocking chains</Text>
+          <Table striped fz="xs">
+            <Table.Tbody>
+              {data.blocking.map((entry, index) => (
+                <Table.Tr key={index}>
+                  <Table.Td>{entry.sessionId} blocked by {entry.blockedBy}</Table.Td>
+                  <Table.Td>{entry.waitMs} ms</Table.Td>
+                  <Table.Td style={{ fontFamily: "monospace" }}>{entry.query.slice(0, 80)}</Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </>
+      ) : null}
+    </Stack>
+  );
+}
+
 function Logs({ connectionId }: { connectionId: string }) {
   const { data, error, busy, reload } = useAsync(() => serverLog(connectionId), [connectionId]);
 
@@ -362,6 +447,8 @@ export function AdminPanel({ connectionId, database = "" }: { connectionId: stri
         <Tabs.Tab value="databases">Databases</Tabs.Tab>
         <Tabs.Tab value="users">Users</Tabs.Tab>
         <Tabs.Tab value="backup">Backup</Tabs.Tab>
+        <Tabs.Tab value="metrics">Metrics</Tabs.Tab>
+        <Tabs.Tab value="slow">Slow queries</Tabs.Tab>
         <Tabs.Tab value="logs">Log</Tabs.Tab>
       </Tabs.List>
 
@@ -370,6 +457,8 @@ export function AdminPanel({ connectionId, database = "" }: { connectionId: stri
       <Tabs.Panel value="databases"><Databases connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="users"><Users connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="backup"><Backup connectionId={connectionId} database={database} /></Tabs.Panel>
+      <Tabs.Panel value="metrics"><ServerMetrics connectionId={connectionId} /></Tabs.Panel>
+      <Tabs.Panel value="slow"><SlowQueries connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="logs"><Logs connectionId={connectionId} /></Tabs.Panel>
     </Tabs>
   );

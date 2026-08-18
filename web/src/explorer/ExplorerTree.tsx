@@ -6,7 +6,10 @@ import { nodeIcon } from "./nodeIcons";
 
 export interface ExplorerSelection { connectionId: string; node: SchemaNodeDto }
 
-export type ExplorerAction = "select" | "design" | "new-table" | "open-data" | "new-query" | "copy-name" | "show-ddl" | "export" | "import" | "copy-table";
+export type ExplorerAction =
+  | "select" | "design" | "new-table" | "open-data" | "new-query" | "copy-name" | "show-ddl"
+  | "export" | "import" | "copy-table" | "rename"
+  | "script-insert" | "script-update" | "script-delete" | "script-truncate" | "script-drop";
 
 // Actions that only make sense on a real object, not on a folder.
 const OBJECT_KINDS = ["Table", "View", "MaterializedView"];
@@ -17,6 +20,14 @@ const CONTEXT_ITEMS: { action: ExplorerAction; label: string }[] = [
   { action: "show-ddl", label: "Show DDL" },
   { action: "design", label: "Design table…" },
   { action: "new-table", label: "New table here…" },
+  { action: "rename", label: "Rename…" },
+  { action: "script-insert", label: "Script: INSERT" },
+  { action: "script-update", label: "Script: UPDATE" },
+  { action: "script-delete", label: "Script: DELETE" },
+  // Destructive statements are written into a query tab rather than run from a menu: one
+  // mis-click must never drop a table.
+  { action: "script-truncate", label: "Script: TRUNCATE" },
+  { action: "script-drop", label: "Script: DROP" },
   { action: "copy-name", label: "Copy name" },
   { action: "export", label: "Export…" },
   { action: "import", label: "Import into this table…" },

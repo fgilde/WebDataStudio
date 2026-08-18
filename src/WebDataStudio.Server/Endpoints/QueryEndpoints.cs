@@ -7,7 +7,7 @@ namespace WebDataStudio.Server.Endpoints;
 public static class QueryEndpoints
 {
     public record ExecuteRequest(string ConnectionId, string Sql, int? MaxRows, int? TimeoutSeconds,
-        string? Schema, Dictionary<string, string?>? Parameters);
+        string? Schema, Dictionary<string, string?>? Parameters, bool? Transactional = null);
 
     public record PlanRequest(string ConnectionId, string Sql, string Mode);
 
@@ -41,7 +41,8 @@ public static class QueryEndpoints
             ctx.Response.ContentType = "application/x-ndjson";
 
             var request = new ScriptRequest(body.Sql, body.MaxRows ?? defaultMaxRows,
-                body.TimeoutSeconds ?? defaultTimeout, body.Schema, body.Parameters);
+                body.TimeoutSeconds ?? defaultTimeout, body.Schema, body.Parameters,
+                body.Transactional ?? false);
 
             await using (session)
             {

@@ -39,30 +39,57 @@ public abstract class AdoDriverBase : IDbDriver
         ct.ThrowIfCancellationRequested();
         var statements = StatementSplitter.Split(request.Sql, Dialect);
 
-        for (var index = 0; index < statements.Count; index++)
+        // One transaction around the whole script: a failing statement halfway through leaves
+        // nothing behind, which is what "run this migration" needs.
+        var transaction = request.Transactional && Caps.Transactions
+            ? await session.Connection.BeginTransactionAsync(ct)
+            : null;
+
+        var failed = false;
+
+        try
         {
-            var statement = statements[index];
-
-            if (session.Spec.ReadOnly && !Dialect.IsReadOnlyStatement(statement.Text))
+            for (var index = 0; index < statements.Count; index++)
             {
-                yield return new ResultChunk.Error(index,
-                    "this connection is read-only; the statement was not executed", "WDS_READONLY", null, null);
-                yield break;
-            }
+                var statement = statements[index];
 
-            await foreach (var chunk in RunOneAsync(session, statement.Text, index, request, ct))
-                yield return chunk;
+                if (session.Spec.ReadOnly && !Dialect.IsReadOnlyStatement(statement.Text))
+                {
+                    failed = true;
+                    yield return new ResultChunk.Error(index,
+                        "this connection is read-only; the statement was not executed", "WDS_READONLY", null, null);
+                    yield break;
+                }
+
+                await foreach (var chunk in RunOneAsync(session, statement.Text, index, request, transaction, ct))
+                {
+                    if (chunk is ResultChunk.Error) failed = true;
+                    yield return chunk;
+                }
+
+                if (failed && transaction is not null) yield break;
+            }
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                if (failed) await transaction.RollbackAsync(CancellationToken.None);
+                else await transaction.CommitAsync(CancellationToken.None);
+                await transaction.DisposeAsync();
+            }
         }
     }
 
     private async IAsyncEnumerable<ResultChunk> RunOneAsync(
         IDbSession session, string sql, int index, ScriptRequest request,
-        [EnumeratorCancellation] CancellationToken ct)
+        DbTransaction? transaction, [EnumeratorCancellation] CancellationToken ct)
     {
         var watch = Stopwatch.StartNew();
         var command = session.Connection.CreateCommand();
         command.CommandText = sql;
         command.CommandTimeout = request.TimeoutSeconds;
+        command.Transaction = transaction;
         AddParameters(command, request.Parameters);
 
         DbDataReader? reader = null;

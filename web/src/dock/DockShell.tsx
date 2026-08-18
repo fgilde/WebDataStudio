@@ -26,7 +26,11 @@ import { CommandPalette, ShortcutsHelp } from "../shell/CommandPalette";
 import { LayoutPresetsModal } from "../shell/LayoutPresets";
 import { buildCommands } from "../shell/commands";
 import { buildDeepLink, parseDeepLink } from "../shell/deepLink";
-import { describeObject, listConnections, loadTabs, saveTabs, type Connection, type ForeignKeyDto } from "../api";
+import { GoToObject } from "../shell/GoToObject";
+import {
+  applyDdl, describeObject, listConnections, loadTabs, previewRename, saveTabs,
+  type Connection, type ForeignKeyDto,
+} from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
 import type { DialectId } from "../sql/splitStatements";
@@ -243,6 +247,7 @@ export function DockShell() {
   const [snippetsOpen, setSnippetsOpen] = useState(false);
   const [layoutsOpen, setLayoutsOpen] = useState(false);
   const [explorerNonce, setExplorerNonce] = useState(0);
+  const [gotoOpen, setGotoOpen] = useState(false);
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, []);
 
@@ -374,6 +379,53 @@ export function DockShell() {
         await navigator.clipboard.writeText(name);
         break;
 
+      case "rename": {
+        const next = window.prompt(`Rename ${s.node.label} to`, s.node.label);
+        if (!next || next === s.node.label) break;
+
+        const preview = await previewRename(s.connectionId, s.node.ref, next).catch(e => {
+          window.alert(e.message);
+          return null;
+        });
+
+        // The dependency list is the point of the prompt: a rename can break a view.
+        if (preview && window.confirm(
+          `${preview.script}
+
+Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
+          await applyDdl(s.connectionId, preview.hash).catch(e => window.alert(e.message));
+        break;
+      }
+
+      case "script-insert":
+      case "script-update":
+      case "script-delete":
+      case "script-truncate":
+      case "script-drop": {
+        const detail = await describeObject(s.connectionId, s.node.ref).catch(() => null);
+        const columns = detail?.columns.map(c => c.name) ?? [];
+        const keys = detail?.columns.filter(c => c.isPrimaryKey).map(c => c.name) ?? [];
+        const where = (keys.length > 0 ? keys : columns.slice(0, 1))
+          .map(c => `${c} = ?`).join(" AND ") || "1 = 0";
+
+        const assignments = columns.filter(c => !keys.includes(c))
+          .map(c => `${c} = ?`).join(",\n       ");
+
+        const script =
+          action === "script-insert"
+            ? `INSERT INTO ${name} (${columns.join(", ")})\nVALUES (${columns.map(() => "?").join(", ")});`
+            : action === "script-update"
+              ? `UPDATE ${name}\n   SET ${assignments}\n WHERE ${where};`
+              : action === "script-delete"
+                ? `DELETE FROM ${name}\n WHERE ${where};`
+                : action === "script-truncate"
+                  ? `-- review before running\nTRUNCATE TABLE ${name};`
+                  : `-- review before running\nDROP TABLE ${name};`;
+
+        newTab(s.connectionId, script);
+        break;
+      }
+
       case "show-ddl": {
         const detail = await describeObject(s.connectionId, s.node.ref).catch(() => null);
         // Engines that do not hand out DDL still get something useful: the column list as a comment.
@@ -447,6 +499,7 @@ export function DockShell() {
     openConnections: () => { window.location.hash = "#/connections"; },
     addConnection: () => { window.location.hash = "#/connections?add=1"; },
     refreshExplorer: () => setExplorerNonce(n => n + 1),
+    goToObject: () => setGotoOpen(true),
     openDiagram: () => openTool("diagram", "Diagram", activeConnection),
     openHealth: () => api.current?.getPanel("health")?.api.setActive(),
     openAdmin: () => openTool("admin", "Admin", activeConnection),
@@ -481,6 +534,11 @@ export function DockShell() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setPaletteOpen(true);
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "o") {
+        event.preventDefault();
+        setGotoOpen(true);
         return;
       }
       if (event.key === "?" && !typing) {
@@ -587,6 +645,8 @@ export function DockShell() {
       <CopyTableDialog source={copySource} connections={connections}
         onClose={() => setCopySource(null)} />
 
+      <GoToObject connectionId={activeConnection} opened={gotoOpen} onClose={() => setGotoOpen(false)}
+        onPick={table => openData(activeConnection, table.ref, table.name)} />
       <CommandPalette commands={commands} opened={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ShortcutsHelp commands={commands} opened={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <SnippetManager opened={snippetsOpen} onClose={() => setSnippetsOpen(false)} />

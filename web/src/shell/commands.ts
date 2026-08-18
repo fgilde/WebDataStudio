@@ -15,6 +15,7 @@ export interface CommandContext {
   openConnections: () => void;
   addConnection: () => void;
   refreshExplorer: () => void;
+  goToObject: () => void;
   openDiagram: () => void;
   openHealth: () => void;
   openAdmin: () => void;
@@ -47,6 +48,7 @@ export function buildCommands(context: CommandContext): Command[] {
     { id: "connection.manage", label: "Open connection manager", group: "Connections", run: context.openConnections },
     { id: "connection.add", label: "Add connection", group: "Connections", run: context.addConnection },
     { id: "explorer.refresh", label: "Refresh explorer", group: "Connections", shortcut: "F6", run: context.refreshExplorer },
+    { id: "explorer.goto", label: "Go to object", group: "Connections", shortcut: "Ctrl+Shift+O", run: context.goToObject },
 
     { id: "tool.diagram", label: "Open ER diagram", group: "Tools", shortcut: "Ctrl+D", run: context.openDiagram },
     { id: "tool.health", label: "Open health report", group: "Tools", run: context.openHealth },

@@ -5,7 +5,11 @@ import {
 import {
   IconArrowRight, IconCopyPlus, IconDeviceFloppy, IconPlus, IconRestore, IconTrash, IconWand,
 } from "@tabler/icons-react";
-import { browseData, type DataPageDto, type ForeignKeyDto } from "../api";
+import { browseData, lookupValues, type DataPageDto, type ForeignKeyDto } from "../api";
+
+/// The referenced table as a schema node reference; an unqualified name means the same schema.
+const refOf = (fk: ForeignKeyDto) =>
+  `Table:${fk.referencedSchema ? `${fk.referencedSchema}/` : ""}${fk.referencedTable}`;
 import { CellValue } from "../grid/CellValue";
 import { EditableCell } from "../grid/editing/EditableCell";
 import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
@@ -149,6 +153,8 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                           state={changeSet.cellState(rowIndex, c.name)}
                           editable={page.editable}
                           boolean={isBoolean(c.dataType)}
+                          lookup={fk ? text => lookupValues(
+                            connectionId, refOf(fk), fk.referencedColumns[0], text) : undefined}
                           onCommit={value => changeSet.edit(rowIndex, c.name, value)} />
                         {fk && onFollowForeignKey && (
                           <Tooltip label={`Go to ${fk.referencedTable}`}>

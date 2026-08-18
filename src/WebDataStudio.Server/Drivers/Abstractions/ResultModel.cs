@@ -22,7 +22,10 @@ public sealed record ScriptRequest(
     int MaxRows,
     int TimeoutSeconds,
     string? Schema = null,
-    IReadOnlyDictionary<string, string?>? Parameters = null);
+    IReadOnlyDictionary<string, string?>? Parameters = null,
+    /// Runs the whole script inside one transaction: it commits when every statement
+    /// succeeded and rolls back on the first failure. Off is the engines' own auto-commit.
+    bool Transactional = false);
 
 public enum PlanMode { Estimated, Actual }
 

@@ -29,10 +29,14 @@ $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" > /etc/apt/sources.lis
     && apt-get install -y --no-install-recommends postgresql-client-18 \
     && curl -fsSL https://pgp.mongodb.com/server-8.0.asc \
         | gpg --dearmor -o /usr/share/keyrings/mongodb.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/mongodb.gpg] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/mongodb.gpg] \
+https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" \
         > /etc/apt/sources.list.d/mongodb.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends mongodb-database-tools \
+    # MongoDB does not publish the tools for every architecture. A missing tool is reported by
+    # the backup endpoint, so the image is still worth building without them.
+    && (apt-get install -y --no-install-recommends mongodb-database-tools \
+        || echo "mongodb-database-tools are not available for $(dpkg --print-architecture)") \
     && apt-get purge -y gnupg \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*

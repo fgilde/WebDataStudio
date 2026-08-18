@@ -127,6 +127,10 @@ public sealed class SqliteDriver : AdoDriverBase
         return new ObjectDetail(target, columns, indexes, foreignKeys, [], rowCount, null, null, ddl);
     }
 
+    public override Task<AnalyzeReport> AnalyzeAsync(IDbSession session, AnalyzeScope scope,
+        SchemaNodeRef? target, CancellationToken ct) =>
+        Analysis.SqliteAnalyzer.RunAsync(session, ct);
+
     public override async Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct)
     {
         if (mode == PlanMode.Actual)

@@ -200,6 +200,10 @@ public sealed class PostgreSqlDriver : AdoDriverBase
         return new ObjectDetail(target, columns, indexes, foreignKeys, triggers, rows, size, comment, null);
     }
 
+    public override Task<AnalyzeReport> AnalyzeAsync(IDbSession session, AnalyzeScope scope,
+        SchemaNodeRef? target, CancellationToken ct) =>
+        Analysis.PostgreSqlAnalyzer.RunAsync(session, target?.Path.FirstOrDefault(), ct);
+
     public override async Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct)
     {
         var prefix = mode == PlanMode.Actual

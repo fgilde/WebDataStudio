@@ -232,6 +232,10 @@ public sealed class SqlServerDriver : AdoDriverBase
             triggers, rows, size, null, null);
     }
 
+    public override Task<AnalyzeReport> AnalyzeAsync(IDbSession session, AnalyzeScope scope,
+        SchemaNodeRef? target, CancellationToken ct) =>
+        Analysis.SqlServerAnalyzer.RunAsync(session, target?.Path.FirstOrDefault(), ct);
+
     public override async Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct)
     {
         // SHOWPLAN_XML returns the estimated plan without executing; STATISTICS XML executes and

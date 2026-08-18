@@ -11,6 +11,7 @@ import { ObjectDetailPanel } from "../explorer/ObjectDetailPanel";
 import { QueryTab } from "../query/QueryTab";
 import { DataTab } from "../data/DataTab";
 import { HistoryPanel } from "../query/HistoryPanel";
+import { PlanPanel, HealthReportPanel } from "../plan/PlanPanel";
 import { describeObject, listConnections, loadTabs, saveTabs, type Connection, type ForeignKeyDto } from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
@@ -30,6 +31,7 @@ interface ShellState {
   openObject: (ref: string) => void;
   exportQuery: (connectionId: string, sql: string) => void;
   followForeignKey: (from: DataTabState, fk: ForeignKeyDto, value: unknown) => void;
+  runStatement: (connectionId: string, sql: string) => void;
 }
 
 const ShellContext = createContext<ShellState | null>(null);
@@ -83,6 +85,24 @@ function DataPanel(props: IDockviewPanelProps<{ tabId: string }>) {
   );
 }
 
+function PlanDockPanel() {
+  const shell = useShell();
+  // The plan follows whichever query tab is active; without one there is nothing to explain.
+  const tab = shell.tabs[shell.tabs.length - 1];
+  if (!tab) return <Text size="xs" c="dimmed" p="xs">Open a query tab to explain a statement.</Text>;
+
+  return <PlanPanel connectionId={tab.connectionId} sql={tab.sql}
+    onRunStatement={statement => shell.runStatement(tab.connectionId, statement)} />;
+}
+
+function HealthDockPanel() {
+  const shell = useShell();
+  const connectionId = shell.selection?.connectionId ?? shell.tabs[0]?.connectionId;
+  if (!connectionId) return <Text size="xs" c="dimmed" p="xs">Select a connection first.</Text>;
+
+  return <HealthReportPanel connectionId={connectionId} />;
+}
+
 function HistoryDockPanel() {
   return <HistoryPanel onOpen={() => { /* opening into a tab lands in P9's command palette work */ }} />;
 }
@@ -97,7 +117,7 @@ function WelcomePanel() {
 
 const components = {
   structure: StructurePanel, query: QueryPanel, history: HistoryDockPanel, welcome: WelcomePanel,
-  data: DataPanel,
+  data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel,
 };
 
 export function DockShell() {
@@ -161,9 +181,18 @@ export function DockShell() {
       initialWidth: 340,
     });
     event.api.addPanel({
+      id: "plan", component: "plan", title: "Plan",
+      position: { referencePanel: structure.id, direction: "within" },
+    });
+    event.api.addPanel({
+      id: "health", component: "health", title: "Health",
+      position: { referencePanel: structure.id, direction: "within" },
+    });
+    event.api.addPanel({
       id: "history", component: "history", title: "History",
       position: { referencePanel: structure.id, direction: "below" },
     });
+    event.api.getPanel("structure")?.api.setActive();
 
     welcome.api.setActive();
   };
@@ -267,13 +296,15 @@ export function DockShell() {
     }
   }, [newTab, openData, qualify]);
 
+  const runStatement = useCallback((connectionId: string, sql: string) => newTab(connectionId, sql), [newTab]);
+
   const exportQuery = useCallback((connectionId: string, sql: string) =>
     setExportTarget({ connectionId, sql, defaultName: "result", scopes: ["result"] }), []);
 
   const activeConnection = selection?.connectionId ?? connections[0]?.id ?? "";
 
   return (
-    <ShellContext.Provider value={{ selection, tabs, dataTabs, updateSql, openObject, exportQuery, followForeignKey }}>
+    <ShellContext.Provider value={{ selection, tabs, dataTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement }}>
       <div style={{ display: "flex", height: "100%" }}>
         <div style={{
           width: 280, flexShrink: 0, display: "flex", flexDirection: "column",

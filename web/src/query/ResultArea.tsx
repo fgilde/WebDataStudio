@@ -4,6 +4,7 @@ import { IconAlertTriangle, IconCopy, IconDownload, IconTable } from "@tabler/ic
 import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
 import { ResultGrid } from "../grid/ResultGrid";
 import { RowFormView } from "../grid/RowFormView";
+import { DocumentResultArea } from "../documents/DocumentResultArea";
 import type { ResultState } from "./resultStore";
 
 export function ResultArea({ result, onExport }: {
@@ -46,6 +47,8 @@ export function ResultArea({ result, onExport }: {
               {s.error.text}
               {s.error.line !== null && <> (line {s.error.line}{s.error.column !== null && `, column ${s.error.column}`})</>}
             </Text>
+          ) : s.documents.length > 0 ? (
+            <DocumentResultArea documents={s.documents} elapsedMs={s.elapsedMs} />
           ) : s.columns.length === 0 ? (
             <Text size="xs" p="xs" c="dimmed">
               {s.rowsAffected !== null ? `${s.rowsAffected} rows affected` : "statement executed"}

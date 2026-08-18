@@ -3,6 +3,7 @@ export interface QueryColumn { name: string; dataType: string; nullable: boolean
 export type QueryChunk =
   | { type: "columns"; statement: number; columns: QueryColumn[] }
   | { type: "rows"; statement: number; rows: unknown[][] }
+  | { type: "documents"; statement: number; documents: unknown[] }
   | { type: "progress"; statement: number; rowsRead: number; elapsedMs: number }
   | { type: "message"; statement: number; severity: string; text: string }
   | { type: "end"; statement: number; rowsAffected: number; elapsedMs: number; truncated: boolean }

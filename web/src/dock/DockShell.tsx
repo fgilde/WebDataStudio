@@ -18,7 +18,9 @@ import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
 import type { DialectId } from "../sql/splitStatements";
 
-interface TabState { id: string; connectionId: string; dialect: DialectId; title: string; sql: string }
+interface TabState {
+  id: string; connectionId: string; dialect: DialectId; engine: string; title: string; sql: string;
+}
 
 interface DesignerTabState {
   id: string; connectionId: string; objectRef?: string; schema: string; title: string;
@@ -69,6 +71,7 @@ function QueryPanel(props: IDockviewPanelProps<{ tabId: string }>) {
       tabId={tab.id}
       connectionId={tab.connectionId}
       dialect={tab.dialect}
+      engine={tab.engine}
       initialSql={seed.current}
       onSqlChange={shell.updateSql}
       onOpenObject={shell.openObject}
@@ -177,6 +180,7 @@ export function DockShell() {
       id: `q${Date.now().toString(36)}`,
       connectionId: connection.id,
       dialect: dialectFor(connection.engine),
+      engine: connection.engine,
       title: `${connection.name} · query`,
       sql,
     };

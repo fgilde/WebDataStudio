@@ -98,6 +98,7 @@ public static class QueryEndpoints
     {
         ResultChunk.Columns c => new { type = "columns", statement = c.Statement, columns = c.Items },
         ResultChunk.Rows r => new { type = "rows", statement = r.Statement, rows = r.Items },
+        ResultChunk.Documents d => new { type = "documents", statement = d.Statement, documents = d.Items },
         ResultChunk.Progress p => new { type = "progress", statement = p.Statement, rowsRead = p.RowsRead, elapsedMs = p.ElapsedMs },
         ResultChunk.Message m => new { type = "message", statement = m.Statement, severity = m.Severity, text = m.Text },
         ResultChunk.End e => new { type = "end", statement = e.Statement, rowsAffected = e.RowsAffected, elapsedMs = e.ElapsedMs, truncated = e.Truncated },

@@ -6,6 +6,11 @@ public abstract record ResultChunk(int Statement)
 {
     public sealed record Columns(int Statement, IReadOnlyList<ColumnMeta> Items) : ResultChunk(Statement);
     public sealed record Rows(int Statement, IReadOnlyList<object?[]> Items) : ResultChunk(Statement);
+
+    /// Non-SQL engines answer with documents, not rows. The client renders them as a JSON tree and
+    /// can flatten them into a table when they happen to be flat.
+    public sealed record Documents(int Statement, IReadOnlyList<System.Text.Json.JsonElement> Items)
+        : ResultChunk(Statement);
     public sealed record Progress(int Statement, long RowsRead, long ElapsedMs) : ResultChunk(Statement);
     public sealed record Message(int Statement, string Severity, string Text) : ResultChunk(Statement);
     public sealed record End(int Statement, long RowsAffected, long ElapsedMs, bool Truncated) : ResultChunk(Statement);

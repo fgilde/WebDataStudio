@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ActionIcon, Badge, Group, Loader, Popover, Stack, Text, TextInput, UnstyledButton } from "@mantine/core";
 import { IconChevronDown, IconChevronRight, IconRefresh, IconSearch } from "@tabler/icons-react";
 import { listConnections, listSchema, type Connection, type SchemaNodeDto } from "../api";
@@ -6,7 +6,10 @@ import { nodeIcon } from "./nodeIcons";
 
 export interface ExplorerSelection { connectionId: string; node: SchemaNodeDto }
 
-export type ExplorerAction = "select" | "design" | "new-table" | "open-data" | "new-query" | "copy-name" | "show-ddl" | "export" | "import" | "copy-table";
+export type ExplorerAction =
+  | "select" | "design" | "new-table" | "open-data" | "new-query" | "copy-name" | "show-ddl"
+  | "export" | "import" | "copy-table" | "rename"
+  | "script-insert" | "script-update" | "script-delete" | "script-truncate" | "script-drop";
 
 // Actions that only make sense on a real object, not on a folder.
 const OBJECT_KINDS = ["Table", "View", "MaterializedView"];
@@ -17,6 +20,14 @@ const CONTEXT_ITEMS: { action: ExplorerAction; label: string }[] = [
   { action: "show-ddl", label: "Show DDL" },
   { action: "design", label: "Design table…" },
   { action: "new-table", label: "New table here…" },
+  { action: "rename", label: "Rename…" },
+  { action: "script-insert", label: "Script: INSERT" },
+  { action: "script-update", label: "Script: UPDATE" },
+  { action: "script-delete", label: "Script: DELETE" },
+  // Destructive statements are written into a query tab rather than run from a menu: one
+  // mis-click must never drop a table.
+  { action: "script-truncate", label: "Script: TRUNCATE" },
+  { action: "script-drop", label: "Script: DROP" },
   { action: "copy-name", label: "Copy name" },
   { action: "export", label: "Export…" },
   { action: "import", label: "Import into this table…" },
@@ -116,8 +127,20 @@ export function ExplorerTree({ onSelect, onAction }: {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState("");
   const [nonce, setNonce] = useState(0);
+  const [closedGroups, setClosedGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, [nonce]);
+
+  // Ungrouped connections keep their place at the top under the empty key.
+  const groups = useMemo(() => {
+    const map = new Map<string, Connection[]>();
+    for (const connection of connections) {
+      const key = connection.group ?? "";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(connection);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [connections]);
 
   return (
     <div style={{ height: "100%", overflow: "auto" }}>
@@ -129,16 +152,40 @@ export function ExplorerTree({ onSelect, onAction }: {
         </ActionIcon>
       </Group>
 
-      {connections.map(c => (
-        <div key={`${c.id}-${nonce}`}>
-          <UnstyledButton w="100%" px={4} py={3} onClick={() => setOpen(o => ({ ...o, [c.id]: !o[c.id] }))}>
-            <Group gap={4} wrap="nowrap">
-              {open[c.id] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
-              <Text size="xs" fw={600} c={c.color ?? undefined} truncate>{c.name}</Text>
-              {c.readOnly && <Badge size="xs" variant="light" color="orange">RO</Badge>}
-            </Group>
-          </UnstyledButton>
-          {open[c.id] && <TreeLevel conn={c.id} depth={1} filter={filter} onSelect={onSelect} onAction={onAction} />}
+      {groups.map(([group, list]) => (
+        <div key={group}>
+          {group ? (
+            <UnstyledButton w="100%" px={4} py={2}
+              onClick={() => setClosedGroups(g => ({ ...g, [group]: !g[group] }))}>
+              <Group gap={4} wrap="nowrap">
+                {closedGroups[group] ? <IconChevronRight size={11} /> : <IconChevronDown size={11} />}
+                <Text size="10px" fw={700} c="dimmed" tt="uppercase">{group}</Text>
+              </Group>
+            </UnstyledButton>
+          ) : null}
+
+          {!closedGroups[group] && list.map(c => (
+            <div key={`${c.id}-${nonce}`}>
+              <UnstyledButton w="100%" px={4} py={3} pl={group ? 14 : 4}
+                onClick={() => setOpen(o => ({ ...o, [c.id]: !o[c.id] }))}
+                // The colour tint is the production-is-red affordance: a wrong-window DELETE is
+                // much less likely when the whole row is the wrong colour.
+                style={c.color ? {
+                  borderLeft: `3px solid ${c.color}`,
+                  background: `color-mix(in srgb, ${c.color} 12%, transparent)`,
+                } : undefined}>
+                <Group gap={4} wrap="nowrap">
+                  {open[c.id] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
+                  <Text size="xs" fw={600} c={c.color ?? undefined} truncate>{c.name}</Text>
+                  {c.readOnly && <Badge size="xs" variant="light" color="orange">RO</Badge>}
+                  {c.tunnelled && <Badge size="xs" variant="light" color="blue">SSH</Badge>}
+                </Group>
+              </UnstyledButton>
+              {open[c.id] && (
+                <TreeLevel conn={c.id} depth={1} filter={filter} onSelect={onSelect} onAction={onAction} />
+              )}
+            </div>
+          ))}
         </div>
       ))}
     </div>

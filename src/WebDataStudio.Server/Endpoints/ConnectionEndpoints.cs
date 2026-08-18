@@ -7,7 +7,7 @@ namespace WebDataStudio.Server.Endpoints;
 public static class ConnectionEndpoints
 {
     public record ConnectionRequest(string Name, string Engine, string ConnectionString,
-        bool ReadOnly, string? Color, string? Group);
+        bool ReadOnly, string? Color, string? Group, TunnelSpec? Tunnel = null);
 
     public static void MapConnectionEndpoints(this WebApplication app)
     {
@@ -22,7 +22,8 @@ public static class ConnectionEndpoints
             try
             {
                 var added = store.Add(new ConnectionSpec("", body.Name.Trim(), body.Engine,
-                    body.ConnectionString, body.ReadOnly, body.Color, body.Group, ConnectionSource.Stored));
+                    body.ConnectionString, body.ReadOnly, body.Color, body.Group, ConnectionSource.Stored,
+                    body.Tunnel));
                 return Results.Ok(ConnectionRegistry.ToDto(added));
             }
             catch (InvalidOperationException e)
@@ -31,7 +32,8 @@ public static class ConnectionEndpoints
             }
         });
 
-        api.MapPut("/{id}", (string id, ConnectionRequest body, ConnectionRegistry registry, ConnectionStore store) =>
+        api.MapPut("/{id}", async (string id, ConnectionRequest body, ConnectionRegistry registry,
+            ConnectionStore store, SessionPool pool) =>
         {
             if (registry.Find(id) is not { } existing) return Results.NotFound();
             if (existing.Source == ConnectionSource.Environment) return EnvironmentIsReadOnly();
@@ -45,26 +47,91 @@ public static class ConnectionEndpoints
                 ReadOnly = body.ReadOnly,
                 Color = body.Color,
                 Group = body.Group,
+                // A form that posts no tunnel keeps the stored one: the private key is never sent
+                // back to the browser, so an edit cannot round-trip it.
+                Tunnel = body.Tunnel ?? existing.Tunnel,
             });
+
+            // Pooled sessions still point at the old target, so they go.
+            await pool.EvictAsync(id);
             return Results.Ok(ConnectionRegistry.ToDto(registry.Find(id)!));
         });
 
-        api.MapDelete("/{id}", (string id, ConnectionRegistry registry, ConnectionStore store) =>
+        api.MapDelete("/{id}", async (string id, ConnectionRegistry registry, ConnectionStore store,
+            SessionPool pool) =>
         {
             if (registry.Find(id) is not { } existing) return Results.NotFound();
             if (existing.Source == ConnectionSource.Environment) return EnvironmentIsReadOnly();
 
             store.Delete(id);
+            await pool.EvictAsync(id);
             return Results.NoContent();
         });
 
-        api.MapPost("/test", async (ConnectionRequest body, DriverRegistry drivers, CancellationToken ct) =>
+        api.MapGet("/export", (ConnectionRegistry registry) =>
+            Results.Ok(registry.All().Select(ToPortable)));
+
+        api.MapPost("/import", (List<PortableConnection> body, ConnectionStore store) =>
+        {
+            var imported = new List<string>();
+            var skipped = new List<object>();
+
+            foreach (var entry in body)
+            {
+                if (string.IsNullOrWhiteSpace(entry.Name) ||
+                    !ConnectionRegistry.KnownEngines.Contains(entry.Engine))
+                {
+                    skipped.Add(new { entry.Name, reason = $"unknown engine '{entry.Engine}'" });
+                    continue;
+                }
+
+                // Enough of a connection string to identify the target; the user fills in the rest.
+                var draft = string.Join(";", new[]
+                {
+                    entry.Host is { Length: > 0 } ? $"Host={entry.Host}" : null,
+                    entry.Database is { Length: > 0 } ? $"Database={entry.Database}" : null,
+                }.Where(p => p is not null));
+
+                try
+                {
+                    store.Add(new ConnectionSpec("", entry.Name.Trim(), entry.Engine,
+                        draft.Length > 0 ? draft : " ", entry.ReadOnly, entry.Color, entry.Group,
+                        ConnectionSource.Stored));
+                    imported.Add(entry.Name);
+                }
+                catch (InvalidOperationException e)
+                {
+                    // One duplicate name must not abort the rest of the file.
+                    skipped.Add(new { entry.Name, reason = e.Message });
+                }
+            }
+
+            return Results.Ok(new { imported, skipped });
+        });
+
+        api.MapPost("/test", async (ConnectionRequest body, DriverRegistry drivers,
+            TunnelManager tunnels, CancellationToken ct) =>
         {
             if (Validate(body) is { } error) return error;
+
+            TunnelSpec? opened = null;
+            (string Host, int Port) target = default;
+
             try
             {
                 var driver = drivers.Get(body.Engine);
-                var spec = new ConnectionSpec("probe", body.Name, body.Engine, body.ConnectionString,
+                var connectionString = body.ConnectionString;
+
+                if (body.Tunnel is { } tunnel)
+                {
+                    target = ConnectionEndpoint.Of(body.Engine, connectionString);
+                    var local = tunnels.Ensure(tunnel, target.Host, target.Port);
+                    opened = tunnel;
+                    connectionString = ConnectionEndpoint.Rewrite(body.Engine, connectionString,
+                        local.Host, local.Port);
+                }
+
+                var spec = new ConnectionSpec("probe", body.Name, body.Engine, connectionString,
                     true, null, null, ConnectionSource.Stored);
                 await using var session = await driver.OpenAsync(spec, ct);
                 return Results.Ok(new { ok = true, message = $"connected to {driver.Info.Label}" });
@@ -74,7 +141,30 @@ public static class ConnectionEndpoints
                 // A failed probe is information, not a server fault: 200 with ok=false keeps the form simple.
                 return Results.Ok(new { ok = false, message = e.Message });
             }
+            finally
+            {
+                if (opened is not null) tunnels.Release(opened, target.Host, target.Port);
+            }
         });
+    }
+
+    public record PortableConnection(string Name, string Engine, bool ReadOnly,
+        string? Color, string? Group, string? Host, string? Database, bool NeedsCredentials);
+
+    /// Export carries definitions, never secrets: no connection string, no password, no key. The
+    /// importing side has to supply credentials, which is the point of a shareable file.
+    private static PortableConnection ToPortable(ConnectionSpec spec)
+    {
+        var parts = spec.ConnectionString.Split(';', StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Split('=', 2))
+            .Where(kv => kv.Length == 2)
+            .ToDictionary(kv => kv[0].Trim(), kv => kv[1].Trim(), StringComparer.OrdinalIgnoreCase);
+
+        string? Value(params string[] keys) =>
+            keys.Select(k => parts.TryGetValue(k, out var v) ? v : null).FirstOrDefault(v => v is not null);
+
+        return new PortableConnection(spec.Name, spec.Engine, spec.ReadOnly, spec.Color, spec.Group,
+            Value("Host", "Server", "Data Source"), Value("Database", "Initial Catalog"), true);
     }
 
     private static IResult EnvironmentIsReadOnly() =>

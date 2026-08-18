@@ -1,0 +1,46 @@
+# Connections
+
+## Adding one in the UI
+
+Open **Connections** in the header, press **Add**, and either fill in the form or paste a
+connection string — pasting detects the engine and fills the rest. **Test** opens the connection
+once and reports what the server said, without saving anything.
+
+## Groups and colours
+
+A connection can carry a group and a colour. The explorer draws groups as collapsible headers and
+tints each connection's row with its colour. Red for production is a convention worth adopting.
+
+## Read-only connections
+
+The read-only flag is checked in the driver: anything that is not a read is refused with a clear
+message, and the UI hides the actions that would fail. `WDS_READONLY=true` forces it for every
+connection at once.
+
+## SSH tunnels
+
+Open the **SSH tunnel** section of the connection form and give it a host, a user and either a
+password or a private key. WebDataStudio opens the tunnel when a session needs it, shares one
+tunnel across concurrent sessions, and closes it a minute after the last one ends.
+
+The database host and port in the connection string stay as the jump host sees them — that is the
+point of a tunnel. If the tunnel cannot be opened, the error names SSH rather than reporting a
+generic timeout against a host you could never reach directly.
+
+## TLS
+
+The **TLS** section writes the right key into the connection string for the engine you picked:
+`SSL Mode` for PostgreSQL, `SslMode` for MySQL, `Encrypt` for SQL Server. Client certificates are
+referenced by path in the connection string, so the files have to be reachable by the container.
+
+## Import and export
+
+`GET /api/connections/export` returns the definitions without any secret: no connection string, no
+password, no key. Importing that file recreates the connections with the host and database filled
+in and the credentials empty, so a shared file cannot leak a password.
+
+## Pooling
+
+Sessions are pooled per connection. `WDS_MAX_SESSIONS` caps how many a single connection may hold
+at once, and `WDS_IDLE_TIMEOUT_SECONDS` decides when an unused one is closed. Editing or deleting
+a connection drops its pooled sessions immediately.

@@ -26,5 +26,15 @@ public static class WorkspaceEndpoints
             store.SaveTabs(await reader.ReadToEndAsync());
             return Results.NoContent();
         });
+
+        app.MapGet("/api/workspace/item/{key}", (string key, WorkspaceStore store) =>
+            Results.Content(store.LoadItem(key) ?? "null", "application/json"));
+
+        app.MapPut("/api/workspace/item/{key}", async (string key, HttpContext ctx, WorkspaceStore store) =>
+        {
+            using var reader = new StreamReader(ctx.Request.Body);
+            store.SaveItem(key, await reader.ReadToEndAsync());
+            return Results.NoContent();
+        });
     }
 }

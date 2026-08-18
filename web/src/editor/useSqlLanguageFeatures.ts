@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import * as monaco from "monaco-editor";
 import { completionContext, SQL_KEYWORDS } from "./completion";
 import { schemaCache } from "./schemaCache";
+import { allSnippets, type Snippet } from "./snippets";
 import type { DialectId } from "../sql/splitStatements";
 
 // Completion, hover and go-to-definition, all scoped to the connection the tab is bound to.
@@ -10,6 +11,7 @@ export function useSqlLanguageFeatures(
   connectionId: string,
   _dialect: DialectId,
   onOpenObject?: (ref: string) => void,
+  userSnippets: Snippet[] = [],
 ) {
   useEffect(() => {
     const completion = monaco.languages.registerCompletionItemProvider("sql", {
@@ -38,8 +40,21 @@ export function useSqlLanguageFeatures(
           item(t.name, monaco.languages.CompletionItemKind.Struct, t.schema));
         if (context.kind === "tables") return { suggestions: tableItems };
 
+        // Snippets come first: a three-letter prefix like `sel` should not be buried under
+        // every table whose name starts with the same letters.
+        const snippetItems = allSnippets(userSnippets).map(snippet => ({
+          label: snippet.prefix,
+          kind: monaco.languages.CompletionItemKind.Snippet,
+          insertText: snippet.body,
+          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+          detail: snippet.label,
+          documentation: snippet.description,
+          range,
+        }));
+
         return {
           suggestions: [
+            ...snippetItems,
             ...tableItems,
             ...SQL_KEYWORDS.map(k => item(k, monaco.languages.CompletionItemKind.Keyword)),
           ],
@@ -78,5 +93,8 @@ export function useSqlLanguageFeatures(
     });
 
     return () => { completion.dispose(); hover.dispose(); definition.dispose(); };
-  }, [connectionId, onOpenObject]);
+    // The snippet list is compared by content: a new array of the same snippets must not
+    // re-register the providers on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionId, onOpenObject, JSON.stringify(userSnippets)]);
 }

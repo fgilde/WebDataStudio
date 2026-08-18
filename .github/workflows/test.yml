@@ -25,3 +25,6 @@ jobs:
         working-directory: web
       - run: npm run build
         working-directory: web
+
+      # A renamed page must not silently break the sidebar of the documentation site.
+      - run: node scripts/check-links.mjs docs

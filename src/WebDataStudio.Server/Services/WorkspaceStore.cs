@@ -5,6 +5,9 @@ namespace WebDataStudio.Server.Services;
 public sealed record HistoryEntry(long Id, string ConnectionId, string Sql,
     DateTimeOffset ExecutedAt, long? ElapsedMs, long? RowCount, string? Error);
 
+public sealed record SavedQuery(string Id, string Name, string? Folder, string Sql,
+    string? ConnectionId, DateTimeOffset UpdatedAt);
+
 /// Query history and open tabs. Both live server-side so a container restart does not lose them.
 public sealed class WorkspaceStore
 {
@@ -29,6 +32,14 @@ public sealed class WorkspaceStore
             );
             CREATE INDEX IF NOT EXISTS ix_history_time ON history(id DESC);
             CREATE TABLE IF NOT EXISTS workspace (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS saved_queries (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                folder TEXT NULL,
+                sql TEXT NOT NULL,
+                connection_id TEXT NULL,
+                updated_at TEXT NOT NULL
+            );
             """;
         cmd.ExecuteNonQuery();
     }
@@ -87,8 +98,79 @@ public sealed class WorkspaceStore
 
     public void SaveTabs(string json) => SetValue("tabs", json);
     public string LoadTabs() => GetValue("tabs") ?? "[]";
+
+    /// Any other workspace-scoped blob: snippets, layout presets, panel state. The key comes from
+    /// the client, which is fine — this store belongs to the one user the container serves.
+    public string? LoadItem(string key) => GetValue($"item:{key}");
+    public void SaveItem(string key, string json) => SetValue($"item:{key}", json);
     public void SaveLayout(string connectionId, string json) => SetValue($"layout:{connectionId}", json);
     public string? LoadLayout(string connectionId) => GetValue($"layout:{connectionId}");
+
+    // --- saved queries -------------------------------------------------------
+    public IReadOnlyList<SavedQuery> ListSavedQueries()
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        // Folder first, then name: the panel renders the list as a tree without re-sorting.
+        cmd.CommandText = """
+            SELECT id, name, folder, sql, connection_id, updated_at
+              FROM saved_queries
+             ORDER BY coalesce(folder, '') COLLATE NOCASE, name COLLATE NOCASE
+            """;
+
+        using var reader = cmd.ExecuteReader();
+        var list = new List<SavedQuery>();
+
+        while (reader.Read())
+            list.Add(new SavedQuery(
+                reader.GetString(0), reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                DateTimeOffset.Parse(reader.GetString(5))));
+
+        return list;
+    }
+
+    public SavedQuery SaveQuery(SavedQuery query)
+    {
+        var stored = query with
+        {
+            Id = string.IsNullOrEmpty(query.Id) ? Guid.NewGuid().ToString("n") : query.Id,
+            UpdatedAt = DateTimeOffset.UtcNow,
+            // An empty folder string and no folder are the same thing; storing both would show
+            // an empty group in the tree.
+            Folder = string.IsNullOrWhiteSpace(query.Folder) ? null : query.Folder.Trim(),
+        };
+
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO saved_queries (id, name, folder, sql, connection_id, updated_at)
+            VALUES ($id, $name, $folder, $sql, $conn, $updated)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name, folder = excluded.folder, sql = excluded.sql,
+                connection_id = excluded.connection_id, updated_at = excluded.updated_at
+            """;
+        cmd.Parameters.AddWithValue("$id", stored.Id);
+        cmd.Parameters.AddWithValue("$name", stored.Name);
+        cmd.Parameters.AddWithValue("$folder", (object?)stored.Folder ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$sql", stored.Sql);
+        cmd.Parameters.AddWithValue("$conn", (object?)stored.ConnectionId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$updated", stored.UpdatedAt.ToString("O"));
+        cmd.ExecuteNonQuery();
+
+        return stored;
+    }
+
+    public bool DeleteSavedQuery(string id)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "DELETE FROM saved_queries WHERE id = $id";
+        cmd.Parameters.AddWithValue("$id", id);
+        return cmd.ExecuteNonQuery() > 0;
+    }
 
     private void SetValue(string key, string value)
     {

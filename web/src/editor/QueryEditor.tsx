@@ -4,12 +4,13 @@ import { useAppTheme } from "../ThemeProvider";
 import { configureMonaco } from "./monacoSetup";
 import { useActiveStatement } from "./useActiveStatement";
 import { useSqlLanguageFeatures } from "./useSqlLanguageFeatures";
+import type { Snippet } from "./snippets";
 import { formatSql } from "./formatSql";
 import { statementAt, type DialectId } from "../sql/splitStatements";
 import type { QueryError } from "../query/resultStore";
 
 export function QueryEditor({ value, dialect, language = "sql", connectionId, error,
-  onChange, onRun, onRunAll, onOpenObject }: {
+  onChange, onRun, onRunAll, onOpenObject, snippets = [] }: {
   value: string;
   dialect: DialectId;
   /// Non-SQL engines get a different editor language: MongoDB commands read as JavaScript, Redis
@@ -21,6 +22,7 @@ export function QueryEditor({ value, dialect, language = "sql", connectionId, er
   onRun: (sql: string) => void;
   onRunAll: (sql: string) => void;
   onOpenObject?: (ref: string) => void;
+  snippets?: Snippet[];
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [editor, setEditor] = useState<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -55,7 +57,7 @@ export function QueryEditor({ value, dialect, language = "sql", connectionId, er
 
   // Statement highlighting and schema completion only make sense for SQL.
   useActiveStatement(language === "sql" ? editor : null, dialect);
-  useSqlLanguageFeatures(language === "sql" ? connectionId : "", dialect, onOpenObject);
+  useSqlLanguageFeatures(language === "sql" ? connectionId : "", dialect, onOpenObject, snippets);
 
   useEffect(() => { markErrors(editor, error); }, [editor, error]);
 

@@ -1,0 +1,20 @@
+- [English](/) · **Deutsch**
+
+- [Überblick](/de/)
+- [Erste Schritte](/de/getting-started.md)
+- [Umgebungsvariablen](/de/environment.md)
+- [Verbindungen](/de/connections.md)
+- [Abfrage-Editor](/de/editor.md)
+- [Ergebnisse und Export](/de/results.md)
+- [Daten bearbeiten](/de/editing.md)
+- [Schema bearbeiten](/de/schema.md)
+- [Analyse](/de/analysis.md)
+- [Vergleich](/de/comparison.md)
+- [Administration](/de/administration.md)
+- [Diagramme](/de/diagrams.md)
+- [Engine-Funktionsumfang](/de/engines.md)
+- [Tastenkürzel](/de/shortcuts.md)
+- [Entwicklung](/de/development.md)
+
+- [Webseite](https://fgilde.github.io/WebDataStudio/de/)
+- [Funktionsmatrix](../../features.md)

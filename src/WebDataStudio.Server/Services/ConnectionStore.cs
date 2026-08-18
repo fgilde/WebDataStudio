@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using WebDataStudio.Server.Models;
 
@@ -118,17 +119,46 @@ public sealed class ConnectionStore
         cmd.Parameters.AddWithValue("$id", spec.Id);
         cmd.Parameters.AddWithValue("$name", spec.Name);
         cmd.Parameters.AddWithValue("$engine", spec.Engine);
-        cmd.Parameters.AddWithValue("$secret", _protector.Protect(spec.ConnectionString));
+        cmd.Parameters.AddWithValue("$secret", _protector.Protect(Pack(spec)));
         cmd.Parameters.AddWithValue("$ro", spec.ReadOnly ? 1 : 0);
         cmd.Parameters.AddWithValue("$color", (object?)spec.Color ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$grp", (object?)spec.Group ?? DBNull.Value);
     }
 
-    private ConnectionSpec Read(SqliteDataReader r) => new(
-        r.GetString(0), r.GetString(1), r.GetString(2),
-        _protector.Unprotect(r.GetString(3)),
-        r.GetInt32(4) == 1,
-        r.IsDBNull(5) ? null : r.GetString(5),
-        r.IsDBNull(6) ? null : r.GetString(6),
-        ConnectionSource.Stored);
+    private ConnectionSpec Read(SqliteDataReader r)
+    {
+        var (connectionString, tunnel) = Unpack(_protector.Unprotect(r.GetString(3)));
+
+        return new ConnectionSpec(
+            r.GetString(0), r.GetString(1), r.GetString(2),
+            connectionString,
+            r.GetInt32(4) == 1,
+            r.IsDBNull(5) ? null : r.GetString(5),
+            r.IsDBNull(6) ? null : r.GetString(6),
+            ConnectionSource.Stored,
+            tunnel);
+    }
+
+    private sealed record Secret(string ConnectionString, TunnelSpec? Tunnel);
+
+    /// The tunnel travels inside the same encrypted blob as the connection string: a private key
+    /// is every bit as sensitive as a password and must not sit in a plain column.
+    private static string Pack(ConnectionSpec spec) =>
+        JsonSerializer.Serialize(new Secret(spec.ConnectionString, spec.Tunnel));
+
+    private static (string ConnectionString, TunnelSpec? Tunnel) Unpack(string secret)
+    {
+        // Rows written before tunnels existed hold the bare connection string.
+        if (!secret.StartsWith('{')) return (secret, null);
+
+        try
+        {
+            var parsed = JsonSerializer.Deserialize<Secret>(secret);
+            return parsed is null ? (secret, null) : (parsed.ConnectionString, parsed.Tunnel);
+        }
+        catch (JsonException)
+        {
+            return (secret, null);
+        }
+    }
 }

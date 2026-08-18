@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import {
-  Alert, Badge, Button, Code, Group, List, Loader, ScrollArea, Select, Stack, Table, Tabs,
+  Alert, Badge, Button, Group, List, Loader, ScrollArea, Select, Stack, Table, Tabs,
   Text, TextInput,
 } from "@mantine/core";
 import {
   compareData, compareSchemas, listConnections,
   type Connection, type DataComparisonDto, type SchemaComparisonDto,
 } from "../api";
+import { DiffView } from "./DiffView";
 
 function useConnections() {
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -73,9 +74,10 @@ function SchemaCompare({ initialConnectionId }: { initialConnectionId: string })
 
           {/* The script is shown, never run from here: applying it belongs in a query tab. */}
           <Text size="xs" c="dimmed">Sync script (copy it into a query tab to run it):</Text>
-          <ScrollArea h={200}>
-            <Code block fz="xs">{result.script || "-- the schemas already match"}</Code>
-          </ScrollArea>
+          <DiffView height={240}
+            original={["-- target as it is now",
+              ...result.tablesOnlyInTarget.map(t => `-- has ${t}`)].join("\n")}
+            modified={result.script || "-- the schemas already match"} />
         </Stack>
       ) : null}
     </Stack>
@@ -152,9 +154,11 @@ function DataCompare({ initialConnectionId }: { initialConnectionId: string }) {
             </Table>
           </ScrollArea>
 
-          <ScrollArea h={180}>
-            <Code block fz="xs">{result.script || "-- the data already matches"}</Code>
-          </ScrollArea>
+          <DiffView height={200}
+            original={result.different.map(d =>
+              `-- ${d.key.map(String).join(", ")}: ${d.targetRow.map(String).join(" | ")}`).join("\n")
+              || "-- target unchanged"}
+            modified={result.script || "-- the data already matches"} />
         </Stack>
       ) : null}
     </Stack>

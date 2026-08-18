@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using WebDataStudio.Server.Drivers;
 using WebDataStudio.Server.Endpoints;
@@ -32,20 +33,28 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 
 builder.Services.AddAuthorization();
 
+// A desktop build keeps its data beside the binary; a container keeps it on the /data volume.
+AppContext.TryGetSwitch("Wds.Desktop", out var desktop);
+var defaultDbPath = desktop
+    ? Path.Combine(AppContext.BaseDirectory, "data", "webdatastudio.db")
+    : "/data/webdatastudio.db";
+
 // Same reason as AuthOptions: DB_PATH is only final once the host has composed its configuration.
 builder.Services.AddSingleton(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
-    var dbPath = config["DB_PATH"] ?? "/data/webdatastudio.db";
+    var dbPath = config["DB_PATH"] ?? defaultDbPath;
     var dataDir = Path.GetDirectoryName(Path.GetFullPath(dbPath))!;
     Directory.CreateDirectory(dataDir);
     return new SecretProtector(dataDir, config["WDS_SECRET_KEY"]);
 });
 builder.Services.AddSingleton(sp => new ConnectionStore(
-    sp.GetRequiredService<IConfiguration>()["DB_PATH"] ?? "/data/webdatastudio.db",
+    sp.GetRequiredService<IConfiguration>()["DB_PATH"] ?? defaultDbPath,
     sp.GetRequiredService<SecretProtector>()));
 builder.Services.AddSingleton<ConnectionRegistry>();
 builder.Services.AddSingleton<DriverRegistry>();
+builder.Services.AddSingleton<TunnelManager>();
+builder.Services.AddSingleton(sp => new SessionPool(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<SessionFactory>();
 builder.Services.AddSingleton<QueryRunner>();
 builder.Services.AddSingleton<ExporterRegistry>();
@@ -98,9 +107,31 @@ app.MapDdlEndpoints();
 app.MapCompareEndpoints();
 app.MapAdminEndpoints();
 app.MapDiagramEndpoints();
+app.MapSavedQueryEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();
+
+// Desktop mode: the same server, started from a downloaded binary rather than a container, opens
+// the browser once it is listening. In a container there is no browser to open.
+if ((desktop || string.Equals(Environment.GetEnvironmentVariable("WDS_OPEN_BROWSER"), "true",
+        StringComparison.OrdinalIgnoreCase))
+    && !string.Equals(Environment.GetEnvironmentVariable("WDS_OPEN_BROWSER"), "false",
+        StringComparison.OrdinalIgnoreCase))
+{
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        var url = app.Urls.FirstOrDefault() ?? "http://localhost:8080";
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception e)
+        {
+            app.Logger.LogInformation("open {Url} in your browser ({Reason})", url, e.Message);
+        }
+    });
+}
 
 app.Run();
 

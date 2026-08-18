@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebDataStudio — a database studio in your browser</title>
+<meta name="description" content="A web database studio for PostgreSQL, MySQL, SQL Server, SQLite, Oracle, DuckDB, ClickHouse, MongoDB and Redis. One container, no install, free and open source.">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a href="index.html"><img src="assets/logo.svg" alt="WebDataStudio"></a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#engines">Databases</a>
+      <a href="#compare">Comparison</a>
+      <a href="#download">Download</a>
+      <a href="guide/">Docs</a>
+      <a href="https://github.com/fgilde/WebDataStudio">GitHub</a>
+      <a href="de/">DE</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap hero">
+  <h1>Your databases, in a browser tab</h1>
+  <p class="lead">
+    WebDataStudio is a database studio you run yourself: one container, nine engines, no install on
+    anybody's machine. Write queries, edit data, design schemas, read execution plans and keep an eye
+    on the server — from any browser on the network.
+  </p>
+
+  <div class="cta">
+    <a class="btn primary" href="#download">Run it now</a>
+    <a class="btn" href="guide/">Read the docs</a>
+    <a class="btn" href="https://github.com/fgilde/WebDataStudio">Source on GitHub</a>
+  </div>
+
+  <pre class="run"><span class="c"># one container, one volume, done</span>
+docker run -d -p 8080:8080 -v wds-data:/data \
+  -e WDS_CONN_LOCAL="postgres://app:pw@db:5432/shop" \
+  ghcr.io/fgilde/webdatastudio</pre>
+</div>
+
+<div class="wrap engines" id="engines">
+  <h2>Nine engines, one interface</h2>
+  <p class="sub">Every driver says what it can do, and the UI hides what an engine does not support.</p>
+
+  <div class="engine-grid">
+    <div class="engine"><img src="assets/db/postgresql.svg" alt=""><span>PostgreSQL</span></div>
+    <div class="engine"><img src="assets/db/mysql.svg" alt=""><span>MySQL</span></div>
+    <div class="engine"><img src="assets/db/mariadb.svg" alt=""><span>MariaDB</span></div>
+    <div class="engine"><img src="assets/db/sqlserver.svg" alt=""><span>SQL Server</span></div>
+    <div class="engine"><img src="assets/db/sqlite.svg" alt=""><span>SQLite</span></div>
+    <div class="engine"><img src="assets/db/oracle.svg" alt=""><span>Oracle</span></div>
+    <div class="engine"><img src="assets/db/duckdb.svg" alt=""><span>DuckDB</span></div>
+    <div class="engine"><img src="assets/db/clickhouse.svg" alt=""><span>ClickHouse</span></div>
+    <div class="engine"><img src="assets/db/mongodb.svg" alt=""><span>MongoDB</span></div>
+    <div class="engine"><img src="assets/db/redis.svg" alt=""><span>Redis</span></div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>What you get</h2>
+    <p class="sub">Everything below ships in the same image; nothing is held back for a paid tier.</p>
+
+    <div class="cards">
+      <div class="card">
+        <h3>A real SQL editor</h3>
+        <p>Monaco with dialect-aware highlighting, schema-aware completion, formatting, the statement
+          under the cursor highlighted, F5 for the selection, bind parameters and snippets.</p>
+      </div>
+      <div class="card">
+        <h3>Results that scale</h3>
+        <p>A virtualised grid for hundreds of thousands of rows, streamed while the query is still
+          running, with per-column filters, grouping, a form view, a transposed view and charts.</p>
+      </div>
+      <div class="card">
+        <h3>Editing with a preview</h3>
+        <p>Edit cells like a spreadsheet. Before anything runs you see the exact SQL, and a table
+          without a primary key says why it cannot be edited instead of guessing.</p>
+      </div>
+      <div class="card">
+        <h3>Export and import</h3>
+        <p>CSV, TSV, Excel, JSON, NDJSON, XML, YAML, Markdown, HTML, SQL and Parquet — streamed, not
+          buffered. Import from CSV, Excel, JSON and SQL, or copy a table to another engine.</p>
+      </div>
+      <div class="card">
+        <h3>Schema tools</h3>
+        <p>A table designer, index and constraint management, an ER diagram with automatic layout,
+          and a migration script preview for every change.</p>
+      </div>
+      <div class="card">
+        <h3>Analysis</h3>
+        <p>Estimated and actual plans with a cost heat map, an index advisor that writes the
+          <code>CREATE INDEX</code> for you, deep analyze, slow queries and server metrics.</p>
+      </div>
+      <div class="card">
+        <h3>Administration</h3>
+        <p>Maintenance commands, sessions and kill, databases, users and privileges, the server log,
+          and backup and restore through the engines' own tools.</p>
+      </div>
+      <div class="card">
+        <h3>Made to be hosted</h3>
+        <p>Connections come from environment variables, so a studio for your stack is one container
+          in Docker Compose, Kubernetes or a .NET Aspire app host.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>See it</h2>
+    <p class="sub">The same app in two of its twenty-one themes.</p>
+
+    <div class="shots">
+      <figure>
+        <img src="assets/screenshots/query-dark.png" alt="Query editor and result grid">
+        <figcaption>Query editor and result grid</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshots/diagram-light.png" alt="ER diagram">
+        <figcaption>ER diagram with automatic layout</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshots/chart-dark.png" alt="Chart view of a result">
+        <figcaption>Any result as a chart</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshots/admin-light.png" alt="Administration panel">
+        <figcaption>Maintenance, sessions, users, backups</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>In .NET Aspire</h2>
+    <p class="sub">Hang it into your app host and it picks up the connection string of your resource.</p>
+
+<pre class="run">var db = builder.AddPostgres("db").AddDatabase("shop");
+
+builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
+       .WithHttpEndpoint(port: 8080, targetPort: 8080)
+       .WithEnvironment("WDS_CONN_SHOP", db.Resource.ConnectionStringExpression)
+       .WithVolume("wds-data", "/data");</pre>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <h2>How it compares</h2>
+    <p class="sub">
+      Free and community editions only, as of August 2026. Every one of these is a good tool; this
+      table is about which one fits a browser-first, self-hosted setup.
+    </p>
+
+    <table class="compare">
+      <tr>
+        <th>&nbsp;</th>
+        <th>WebDataStudio</th>
+        <th><a href="https://dbgate.io/">DbGate</a></th>
+        <th><a href="https://www.adminer.org/">Adminer</a></th>
+        <th><a href="https://www.phpmyadmin.net/">phpMyAdmin</a></th>
+        <th><a href="https://www.pgadmin.org/">pgAdmin 4</a></th>
+        <th><a href="https://dbeaver.com/">CloudBeaver CE</a></th>
+      </tr>
+      <tr>
+        <td>Runs in a browser</td>
+        <td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td>
+        <td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td>
+      </tr>
+      <tr>
+        <td>Official container image</td>
+        <td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td>
+        <td class="yes">yes</td><td class="yes">yes</td><td class="yes">yes</td>
+      </tr>
+      <tr>
+        <td>Licence</td>
+        <td>MIT</td><td>GPL/premium</td><td>Apache 2.0/GPL</td><td>GPL</td>
+        <td>PostgreSQL licence</td><td>Apache 2.0</td>
+      </tr>
+      <tr>
+        <td>Relational engines</td>
+        <td>PostgreSQL, MySQL/MariaDB, SQL&nbsp;Server, SQLite, Oracle, DuckDB, ClickHouse</td>
+        <td>PostgreSQL, MySQL/MariaDB, SQL&nbsp;Server, SQLite, Oracle, ClickHouse and more</td>
+        <td>MySQL/MariaDB, PostgreSQL, SQLite, SQL&nbsp;Server, Oracle, Firebird</td>
+        <td>MySQL/MariaDB</td>
+        <td>PostgreSQL</td>
+        <td>Many, through JDBC</td>
+      </tr>
+      <tr>
+        <td>MongoDB and Redis</td>
+        <td class="yes">both</td><td class="yes">both</td><td class="no">no</td>
+        <td class="no">no</td><td class="no">no</td><td class="part">in the enterprise edition</td>
+      </tr>
+      <tr>
+        <td>Connections from environment variables</td>
+        <td class="yes">yes</td><td class="yes">yes</td><td class="part">one server per URL</td>
+        <td class="yes">yes</td><td class="part">via a servers.json file</td><td class="part">via a config file</td>
+      </tr>
+      <tr>
+        <td>ER diagram</td>
+        <td class="yes">yes</td><td class="yes">yes</td><td class="no">no</td>
+        <td class="yes">designer</td><td class="yes">yes</td><td class="yes">yes</td>
+      </tr>
+      <tr>
+        <td>Execution plans</td>
+        <td class="yes">estimated and actual</td><td class="part">text plan</td><td class="part">EXPLAIN output</td>
+        <td class="part">EXPLAIN output</td><td class="yes">graphical</td><td class="yes">yes</td>
+      </tr>
+      <tr>
+        <td>Index advisor and deep analyze</td>
+        <td class="yes">yes</td><td class="no">no</td><td class="no">no</td>
+        <td class="part">advisor for MySQL variables</td><td class="no">no</td><td class="no">no</td>
+      </tr>
+      <tr>
+        <td>Schema and data comparison</td>
+        <td class="yes">yes</td><td class="part">in the premium edition</td><td class="no">no</td>
+        <td class="no">no</td><td class="no">no</td><td class="no">no</td>
+      </tr>
+      <tr>
+        <td>Backup and restore from the UI</td>
+        <td class="yes">yes</td><td class="part">export only</td><td class="yes">SQL dump</td>
+        <td class="yes">SQL dump</td><td class="yes">yes</td><td class="part">export only</td>
+      </tr>
+      <tr>
+        <td>Price for everything above</td>
+        <td class="yes">free</td><td class="part">free core, paid premium</td><td class="yes">free</td>
+        <td class="yes">free</td><td class="yes">free</td><td class="part">free core, paid enterprise</td>
+      </tr>
+    </table>
+
+    <p class="note">
+      Found something out of date? <a href="https://github.com/fgilde/WebDataStudio/issues">Open an
+      issue</a> and it gets corrected — a comparison is only worth having while it is accurate.
+    </p>
+  </div>
+</section>
+
+<section id="download">
+  <div class="wrap">
+    <h2>Get it</h2>
+    <p class="sub">The container is the main way to run it. Desktop builds are the same server in a
+      single file.</p>
+
+    <div class="cards">
+      <div class="card">
+        <h3>Docker</h3>
+        <p><code>docker run -d -p 8080:8080 -v wds-data:/data ghcr.io/fgilde/webdatastudio</code><br>
+          <a href="https://github.com/fgilde/WebDataStudio/pkgs/container/webdatastudio">Image on
+            GHCR</a></p>
+      </div>
+      <div class="card">
+        <h3>Windows, macOS, Linux</h3>
+        <p>A self-contained binary per platform; start it and your browser opens.<br>
+          <a href="https://github.com/fgilde/WebDataStudio/releases">Releases</a></p>
+      </div>
+      <div class="card">
+        <h3>From source</h3>
+        <p>.NET 10 and Node 22, then <code>dotnet run</code> and <code>npm run dev</code>.<br>
+          <a href="guide/#/development">Development guide</a></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>MIT licensed · built by <a href="https://github.com/fgilde">fgilde</a></span>
+    <span class="spacer"></span>
+    <a href="guide/">Documentation</a>
+    <a href="de/">Deutsch</a>
+    <a href="https://github.com/fgilde/WebDataStudio">GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>

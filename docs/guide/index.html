@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebDataStudio documentation</title>
+<meta name="description" content="How to run and use WebDataStudio: connections, the query editor, results, schema editing, analysis and administration.">
+<link rel="icon" type="image/svg+xml" href="../assets/icon.svg">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/dark.css">
+<style>
+  :root {
+    --theme-color: #22d3c5;
+    --sidebar-width: 280px;
+  }
+  body { background: #0d1120; }
+  .sidebar { background: #10162a; border-right: 1px solid #26304f; }
+  .sidebar .app-name-link img { width: 190px; }
+  .markdown-section { max-width: 900px; }
+  .markdown-section table { display: block; overflow-x: auto; }
+  .markdown-section img { border: 1px solid #26304f; border-radius: 10px; }
+  .lang-switch { padding: 8px 0 0 20px; font-size: 13px; }
+  .lang-switch a { color: #9aa7c7; margin-right: 10px; }
+</style>
+</head>
+<body>
+<div id="app">Loading…</div>
+
+<script>
+  window.$docsify = {
+    name: '<img src="../assets/logo.svg" alt="WebDataStudio">',
+    nameLink: { '/de/': '#/de/', '/': '#/' },
+    repo: 'https://github.com/fgilde/WebDataStudio',
+    loadSidebar: true,
+    subMaxLevel: 2,
+    auto2top: true,
+    relativePath: true,
+    search: { depth: 3, noData: 'Nothing found', placeholder: 'Search' },
+    // One markdown tree per language; the sidebar of each tree links to the other.
+    fallbackLanguages: ['de'],
+    alias: {
+      '/de/_sidebar.md': '/de/_sidebar.md',
+      '/_sidebar.md': '/_sidebar.md',
+    },
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-csharp.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
+</body>
+</html>

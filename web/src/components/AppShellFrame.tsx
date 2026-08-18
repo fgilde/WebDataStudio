@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { ActionIcon, AppShell, Group, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, AppShell, Group, Tooltip } from "@mantine/core";
 import { IconDatabaseCog, IconPalette, IconTable } from "@tabler/icons-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeDrawer } from "../ThemeDrawer";
@@ -14,7 +14,9 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
       <AppShell.Header>
         <Group h="100%" px="sm" justify="space-between">
           <Group gap="sm">
-            <Text fw={600}>WebDataStudio</Text>
+            {/* The wordmark carries the product name, so no second text label next to it. */}
+            <img src="/brand/logo.svg" alt="WebDataStudio" height={24}
+              style={{ display: "block" }} />
             <Tooltip label="Studio">
               <ActionIcon component={Link} to="/" aria-label="Studio" variant={pathname === "/" ? "light" : "subtle"}>
                 <IconTable size={17} />

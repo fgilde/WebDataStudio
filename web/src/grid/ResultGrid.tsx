@@ -6,6 +6,10 @@ import type { StatementResult } from "../query/resultStore";
 import { CellValue } from "./CellValue";
 import { CellViewerModal, type CellRef } from "./CellViewerModal";
 import { summarizeSelection } from "./aggregate";
+import { GroupedTable } from "./GroupedTable";
+import { loadWorkspaceItem, saveWorkspaceItem } from "../api";
+
+const WIDTH_KEY = "grid-column-widths";
 
 const ROW_HEIGHT = 24;
 
@@ -20,10 +24,62 @@ export function ResultGrid({ result, onSelectionChange }: {
   const [hidden, setHidden] = useState<Set<number>>(new Set());
   const [selected, setSelected] = useState<{ row: number; col: number }[]>([]);
   const [viewing, setViewing] = useState<CellRef | null>(null);
+  const [groupBy, setGroupBy] = useState<number | null>(null);
+  const [order, setOrderIndexes] = useState<number[] | null>(null);
+  const [pinned, setPinned] = useState<Set<number>>(new Set());
+  const [widths, setWidths] = useState<Record<string, number>>({});
+  const dragging = useRef<{ name: string; startX: number; startWidth: number } | null>(null);
 
-  const visibleColumns = result.columns
-    .map((c, index) => ({ ...c, index }))
-    .filter(c => !hidden.has(c.index));
+  // Widths are remembered by column name, so the same report keeps its layout across runs.
+  useEffect(() => {
+    loadWorkspaceItem<Record<string, number>>(WIDTH_KEY)
+      .then(stored => setWidths(stored && typeof stored === "object" ? stored : {}))
+      .catch(() => setWidths({}));
+  }, []);
+
+  useEffect(() => {
+    const move = (event: MouseEvent) => {
+      if (!dragging.current) return;
+      const next = Math.max(60, dragging.current.startWidth + event.clientX - dragging.current.startX);
+      setWidths(w => ({ ...w, [dragging.current!.name]: next }));
+    };
+
+    const up = () => {
+      if (!dragging.current) return;
+      dragging.current = null;
+      // One write when the drag ends, not one per mouse move.
+      setWidths(w => { void saveWorkspaceItem(WIDTH_KEY, w).catch(() => {}); return w; });
+    };
+
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => { window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+  }, []);
+
+  const visibleColumns = (() => {
+    const all = result.columns.map((c, index) => ({ ...c, index })).filter(c => !hidden.has(c.index));
+    const sequence = order ?? all.map(c => c.index);
+
+    const ordered = sequence
+      .map(index => all.find(c => c.index === index))
+      .filter((c): c is typeof all[number] => c !== undefined);
+
+    // Anything the order does not mention yet — a fresh result with more columns — keeps its place.
+    for (const column of all) if (!ordered.includes(column)) ordered.push(column);
+
+    // Pinned columns move to the front and stick there while the rest scrolls.
+    return [...ordered.filter(c => pinned.has(c.index)), ...ordered.filter(c => !pinned.has(c.index))];
+  })();
+
+  const move = (index: number, delta: number) => {
+    const sequence = (order ?? visibleColumns.map(c => c.index)).slice();
+    const at = sequence.indexOf(index);
+    const to = at + delta;
+    if (at < 0 || to < 0 || to >= sequence.length) return;
+
+    [sequence[at], sequence[to]] = [sequence[to], sequence[at]];
+    setOrderIndexes(sequence);
+  };
 
   // Sorting and filtering happen client-side over the rows already fetched. Anything beyond the
   // fetch cap needs a server round trip, which the result footer's "load more" will trigger.
@@ -86,13 +142,19 @@ export function ResultGrid({ result, onSelectionChange }: {
         </Text>
       </Group>
 
+      {groupBy !== null ? (
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <GroupedTable columns={visibleColumns} rows={rows} groupBy={groupBy} />
+        </div>
+      ) : (
       <div ref={parentRef} style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
         <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--mantine-color-default)" }}>
             <tr>
               {visibleColumns.map(c => (
                 <th key={c.index} style={{
-                  textAlign: "left", padding: "2px 8px", whiteSpace: "nowrap",
+                  textAlign: "left", padding: "2px 8px", whiteSpace: "nowrap", position: "relative",
+                  width: widths[c.name], minWidth: widths[c.name],
                   borderBottom: "1px solid var(--mantine-color-default-border)",
                 }}>
                   <Menu withinPortal closeOnItemClick={false}>
@@ -114,11 +176,37 @@ export function ResultGrid({ result, onSelectionChange }: {
                           onChange={e => setFilters(f => ({ ...f, [c.index]: e.currentTarget.value }))} />
                       </Menu.Item>
                       <Menu.Divider />
+                      <Menu.Item onClick={() => setPinned(p => {
+                        const next = new Set(p);
+                        if (next.has(c.index)) next.delete(c.index); else next.add(c.index);
+                        return next;
+                      })}>{pinned.has(c.index) ? "Unpin column" : "Pin column"}</Menu.Item>
+                      <Menu.Item onClick={() => move(c.index, -1)}>Move left</Menu.Item>
+                      <Menu.Item onClick={() => move(c.index, 1)}>Move right</Menu.Item>
+                      <Menu.Divider />
+                      <Menu.Item onClick={() => setGroupBy(c.index)}>Group by this column</Menu.Item>
+                      <Menu.Item disabled={groupBy === null}
+                        onClick={() => setGroupBy(null)}>Clear grouping</Menu.Item>
+                      <Menu.Divider />
                       <Menu.Item onClick={() => setHidden(h => new Set(h).add(c.index))}>Hide column</Menu.Item>
                       <Menu.Item onClick={() => setHidden(new Set())}>Show all columns</Menu.Item>
                     </Menu.Dropdown>
                   </Menu>
                   <Text size="10px" c="dimmed">{c.dataType}</Text>
+
+                  {/* A grab strip on the right edge; the drag itself lives on the window. */}
+                  <span
+                    onMouseDown={event => {
+                      dragging.current = {
+                        name: c.name, startX: event.clientX,
+                        startWidth: widths[c.name] ?? (event.currentTarget.parentElement?.clientWidth ?? 120),
+                      };
+                      event.preventDefault();
+                    }}
+                    style={{
+                      position: "absolute", top: 0, right: 0, width: 5, height: "100%",
+                      cursor: "col-resize",
+                    }} />
                 </th>
               ))}
             </tr>
@@ -154,6 +242,7 @@ export function ResultGrid({ result, onSelectionChange }: {
           </tbody>
         </table>
       </div>
+      )}
 
       {selected.length > 0 && (
         <Group gap={12} px={8} py={2} style={{ borderTop: "1px solid var(--mantine-color-default-border)" }}>

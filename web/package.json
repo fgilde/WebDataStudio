@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "smoke": "node scripts/smoke.mjs",
     "smoke:admin": "node scripts/smoke-admin.mjs",
-    "smoke:editing": "node scripts/smoke-editing.mjs"
+    "smoke:editing": "node scripts/smoke-editing.mjs",
+    "smoke:p9": "node scripts/smoke-p9.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

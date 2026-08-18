@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import type { ReactNode } from "react";
 import { MantineProvider } from "@mantine/core";
 import { ModalsProvider } from "@mantine/modals";
@@ -20,6 +20,20 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   const [themeId, setThemeIdState] = useState<string>(() => localStorage.getItem(THEME_KEY) ?? DEFAULT_THEME);
   const setThemeId = useCallback((id: string) => { localStorage.setItem(THEME_KEY, id); setThemeIdState(id); }, []);
   const current = getTheme(themeId);
+
+  // The command palette cycles themes without knowing the list; this is the one place that does.
+  useEffect(() => {
+    const cycle = () => setThemeIdState(id => {
+      const index = THEMES.findIndex(t => t.id === id);
+      const next = THEMES[(index + 1) % THEMES.length].id;
+      localStorage.setItem(THEME_KEY, next);
+      return next;
+    });
+
+    document.addEventListener("wds:cycle-theme", cycle);
+    return () => document.removeEventListener("wds:cycle-theme", cycle);
+  }, []);
+
   return (
     <Ctx.Provider value={{ themeId, setThemeId, current, themes: THEMES }}>
       <MantineProvider theme={current.theme} forceColorScheme={current.scheme}>

@@ -13,6 +13,10 @@ export type QueryChunk =
 export interface QueryRequest {
   connectionId: string; sql: string;
   maxRows?: number; timeoutSeconds?: number; schema?: string;
+  // Named bind variables; the statement itself keeps its :name / @name markers.
+  parameters?: Record<string, string | null>;
+  /// Wraps the whole script in one transaction: commit at the end, rollback on the first error.
+  transactional?: boolean;
 }
 
 export interface QueryRun {

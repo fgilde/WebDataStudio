@@ -1,0 +1,77 @@
+export interface Command {
+  id: string;
+  label: string;
+  group: string;
+  shortcut?: string;
+  run: () => void;
+  disabled?: boolean;
+}
+
+export interface CommandContext {
+  newQuery: () => void;
+  runCurrent: () => void;
+  cancelCurrent: () => void;
+  formatCurrent: () => void;
+  openConnections: () => void;
+  addConnection: () => void;
+  refreshExplorer: () => void;
+  goToObject: () => void;
+  openDiagram: () => void;
+  openHealth: () => void;
+  openAdmin: () => void;
+  openCompare: () => void;
+  openHistory: () => void;
+  openSavedQueries: () => void;
+  saveCurrentQuery: () => void;
+  exportResult: () => void;
+  openSnippets: () => void;
+  switchTheme: () => void;
+  saveLayout: () => void;
+  resetLayout: () => void;
+  copyLink: () => void;
+  showShortcuts: () => void;
+}
+
+/// One registry, read by both the palette and the shortcut help. A command can never appear in
+/// one and be missing from the other, which is the usual way those two drift apart.
+export function buildCommands(context: CommandContext): Command[] {
+  return [
+    { id: "query.new", label: "New query tab", group: "Query", shortcut: "Ctrl+N", run: context.newQuery },
+    { id: "query.run", label: "Run statement", group: "Query", shortcut: "F5", run: context.runCurrent },
+    { id: "query.cancel", label: "Cancel running query", group: "Query", shortcut: "Ctrl+Shift+C", run: context.cancelCurrent },
+    { id: "query.format", label: "Format SQL", group: "Query", shortcut: "Ctrl+Shift+F", run: context.formatCurrent },
+    { id: "query.save", label: "Save query", group: "Query", shortcut: "Ctrl+S", run: context.saveCurrentQuery },
+    { id: "query.saved", label: "Open saved queries", group: "Query", run: context.openSavedQueries },
+    { id: "query.history", label: "Open history", group: "Query", shortcut: "Ctrl+H", run: context.openHistory },
+    { id: "query.snippets", label: "Manage snippets", group: "Query", run: context.openSnippets },
+
+    { id: "connection.manage", label: "Open connection manager", group: "Connections", run: context.openConnections },
+    { id: "connection.add", label: "Add connection", group: "Connections", run: context.addConnection },
+    { id: "explorer.refresh", label: "Refresh explorer", group: "Connections", shortcut: "F6", run: context.refreshExplorer },
+    { id: "explorer.goto", label: "Go to object", group: "Connections", shortcut: "Ctrl+Shift+O", run: context.goToObject },
+
+    { id: "tool.diagram", label: "Open ER diagram", group: "Tools", shortcut: "Ctrl+D", run: context.openDiagram },
+    { id: "tool.health", label: "Open health report", group: "Tools", run: context.openHealth },
+    { id: "tool.admin", label: "Open administration", group: "Tools", run: context.openAdmin },
+    { id: "tool.compare", label: "Open compare", group: "Tools", run: context.openCompare },
+    { id: "result.export", label: "Export result", group: "Tools", shortcut: "Ctrl+E", run: context.exportResult },
+
+    { id: "view.theme", label: "Switch theme", group: "View", shortcut: "Ctrl+T", run: context.switchTheme },
+    { id: "view.saveLayout", label: "Save layout preset", group: "View", run: context.saveLayout },
+    // Reachable even with every panel closed: this is the way back from a broken layout.
+    { id: "view.resetLayout", label: "Reset layout", group: "View", run: context.resetLayout },
+    { id: "view.copyLink", label: "Copy link to this object", group: "View", run: context.copyLink },
+    { id: "view.shortcuts", label: "Keyboard shortcuts", group: "View", shortcut: "?", run: context.showShortcuts },
+  ];
+}
+
+/// Matches on the label and the group so "diagram" and "tools" both find the diagram command.
+export const filterCommands = (commands: Command[], search: string): Command[] => {
+  const needle = search.trim().toLowerCase();
+  if (!needle) return commands;
+
+  return commands.filter(c =>
+    c.label.toLowerCase().includes(needle) ||
+    c.group.toLowerCase().includes(needle) ||
+    c.id.toLowerCase().includes(needle));
+};

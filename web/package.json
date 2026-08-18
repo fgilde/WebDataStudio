@@ -1,0 +1,35 @@
+{
+  "name": "web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@mantine/core": "^9.5.1",
+    "@mantine/hooks": "^9.5.1",
+    "@mantine/modals": "^9.5.1",
+    "@mantine/notifications": "^9.5.1",
+    "@mantine/spotlight": "^9.5.1",
+    "@tabler/icons-react": "^3.46.0",
+    "dockview-react": "^8.1.0",
+    "monaco-editor": "^0.56.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "oxlint": "^1.75.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.0",
+    "vitest": "^4.1.11"
+  }
+}

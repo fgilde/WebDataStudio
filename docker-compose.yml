@@ -1,0 +1,16 @@
+services:
+  webdatastudio:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      # Remove both to run without a login screen.
+      WDS_USER: admin
+      WDS_PASSWORD: change-me
+      WDS_CONN_DEMO: sqlite:///data/demo.db
+    volumes:
+      - wds-data:/data
+    restart: unless-stopped
+
+volumes:
+  wds-data:

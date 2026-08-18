@@ -1,0 +1,8 @@
+bin/
+obj/
+node_modules/
+dist/
+*.user
+.vs/
+/data/
+src/WebDataStudio.Server/wwwroot/

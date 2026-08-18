@@ -107,7 +107,7 @@ public static class CompareEndpoints
         });
     }
 
-    private static async Task<List<TableDefinition>> ReadSchemaAsync(IDbDriver driver, IDbSession session,
+    internal static async Task<List<TableDefinition>> ReadSchemaAsync(IDbDriver driver, IDbSession session,
         string? schema, CancellationToken ct)
     {
         var tables = new List<TableDefinition>();

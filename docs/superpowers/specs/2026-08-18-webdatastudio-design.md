@@ -403,6 +403,16 @@ it works for every engine whose capability set claims support for it.
 | F14.2 | Redis: key tree, type-specific editors, TTL, command console |
 | F14.3 | Result renderer as a JSON tree, switchable to a table for flat documents |
 
+### F15 Documentation site
+| ID | Feature |
+|---|---|
+| F15.1 | GitHub Pages site served from `/docs`, docsify like AspireUI, same visual language |
+| F15.2 | Every page in English and German, switchable in the sidebar; docsify i18n through a `/docs/de/` tree |
+| F15.3 | Content: getting started, environment variables, connections, query editor, results and export, schema editing, analysis, administration, engine capability matrix, shortcuts |
+| F15.4 | Screenshots per major feature, captured in a dark and a light theme |
+| F15.5 | README links to the site in both languages; the site links back to the repository and the GHCR image |
+| F15.6 | A link check in CI so a renamed page cannot silently break the sidebar |
+
 ## 10. Safety behaviour
 
 - Statement timeout and row cap apply to every run; the cap is visible in the result footer
@@ -469,6 +479,7 @@ Each phase is planned and implemented separately and ends in a working, shippabl
 | P7 | Tier 2 (Oracle, DuckDB, ClickHouse) and tier 3 (MongoDB, Redis) | F14.1–F14.3, capability extensions |
 | P8 | ER diagrams, compare and deploy, backup and restore, administration, session control | F4.7, F10.1–F10.3, F11.1–F11.5, F12.1–F12.3 |
 | P9 | Remaining usability: query designer, charts, macros, layout presets, SSH tunnel, parameters, snippets | F1.4, F1.5, F1.7, F1.8, F3.8, F3.9, F3.11, F3.14, F5.9–F5.12, F13.1, F13.2, F13.4–F13.6 |
+| P10 | Bilingual documentation site on GitHub Pages | F15.1–F15.6 |
 
 The tool is usable after P2, replaces phpMyAdmin after P4, and covers day-to-day DataGrip
 work after P6.

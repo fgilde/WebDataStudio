@@ -15,8 +15,9 @@ ends with a working, shippable image.
 | [2026-08-18-p7-tier2-tier3-engines.md](2026-08-18-p7-tier2-tier3-engines.md) | Oracle, DuckDB, ClickHouse, MongoDB, Redis | F14.1–F14.3 plus capability extensions |
 | [2026-08-18-p8-diagrams-compare-admin.md](2026-08-18-p8-diagrams-compare-admin.md) | ER diagrams, schema and data compare, backup/restore, administration | F4.7, F10.1–F10.3, F11.1–F11.5, F12.1–F12.3 |
 | [2026-08-18-p9-usability.md](2026-08-18-p9-usability.md) | SSH tunnels, pooling, parameters, snippets, saved queries, query designer, charts, palette, layouts | F1.4, F1.5, F1.7, F1.8, F3.8, F3.9, F3.11, F3.14, F5.9–F5.12, F13.1, F13.2, F13.4–F13.6 |
+| [2026-08-18-p10-docs-site.md](2026-08-18-p10-docs-site.md) | Bilingual docsify site on GitHub Pages, screenshots, link check | F15.1–F15.6 |
 
-All 96 feature ids from the spec are covered exactly once across these plans; nothing appears in a
+All 102 feature ids from the spec are covered exactly once across these plans; nothing appears in a
 plan that is not in the spec.
 
 ## Plan depth

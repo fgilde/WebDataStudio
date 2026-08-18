@@ -71,7 +71,7 @@ export function ExplorerTree({ onSelect }: { onSelect: (s: ExplorerSelection) =>
       <Group gap={4} p={4} wrap="nowrap">
         <TextInput size="xs" flex={1} placeholder="Filter" leftSection={<IconSearch size={13} />}
           value={filter} onChange={e => setFilter(e.currentTarget.value)} />
-        <ActionIcon size="sm" variant="subtle" title="Refresh" onClick={() => setNonce(n => n + 1)}>
+        <ActionIcon size="sm" variant="subtle" aria-label="Refresh explorer" onClick={() => setNonce(n => n + 1)}>
           <IconRefresh size={14} />
         </ActionIcon>
       </Group>

@@ -16,3 +16,8 @@
   background-color: var(--mantine-color-default) !important;
   color: var(--mantine-color-dimmed) !important;
 }
+
+/* The statement F5 would run, tinted just enough to be visible in every theme. */
+.wds-active-statement {
+  background-color: color-mix(in srgb, var(--mantine-primary-color-filled) 10%, transparent);
+}

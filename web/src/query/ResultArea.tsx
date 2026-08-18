@@ -1,0 +1,76 @@
+import { useState } from "react";
+import { Badge, Group, ScrollArea, SegmentedControl, Tabs, Text } from "@mantine/core";
+import { IconAlertTriangle, IconTable } from "@tabler/icons-react";
+import { ResultGrid } from "../grid/ResultGrid";
+import { RowFormView } from "../grid/RowFormView";
+import type { ResultState } from "./resultStore";
+
+export function ResultArea({ result }: { result: ResultState }) {
+  const [view, setView] = useState<"grid" | "form">("grid");
+  const [formRow, setFormRow] = useState(0);
+
+  if (result.statements.length === 0 && result.messages.length === 0)
+    return <Text size="xs" c="dimmed" p="xs">Run a statement to see results here.</Text>;
+
+  const defaultTab = result.statements.length > 0 ? "s0" : "messages";
+
+  return (
+    <Tabs defaultValue={defaultTab} value={undefined} h="100%"
+      styles={{ panel: { height: "calc(100% - 34px)", minHeight: 0 } }}>
+      <Tabs.List>
+        {result.statements.map(s => (
+          <Tabs.Tab key={s.index} value={`s${s.index}`}
+            leftSection={s.error ? <IconAlertTriangle size={13} color="var(--mantine-color-red-6)" /> : <IconTable size={13} />}>
+            {result.statements.length > 1 ? `Result ${s.index + 1}` : "Result"}
+          </Tabs.Tab>
+        ))}
+        <Tabs.Tab value="messages">
+          Messages
+          {result.messages.length > 0 && <Badge size="xs" ml={4} variant="light">{result.messages.length}</Badge>}
+        </Tabs.Tab>
+        {result.cancelled && <Tabs.Tab value="cancelled" disabled>cancelled</Tabs.Tab>}
+      </Tabs.List>
+
+      {result.statements.map(s => (
+        <Tabs.Panel key={s.index} value={`s${s.index}`}>
+          {s.error ? (
+            <Text size="xs" c="red" p="xs" style={{ whiteSpace: "pre-wrap" }}>
+              {s.error.text}
+              {s.error.line !== null && <> (line {s.error.line}{s.error.column !== null && `, column ${s.error.column}`})</>}
+            </Text>
+          ) : s.columns.length === 0 ? (
+            <Text size="xs" p="xs" c="dimmed">
+              {s.rowsAffected !== null ? `${s.rowsAffected} rows affected` : "statement executed"}
+              {s.elapsedMs !== null && ` · ${s.elapsedMs} ms`}
+            </Text>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+              <Group gap={6} px={4} pt={4}>
+                <SegmentedControl size="xs" value={view} onChange={v => setView(v as "grid" | "form")}
+                  data={[{ label: "Grid", value: "grid" }, { label: "Form", value: "form" }]} />
+                {s.running && <Text size="xs" c="dimmed">running… {s.rowsRead} rows</Text>}
+              </Group>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                {view === "grid"
+                  ? <ResultGrid result={s} />
+                  : <RowFormView result={s} index={formRow} onIndexChange={setFormRow} />}
+              </div>
+            </div>
+          )}
+        </Tabs.Panel>
+      ))}
+
+      <Tabs.Panel value="messages">
+        <ScrollArea h="100%">
+          {result.messages.length === 0
+            ? <Text size="xs" c="dimmed" p="xs">No messages.</Text>
+            : result.messages.map((m, i) => (
+                <Text key={i} size="xs" p={4} ff="monospace">
+                  <Badge size="xs" variant="light" mr={4}>{m.severity}</Badge>{m.text}
+                </Text>
+              ))}
+        </ScrollArea>
+      </Tabs.Panel>
+    </Tabs>
+  );
+}

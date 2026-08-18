@@ -83,3 +83,32 @@ export const listSchema = (conn: string, parent?: string): Promise<SchemaNodeDto
 
 export const describeObject = (conn: string, ref: string): Promise<ObjectDetailDto> =>
   fetch(`${base}/schema/${conn}/object/${encodeURIComponent(ref)}`).then(r => ok<ObjectDetailDto>(r));
+
+export interface HistoryEntryDto {
+  id: number; connectionId: string; sql: string; executedAt: string;
+  elapsedMs: number | null; rowCount: number | null; error: string | null;
+}
+export interface HistoryInput {
+  connectionId: string; sql: string;
+  elapsedMs: number | null; rowCount: number | null; error: string | null;
+}
+
+export const listHistory = (params: { connectionId?: string; search?: string; limit?: number } = {}):
+  Promise<HistoryEntryDto[]> => {
+  const query = new URLSearchParams();
+  if (params.connectionId) query.set("connectionId", params.connectionId);
+  if (params.search) query.set("search", params.search);
+  if (params.limit) query.set("limit", String(params.limit));
+  const suffix = query.toString();
+  return fetch(`${base}/history${suffix ? `?${suffix}` : ""}`).then(r => ok<HistoryEntryDto[]>(r));
+};
+
+export const addHistory = (body: HistoryInput): Promise<void> =>
+  fetch(`${base}/history`, json("POST", body)).then(r => ok<void>(r));
+
+export const loadTabs = (): Promise<unknown[]> => fetch(`${base}/workspace/tabs`).then(r => ok<unknown[]>(r));
+
+export const saveTabs = (tabs: unknown): Promise<void> =>
+  fetch(`${base}/workspace/tabs`, {
+    method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(tabs),
+  }).then(r => ok<void>(r));

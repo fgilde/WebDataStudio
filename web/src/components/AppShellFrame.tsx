@@ -16,19 +16,19 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
           <Group gap="sm">
             <Text fw={600}>WebDataStudio</Text>
             <Tooltip label="Studio">
-              <ActionIcon component={Link} to="/" variant={pathname === "/" ? "light" : "subtle"}>
+              <ActionIcon component={Link} to="/" aria-label="Studio" variant={pathname === "/" ? "light" : "subtle"}>
                 <IconTable size={17} />
               </ActionIcon>
             </Tooltip>
             <Tooltip label="Connections">
-              <ActionIcon component={Link} to="/connections"
+              <ActionIcon component={Link} to="/connections" aria-label="Connections"
                 variant={pathname === "/connections" ? "light" : "subtle"}>
                 <IconDatabaseCog size={17} />
               </ActionIcon>
             </Tooltip>
           </Group>
           <Tooltip label="Theme">
-            <ActionIcon variant="subtle" onClick={() => setThemeOpen(true)}><IconPalette size={18} /></ActionIcon>
+            <ActionIcon variant="subtle" aria-label="Theme" onClick={() => setThemeOpen(true)}><IconPalette size={18} /></ActionIcon>
           </Tooltip>
         </Group>
       </AppShell.Header>

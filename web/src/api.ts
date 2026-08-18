@@ -221,3 +221,131 @@ export const previewRename = (conn: string, ref: string, newName: string):
   Promise<{ hash: string; script: string; dependencies: DependencyReportDto }> =>
   fetch(`${base}/ddl/${conn}/rename`, json("POST", { objectRef: ref, newName }))
     .then(r => ok<{ hash: string; script: string; dependencies: DependencyReportDto }>(r));
+
+// --- ER diagram --------------------------------------------------------------
+export interface DiagramColumnDto {
+  name: string; type: string; nullable: boolean; primaryKey: boolean; foreignKey: boolean;
+}
+export interface DiagramNodeDto {
+  id: string; schema: string; name: string; columns: DiagramColumnDto[];
+}
+export interface DiagramEdgeDto {
+  name: string; source: string; target: string;
+  sourceColumns: string[]; targetColumns: string[]; resolved: boolean;
+}
+
+export const loadDiagram = (conn: string, schema?: string):
+  Promise<{ nodes: DiagramNodeDto[]; edges: DiagramEdgeDto[] }> =>
+  fetch(`${base}/diagram/${conn}${schema ? `?schema=${encodeURIComponent(schema)}` : ""}`)
+    .then(r => ok<{ nodes: DiagramNodeDto[]; edges: DiagramEdgeDto[] }>(r));
+
+// --- administration ----------------------------------------------------------
+export interface SystemCommandDto {
+  id: string; label: string; sql: string; needsTarget: boolean;
+  destructive: boolean; description: string;
+}
+export interface SessionDto {
+  id: string; user: string; database: string; query: string;
+  state: string; durationMs: number; blockedBy: string | null;
+}
+export interface DatabaseDto { name: string; sizeBytes: number | null }
+export interface ServerLogDto { available: boolean; reason: string | null; lines: string[] }
+
+export const systemCommands = (conn: string): Promise<SystemCommandDto[]> =>
+  fetch(`${base}/admin/system-commands/${conn}`).then(r => ok<SystemCommandDto[]>(r));
+
+export const runSystemCommand = (conn: string, commandId: string, target?: string):
+  Promise<{ executed: string }> =>
+  fetch(`${base}/admin/system-command/${conn}`, json("POST", { commandId, target }))
+    .then(r => ok<{ executed: string }>(r));
+
+export const listSessions = (conn: string): Promise<SessionDto[]> =>
+  fetch(`${base}/admin/sessions/${conn}`).then(r => ok<SessionDto[]>(r));
+
+export const killSession = (conn: string, id: string): Promise<void> =>
+  fetch(`${base}/admin/sessions/${conn}/${encodeURIComponent(id)}/kill`, { method: "POST" })
+    .then(r => ok<void>(r));
+
+export const listDatabases = (conn: string): Promise<DatabaseDto[]> =>
+  fetch(`${base}/admin/databases/${conn}`).then(r => ok<DatabaseDto[]>(r));
+
+export const createDatabase = (conn: string, name: string): Promise<void> =>
+  fetch(`${base}/admin/databases/${conn}`, json("POST", { name })).then(r => ok<void>(r));
+
+export const dropDatabase = (conn: string, name: string): Promise<void> =>
+  fetch(`${base}/admin/databases/${conn}/${encodeURIComponent(name)}`, { method: "DELETE" })
+    .then(r => ok<void>(r));
+
+export const listUsers = (conn: string): Promise<string[]> =>
+  fetch(`${base}/admin/users/${conn}`).then(r => ok<string[]>(r));
+
+export const previewUserChange = (conn: string, body: {
+  user: string; password?: string; privilege?: string; target?: string;
+}): Promise<{ hash: string; script: string }> =>
+  fetch(`${base}/admin/users/${conn}/preview`, json("POST", body))
+    .then(r => ok<{ hash: string; script: string }>(r));
+
+export const applyUserChange = (conn: string, hash: string): Promise<{ executed: string }> =>
+  fetch(`${base}/admin/users/${conn}/apply`, json("POST", { hash }))
+    .then(r => ok<{ executed: string }>(r));
+
+export const serverLog = (conn: string, lines = 200): Promise<ServerLogDto> =>
+  fetch(`${base}/admin/logs/${conn}?lines=${lines}`).then(r => ok<ServerLogDto>(r));
+
+/// The backup answers with the dump itself, so it is downloaded rather than parsed.
+export const downloadBackup = async (conn: string, body: {
+  schemaOnly?: boolean; dataOnly?: boolean; tables?: string[];
+}): Promise<void> => {
+  const response = await fetch(`${base}/admin/backup/${conn}`, json("POST", body));
+  if (!response.ok) await fail(response);
+
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const name = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "backup";
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
+export const restoreBackup = async (conn: string, file: File, confirm: string): Promise<string> => {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("confirm", confirm);
+
+  const response = await fetch(`${base}/admin/restore/${conn}`, { method: "POST", body: form });
+  if (!response.ok) await fail(response);
+  return (await response.json()).message as string;
+};
+
+// --- compare -------------------------------------------------------------------
+export interface SchemaComparisonDto {
+  tablesOnlyInSource: string[]; tablesOnlyInTarget: string[];
+  changedTables: {
+    name: string; addedColumns: string[]; removedColumns: string[]; changedColumns: string[];
+  }[];
+  identicalTables: string[];
+  script: string;
+}
+export interface DataComparisonDto {
+  columns: string[]; keyColumns: string[];
+  missing: unknown[][]; extra: unknown[][];
+  different: { key: unknown[]; changedColumns: string[]; sourceRow: unknown[]; targetRow: unknown[] }[];
+  identical: number; truncated: boolean; script: string;
+}
+
+export const compareSchemas = (body: {
+  sourceConnectionId: string; sourceSchema?: string;
+  targetConnectionId: string; targetSchema?: string;
+}): Promise<SchemaComparisonDto> =>
+  fetch(`${base}/compare/schema`, json("POST", body)).then(r => ok<SchemaComparisonDto>(r));
+
+export const compareData = (body: {
+  sourceConnectionId: string; sourceRef: string;
+  targetConnectionId: string; targetRef: string;
+  keyColumns: string[]; maxRows?: number;
+}): Promise<DataComparisonDto> =>
+  fetch(`${base}/compare/data`, json("POST", body)).then(r => ok<DataComparisonDto>(r));

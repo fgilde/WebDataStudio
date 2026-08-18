@@ -8,9 +8,12 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "smoke:admin": "node scripts/smoke-admin.mjs",
+    "smoke:editing": "node scripts/smoke-editing.mjs"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.1.1",
     "@mantine/core": "^9.5.1",
     "@mantine/hooks": "^9.5.1",
     "@mantine/modals": "^9.5.1",
@@ -19,6 +22,7 @@
     "@tabler/icons-react": "^3.46.0",
     "@tanstack/react-table": "^9.1.2",
     "@tanstack/react-virtual": "^3.14.10",
+    "@xyflow/react": "^12.11.3",
     "dockview-react": "^8.1.0",
     "monaco-editor": "^0.56.0",
     "react": "^19.2.8",

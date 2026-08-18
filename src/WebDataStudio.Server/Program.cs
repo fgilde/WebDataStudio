@@ -6,6 +6,10 @@ using WebDataStudio.Server.Services;
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();
 
+// Enums travel as their names: "Table", not 8. The SPA switches on these strings.
+builder.Services.ConfigureHttpJsonOptions(o =>
+    o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
+
 // Resolved from DI rather than from builder.Configuration: configuration sources added by a host
 // builder (WebApplicationFactory in tests, and anything layered on later) only land in the composed
 // IConfiguration after Build().

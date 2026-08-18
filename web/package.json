@@ -16,6 +16,8 @@
     "@mantine/notifications": "^9.5.1",
     "@mantine/spotlight": "^9.5.1",
     "@tabler/icons-react": "^3.46.0",
+    "@tanstack/react-table": "^9.1.2",
+    "@tanstack/react-virtual": "^3.14.10",
     "dockview-react": "^8.1.0",
     "monaco-editor": "^0.56.0",
     "react": "^19.2.8",

@@ -110,6 +110,9 @@ public interface IDbDriver
 }
 ```
 
+`Ddl` arrives later than the rest: nothing writes DDL before the SQL schema exporter (P3), and the
+full writer interface only becomes necessary with the designer (P6).
+
 `DriverCapabilities` is a flags record covering at minimum: `Sql`, `MultiSchema`,
 `MultiDatabase`, `EstimatedPlan`, `ActualPlan`, `Transactions`, `Ddl`, `StoredProcedures`,
 `Triggers`, `Views`, `MaterializedViews`, `Sequences`, `ForeignKeys`, `PartialIndexes`,

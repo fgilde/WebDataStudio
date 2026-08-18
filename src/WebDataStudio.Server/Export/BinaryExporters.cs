@@ -16,6 +16,7 @@ public sealed class ExcelExporter : IResultExporter
     public string Label => "Excel";
     public string ContentType => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     public string FileExtension => "xlsx";
+    public bool RequiresSeekableStream => true;
 
     public async Task WriteAsync(Stream target, IAsyncEnumerable<ResultChunk> chunks,
         ExportOptions options, CancellationToken ct)
@@ -97,6 +98,7 @@ public sealed class ParquetExporter : IResultExporter
     public string Label => "Parquet";
     public string ContentType => "application/vnd.apache.parquet";
     public string FileExtension => "parquet";
+    public bool RequiresSeekableStream => true;
 
     public async Task WriteAsync(Stream target, IAsyncEnumerable<ResultChunk> chunks,
         ExportOptions options, CancellationToken ct)

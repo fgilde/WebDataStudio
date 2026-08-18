@@ -82,12 +82,37 @@ public static class ExportEndpoints
 
                 var request = new ScriptRequest("", body.MaxRows ?? defaultMaxRows, timeout, body.Schema);
 
-                foreach (var source in sources)
+                if (exporter.RequiresSeekableStream)
                 {
-                    var perSource = options with { TableName = source.Name };
-                    await exporter.WriteAsync(ctx.Response.Body,
-                        driver.ExecuteAsync(session, request with { Sql = source.Sql }, ctx.RequestAborted),
-                        perSource, ctx.RequestAborted);
+                    // Staged on disk rather than in memory: these writers seek, and a large export
+                    // must not be bounded by RAM.
+                    var temp = Path.Combine(Path.GetTempPath(), $"wds-export-{Guid.NewGuid():n}.tmp");
+                    try
+                    {
+                        await using (var file = new FileStream(temp, FileMode.Create, FileAccess.ReadWrite,
+                            FileShare.None, 64 * 1024, FileOptions.Asynchronous))
+                        {
+                            foreach (var source in sources)
+                                await exporter.WriteAsync(file,
+                                    driver.ExecuteAsync(session, request with { Sql = source.Sql }, ctx.RequestAborted),
+                                    options with { TableName = source.Name }, ctx.RequestAborted);
+                        }
+
+                        await using var read = new FileStream(temp, FileMode.Open, FileAccess.Read,
+                            FileShare.None, 64 * 1024, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
+                        await read.CopyToAsync(ctx.Response.Body, ctx.RequestAborted);
+                    }
+                    finally
+                    {
+                        if (File.Exists(temp)) File.Delete(temp);
+                    }
+                }
+                else
+                {
+                    foreach (var source in sources)
+                        await exporter.WriteAsync(ctx.Response.Body,
+                            driver.ExecuteAsync(session, request with { Sql = source.Sql }, ctx.RequestAborted),
+                            options with { TableName = source.Name }, ctx.RequestAborted);
                 }
 
                 await ctx.Response.Body.FlushAsync(ctx.RequestAborted);

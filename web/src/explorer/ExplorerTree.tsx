@@ -1,15 +1,21 @@
 import { useEffect, useState } from "react";
-import { ActionIcon, Badge, Group, Loader, Text, TextInput, UnstyledButton } from "@mantine/core";
+import { ActionIcon, Badge, Group, Loader, Menu, Text, TextInput, UnstyledButton } from "@mantine/core";
 import { IconChevronDown, IconChevronRight, IconRefresh, IconSearch } from "@tabler/icons-react";
 import { listConnections, listSchema, type Connection, type SchemaNodeDto } from "../api";
 import { nodeIcon } from "./nodeIcons";
 
 export interface ExplorerSelection { connectionId: string; node: SchemaNodeDto }
 
+export type ExplorerAction = "select" | "new-query" | "copy-name" | "show-ddl" | "export";
+
+// Actions that only make sense on a real object, not on a folder.
+const OBJECT_KINDS = ["Table", "View", "MaterializedView"];
+
 // One lazily loaded level. Children are fetched on first expand and cached until a manual refresh.
-function TreeLevel({ conn, parent, depth, filter, onSelect }: {
+function TreeLevel({ conn, parent, depth, filter, onSelect, onAction }: {
   conn: string; parent?: string; depth: number; filter: string;
   onSelect: (s: ExplorerSelection) => void;
+  onAction: (action: ExplorerAction, s: ExplorerSelection) => void;
 }) {
   const [nodes, setNodes] = useState<SchemaNodeDto[] | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -34,23 +40,53 @@ function TreeLevel({ conn, parent, depth, filter, onSelect }: {
     <>
       {visible.map(node => (
         <div key={node.ref}>
-          <UnstyledButton
-            w="100%" px={4} py={2}
-            style={{ paddingLeft: depth * 12 + 4 }}
-            onClick={() => {
-              if (node.hasChildren) setOpen(o => ({ ...o, [node.ref]: !o[node.ref] }));
-              onSelect({ connectionId: conn, node });
-            }}>
-            <Group gap={4} wrap="nowrap">
-              {node.hasChildren
-                ? (open[node.ref] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />)
-                : <span style={{ width: 12 }} />}
-              {nodeIcon(node.kind)}
-              <Text size="xs" truncate>{node.label}</Text>
-            </Group>
-          </UnstyledButton>
+          <Menu withinPortal shadow="md" position="right-start" trigger="click"
+            disabled={!OBJECT_KINDS.includes(node.kind)}>
+            <Menu.Target>
+              <UnstyledButton
+                w="100%" px={4} py={2}
+                style={{ paddingLeft: depth * 12 + 4 }}
+                onClick={e => {
+                  // Left click navigates; the context menu opens on right click only.
+                  if (e.button !== 0) return;
+                  if (node.hasChildren) setOpen(o => ({ ...o, [node.ref]: !o[node.ref] }));
+                  onSelect({ connectionId: conn, node });
+                }}
+                onContextMenu={e => {
+                  if (!OBJECT_KINDS.includes(node.kind)) return;
+                  e.preventDefault();
+                  onSelect({ connectionId: conn, node });
+                  (e.currentTarget as HTMLElement).click();
+                }}>
+                <Group gap={4} wrap="nowrap">
+                  {node.hasChildren
+                    ? (open[node.ref] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />)
+                    : <span style={{ width: 12 }} />}
+                  {nodeIcon(node.kind)}
+                  <Text size="xs" truncate>{node.label}</Text>
+                </Group>
+              </UnstyledButton>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item onClick={() => onAction("new-query", { connectionId: conn, node })}>
+                New query (SELECT *)
+              </Menu.Item>
+              <Menu.Item onClick={() => onAction("show-ddl", { connectionId: conn, node })}>
+                Show DDL
+              </Menu.Item>
+              <Menu.Item onClick={() => onAction("copy-name", { connectionId: conn, node })}>
+                Copy name
+              </Menu.Item>
+              <Menu.Divider />
+              <Menu.Item onClick={() => onAction("export", { connectionId: conn, node })}>
+                Export…
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+
           {node.hasChildren && open[node.ref] && (
-            <TreeLevel conn={conn} parent={node.ref} depth={depth + 1} filter="" onSelect={onSelect} />
+            <TreeLevel conn={conn} parent={node.ref} depth={depth + 1} filter=""
+              onSelect={onSelect} onAction={onAction} />
           )}
         </div>
       ))}
@@ -58,7 +94,10 @@ function TreeLevel({ conn, parent, depth, filter, onSelect }: {
   );
 }
 
-export function ExplorerTree({ onSelect }: { onSelect: (s: ExplorerSelection) => void }) {
+export function ExplorerTree({ onSelect, onAction }: {
+  onSelect: (s: ExplorerSelection) => void;
+  onAction: (action: ExplorerAction, s: ExplorerSelection) => void;
+}) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState("");
@@ -85,7 +124,7 @@ export function ExplorerTree({ onSelect }: { onSelect: (s: ExplorerSelection) =>
               {c.readOnly && <Badge size="xs" variant="light" color="orange">RO</Badge>}
             </Group>
           </UnstyledButton>
-          {open[c.id] && <TreeLevel conn={c.id} depth={1} filter={filter} onSelect={onSelect} />}
+          {open[c.id] && <TreeLevel conn={c.id} depth={1} filter={filter} onSelect={onSelect} onAction={onAction} />}
         </div>
       ))}
     </div>

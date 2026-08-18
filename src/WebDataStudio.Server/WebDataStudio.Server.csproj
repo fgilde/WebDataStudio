@@ -19,6 +19,7 @@
     <PackageReference Include="MySqlConnector" />
     <PackageReference Include="Parquet.Net" />
     <PackageReference Include="Npgsql" />
+    <PackageReference Include="SSH.NET" />
     <PackageReference Include="Scalar.AspNetCore" />
   </ItemGroup>
 

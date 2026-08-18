@@ -46,6 +46,7 @@ builder.Services.AddSingleton(sp => new ConnectionStore(
     sp.GetRequiredService<SecretProtector>()));
 builder.Services.AddSingleton<ConnectionRegistry>();
 builder.Services.AddSingleton<DriverRegistry>();
+builder.Services.AddSingleton<TunnelManager>();
 builder.Services.AddSingleton<SessionFactory>();
 builder.Services.AddSingleton<QueryRunner>();
 builder.Services.AddSingleton<ExporterRegistry>();
@@ -98,6 +99,7 @@ app.MapDdlEndpoints();
 app.MapCompareEndpoints();
 app.MapAdminEndpoints();
 app.MapDiagramEndpoints();
+app.MapSavedQueryEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();

@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
-import { ActionIcon, Badge, Group, Loader, Menu, Text, TextInput, UnstyledButton } from "@mantine/core";
+import { ActionIcon, Badge, Group, Loader, Popover, Stack, Text, TextInput, UnstyledButton } from "@mantine/core";
 import { IconChevronDown, IconChevronRight, IconRefresh, IconSearch } from "@tabler/icons-react";
 import { listConnections, listSchema, type Connection, type SchemaNodeDto } from "../api";
 import { nodeIcon } from "./nodeIcons";
 
 export interface ExplorerSelection { connectionId: string; node: SchemaNodeDto }
 
-export type ExplorerAction = "select" | "new-query" | "copy-name" | "show-ddl" | "export";
+export type ExplorerAction = "select" | "new-query" | "copy-name" | "show-ddl" | "export" | "import" | "copy-table";
 
 // Actions that only make sense on a real object, not on a folder.
 const OBJECT_KINDS = ["Table", "View", "MaterializedView"];
+
+const CONTEXT_ITEMS: { action: ExplorerAction; label: string }[] = [
+  { action: "new-query", label: "New query (SELECT *)" },
+  { action: "show-ddl", label: "Show DDL" },
+  { action: "copy-name", label: "Copy name" },
+  { action: "export", label: "Export…" },
+  { action: "import", label: "Import into this table…" },
+  { action: "copy-table", label: "Copy to another connection…" },
+];
 
 // One lazily loaded level. Children are fetched on first expand and cached until a manual refresh.
 function TreeLevel({ conn, parent, depth, filter, onSelect, onAction }: {
@@ -20,6 +29,8 @@ function TreeLevel({ conn, parent, depth, filter, onSelect, onAction }: {
   const [nodes, setNodes] = useState<SchemaNodeDto[] | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
+  // Controlled, because an uncontrolled Menu would swallow the left click that navigates.
+  const [menuFor, setMenuFor] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,15 +51,15 @@ function TreeLevel({ conn, parent, depth, filter, onSelect, onAction }: {
     <>
       {visible.map(node => (
         <div key={node.ref}>
-          <Menu withinPortal shadow="md" position="right-start" trigger="click"
-            disabled={!OBJECT_KINDS.includes(node.kind)}>
-            <Menu.Target>
+          <Popover withinPortal shadow="md" position="right-start" opened={menuFor === node.ref}
+            onDismiss={() => setMenuFor(null)}>
+            {/* Popover, not Menu: Mantine's Menu.Target toggles on left click, which would fight
+                the click that selects a node. Here the menu opens on right click only. */}
+            <Popover.Target>
               <UnstyledButton
                 w="100%" px={4} py={2}
                 style={{ paddingLeft: depth * 12 + 4 }}
-                onClick={e => {
-                  // Left click navigates; the context menu opens on right click only.
-                  if (e.button !== 0) return;
+                onClick={() => {
                   if (node.hasChildren) setOpen(o => ({ ...o, [node.ref]: !o[node.ref] }));
                   onSelect({ connectionId: conn, node });
                 }}
@@ -56,7 +67,7 @@ function TreeLevel({ conn, parent, depth, filter, onSelect, onAction }: {
                   if (!OBJECT_KINDS.includes(node.kind)) return;
                   e.preventDefault();
                   onSelect({ connectionId: conn, node });
-                  (e.currentTarget as HTMLElement).click();
+                  setMenuFor(node.ref);
                 }}>
                 <Group gap={4} wrap="nowrap">
                   {node.hasChildren
@@ -66,23 +77,20 @@ function TreeLevel({ conn, parent, depth, filter, onSelect, onAction }: {
                   <Text size="xs" truncate>{node.label}</Text>
                 </Group>
               </UnstyledButton>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item onClick={() => onAction("new-query", { connectionId: conn, node })}>
-                New query (SELECT *)
-              </Menu.Item>
-              <Menu.Item onClick={() => onAction("show-ddl", { connectionId: conn, node })}>
-                Show DDL
-              </Menu.Item>
-              <Menu.Item onClick={() => onAction("copy-name", { connectionId: conn, node })}>
-                Copy name
-              </Menu.Item>
-              <Menu.Divider />
-              <Menu.Item onClick={() => onAction("export", { connectionId: conn, node })}>
-                Export…
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+            </Popover.Target>
+
+            <Popover.Dropdown p={4}>
+              <Stack gap={0}>
+                {CONTEXT_ITEMS.map(item => (
+                  <UnstyledButton key={item.action} px={8} py={4}
+                    onClick={() => { setMenuFor(null); onAction(item.action, { connectionId: conn, node }); }}
+                    style={{ borderRadius: 4 }}>
+                    <Text size="xs">{item.label}</Text>
+                  </UnstyledButton>
+                ))}
+              </Stack>
+            </Popover.Dropdown>
+          </Popover>
 
           {node.hasChildren && open[node.ref] && (
             <TreeLevel conn={conn} parent={node.ref} depth={depth + 1} filter=""

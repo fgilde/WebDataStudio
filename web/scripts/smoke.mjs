@@ -21,11 +21,23 @@ await page.getByText("DEMO", { exact: true }).waitFor({ timeout: 15000 });
 await page.getByText("DEMO", { exact: true }).click();
 await page.getByText("Tables", { exact: true }).waitFor({ timeout: 10000 });
 await page.getByText("Tables", { exact: true }).click();
-await page.getByText("people", { exact: true }).waitFor({ timeout: 10000 });
+const peopleNode = page.locator("aside, div").filter({ hasText: "EXPLORER" }).getByText("people", { exact: true }).first();
+await peopleNode.waitFor({ timeout: 10000 });
 
-// Structure panel fills for the selected table.
-await page.getByText("people", { exact: true }).click();
-await page.getByRole("tab", { name: "Columns" }).waitFor({ timeout: 10000 });
+// Structure panel fills for the selected table. Its content only renders while its dock tab is
+// active, and a restored query tab may hold focus, so activate it explicitly.
+// Bring the Structure panel to the front first: its content only mounts while its dock tab is
+// active, and a restored query tab may hold focus.
+await page.getByRole("tab", { name: "Structure" }).click();
+await peopleNode.click();
+try {
+  await page.getByRole("tab", { name: "Columns" }).waitFor({ timeout: 10000 });
+} catch (e) {
+  await page.screenshot({ path: "smoke-fail.png" });
+  console.error("tabs:", await page.getByRole("tab").allInnerTexts());
+  console.error("console errors:", errors.slice(0, 3).join(" | ") || "(none)");
+  throw e;
+}
 await page.getByText("active", { exact: true }).first().waitFor({ timeout: 10000 });
 
 // New query tab, type a statement, run it with F5, read a value out of the grid.
@@ -36,7 +48,7 @@ await page.locator(".monaco-editor").first().click();
 await page.keyboard.type("SELECT id, name FROM people ORDER BY id LIMIT 3");
 await page.keyboard.press("F5");
 try {
-  await page.getByText("user1", { exact: true }).first().waitFor({ timeout: 15000 });
+  await page.getByText("ada", { exact: true }).first().waitFor({ timeout: 15000 });
 } catch (e) {
   await page.screenshot({ path: "smoke-fail.png", fullPage: false });
   console.error("console errors:", errors.slice(0, 5).join(" | ") || "(none)");

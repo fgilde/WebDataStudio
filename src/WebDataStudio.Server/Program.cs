@@ -90,6 +90,7 @@ app.MapSchemaEndpoints();
 app.MapQueryEndpoints();
 app.MapWorkspaceEndpoints();
 app.MapExportEndpoints();
+app.MapImportEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();

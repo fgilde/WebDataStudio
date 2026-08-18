@@ -12,6 +12,7 @@ import { QueryTab } from "../query/QueryTab";
 import { HistoryPanel } from "../query/HistoryPanel";
 import { describeObject, listConnections, loadTabs, saveTabs, type Connection } from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
+import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
 import type { DialectId } from "../sql/splitStatements";
 
 interface TabState { id: string; connectionId: string; dialect: DialectId; title: string; sql: string }
@@ -85,6 +86,8 @@ export function DockShell() {
   const centerGroup = useRef<DockviewGroupPanel | null>(null);
   const restored = useRef(false);
   const [exportTarget, setExportTarget] = useState<ExportTarget | null>(null);
+  const [importTarget, setImportTarget] = useState<ImportTarget | null>(null);
+  const [copySource, setCopySource] = useState<{ connectionId: string; objectRef: string; label: string } | null>(null);
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, []);
 
@@ -192,6 +195,14 @@ export function DockShell() {
         break;
       }
 
+      case "import":
+        setImportTarget({ connectionId: s.connectionId, table: name });
+        break;
+
+      case "copy-table":
+        setCopySource({ connectionId: s.connectionId, objectRef: s.node.ref, label: s.node.label });
+        break;
+
       case "export":
         setExportTarget({
           connectionId: s.connectionId,
@@ -247,6 +258,9 @@ export function DockShell() {
       </div>
 
       <ExportDialog target={exportTarget} onClose={() => setExportTarget(null)} />
+      <ImportDialog target={importTarget} onClose={() => setImportTarget(null)} />
+      <CopyTableDialog source={copySource} connections={connections}
+        onClose={() => setCopySource(null)} />
     </ShellContext.Provider>
   );
 }

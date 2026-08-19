@@ -32,8 +32,12 @@ header.top {
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
-header.top .wrap { display: flex; align-items: center; gap: 20px; height: 62px; }
-header.top img { height: 26px; }
+/* min-height, not height: the nav wraps on a narrow screen, and a fixed height would let it run
+   out of the bar. */
+header.top .wrap {
+  display: flex; align-items: center; gap: 20px; min-height: 74px; padding: 8px 0;
+}
+header.top img { height: 55px; }
 header.top nav { margin-left: auto; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 header.top nav a { color: var(--muted); font-size: 15px; }
 header.top nav a:hover { color: var(--ink); text-decoration: none; }
@@ -145,6 +149,8 @@ figure.zoomable img:focus-visible { border-color: var(--teal); transform: transl
 .lightbox-nav:hover, .lightbox-close:hover { border-color: var(--teal); color: var(--teal); }
 
 @media (max-width: 700px) {
+  /* The wordmark gives up its size before the navigation gives up its place. */
+  header.top img { height: 34px; }
   .lightbox { padding: 12px; }
   .lightbox-nav { width: 36px; height: 52px; font-size: 22px; }
 }

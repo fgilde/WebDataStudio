@@ -353,6 +353,8 @@ export function DockShell() {
   const restored = useRef(false);
   const chord = useRef(false);
   const chordTimer = useRef(0);
+  // Rendered, not just read: the slot numbers only show while a digit would still land.
+  const [chordOpen, setChordOpen] = useState(false);
   const [exportTarget, setExportTarget] = useState<ExportTarget | null>(null);
   const [importTarget, setImportTarget] = useState<ImportTarget | null>(null);
   const [copySource, setCopySource] = useState<{ connectionId: string; objectRef: string; label: string } | null>(null);
@@ -789,12 +791,19 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         setLayoutsOpen(true);
         window.clearTimeout(chordTimer.current);
         chord.current = true;
-        chordTimer.current = window.setTimeout(() => { chord.current = false; }, 3000);
+        setChordOpen(true);
+        chordTimer.current = window.setTimeout(() => {
+          chord.current = false;
+          setChordOpen(false);
+        }, 3000);
         return;
       }
-      if (chord.current && /^[0-9]$/.test(event.key)) {
+      // A digit typed into a field is part of a name, not a slot — the preset dialog has a text
+      // input right there.
+      if (chord.current && !typing && /^[0-9]$/.test(event.key)) {
         event.preventDefault();
         chord.current = false;
+        setChordOpen(false);
         setLayoutsOpen(false);
 
         const slot = Number(event.key);
@@ -829,6 +838,13 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [activeConnection, applyLayout, presets, resetLayout, showExplorer]);
+
+  // The header button lives outside this component; the theme switch uses the same channel.
+  useEffect(() => {
+    const open = () => setLayoutsOpen(true);
+    document.addEventListener("wds:layouts", open);
+    return () => document.removeEventListener("wds:layouts", open);
+  }, []);
 
   // A deep link opens its target once the connections are known.
   const followedLink = useRef(false);
@@ -895,7 +911,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       <SnippetManager opened={snippetsOpen} onClose={() => setSnippetsOpen(false)} />
       <LayoutPresetsModal opened={layoutsOpen} onClose={() => setLayoutsOpen(false)}
         connectionId={activeConnection || null}
-        presets={presets} save={savePresets}
+        presets={presets} save={savePresets} slotsArmed={chordOpen}
         capture={() => api.current?.toJSON()}
         apply={applyLayout}
         reset={resetLayout} />

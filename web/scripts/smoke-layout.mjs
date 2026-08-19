@@ -73,7 +73,20 @@ await page.getByText("Layout presets").waitFor({ timeout: 5000 });
 await page.getByLabel("Name").fill("smoke");
 await page.getByRole("button", { name: "Save current" }).click();
 await page.waitForTimeout(400);
-check("the first preset is slot 1", (await page.locator(".mantine-Badge-root").first().innerText()) === "1");
+
+// The numbers stand only while a digit would still be caught by the chord.
+check("the first preset is slot 1", await page.getByLabel("Slot 1").innerText() === "1");
+await page.waitForTimeout(3200);
+check("the numbers go away with the chord", await page.getByLabel(/^Slot /).count() === 0);
+await page.keyboard.press("Control+l");
+await page.waitForTimeout(200);
+check("arming the chord again brings them back", await page.getByLabel(/^Slot /).count() === 1);
+await page.keyboard.press("Escape");
+
+// The header button opens the same dialog, which is the way in when the explorer is closed.
+await page.getByLabel("Layout presets").first().click();
+await page.getByText("Layout presets").first().waitFor({ timeout: 5000 });
+check("the header button opens the dialog", await page.getByRole("button", { name: "Save current" }).isVisible());
 await page.keyboard.press("Escape");
 
 // Close History, then bring the whole arrangement back with the chord.

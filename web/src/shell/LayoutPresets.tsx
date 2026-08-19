@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  ActionIcon, Badge, Button, Group, Modal, Stack, Table, Text, TextInput,
+  ActionIcon, Button, Group, Modal, Stack, Table, Text, TextInput,
 } from "@mantine/core";
 import { IconTrash } from "@tabler/icons-react";
 import { loadWorkspaceItem, saveWorkspaceItem } from "../api";
@@ -38,7 +38,7 @@ export const presetForSlot = (
 ): LayoutPreset | undefined => visiblePresets(presets, connectionId)[slot - 1];
 
 export function LayoutPresetsModal({
-  opened, onClose, connectionId, capture, apply, reset, presets, save,
+  opened, onClose, connectionId, capture, apply, reset, presets, save, slotsArmed = false,
 }: {
   opened: boolean;
   onClose: () => void;
@@ -48,6 +48,9 @@ export function LayoutPresetsModal({
   reset: () => void;
   presets: LayoutPreset[];
   save: (list: LayoutPreset[]) => void;
+  /// True while the Ctrl+L chord is still listening. The numbers are only true for those seconds,
+  /// so showing them the rest of the time would promise a key that does nothing.
+  slotsArmed?: boolean;
 }) {
   const [name, setName] = useState("");
   const [global, setGlobal] = useState(false);
@@ -80,8 +83,10 @@ export function LayoutPresetsModal({
                 <Table.Tr key={preset.name}>
                   <Table.Td w={30}>
                     {/* The slot the Ctrl+L chord applies; past nine there is no key left to press. */}
-                    {at < 9
-                      ? <Badge size="xs" variant="light" c="dimmed">{at + 1}</Badge>
+                    {slotsArmed && at < 9
+                      ? <Text size="sm" fw={700} c="orange" aria-label={`Slot ${at + 1}`}>
+                          {at + 1}
+                        </Text>
                       : null}
                   </Table.Td>
                   <Table.Td>{preset.name}</Table.Td>
@@ -108,7 +113,11 @@ export function LayoutPresetsModal({
 
         {/* The way back from a layout with every panel closed. */}
         <Group justify="space-between">
-          <Text size="xs" c="dimmed">Ctrl+L then 1…9 applies a preset, Ctrl+L then 0 resets.</Text>
+          <Text size="xs" c={slotsArmed ? "orange" : "dimmed"}>
+            {slotsArmed
+              ? "Press 1…9 for a preset, 0 for the default."
+              : "Ctrl+L then 1…9 applies a preset, Ctrl+L then 0 resets."}
+          </Text>
           <Button size="xs" variant="light" color="red"
             onClick={() => { reset(); onClose(); }}>Reset layout</Button>
         </Group>

@@ -40,8 +40,9 @@ every action — including the ones without a shortcut.
 | `Ctrl+L` then `1`…`9` | apply the saved layout in that slot |
 | `Ctrl+L` then `0` | reset the layout to the default |
 
-`Ctrl+L` opens the preset list and waits three seconds for a digit, so the numbers next to the
-presets are the keys that apply them. Slot `0` is always the default arrangement, which is the way
+`Ctrl+L` opens the preset list and waits three seconds for a digit; the numbers next to the presets
+appear for exactly those seconds, because that is how long they mean anything. The same dialog is
+behind the layout button in the header and in the explorer's toolbar. Slot `0` is always the default arrangement, which is the way
 back from a layout with every panel closed.
 
 The editor is Monaco, so its own bindings work too: multi-cursor with `Alt+Click`, find and replace

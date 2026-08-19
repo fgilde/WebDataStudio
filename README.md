@@ -81,7 +81,9 @@ applies to; a test fails the build if that list falls behind.
 | Variable | Meaning |
 |---|---|
 | `WDS_CONNECTIONS` | JSON array of connection objects, applied at startup |
-| `WDS_CONN_<NAME>` | one connection as a URL, e.g. `postgres://user:pw@host:5432/db` |
+| `WDS_CONN_<NAME>` | one connection as a URL, e.g. `postgres://user:pw@host:5432/db`, or a provider connection string |
+| `WDS_CONN_<NAME>_ENGINE` | the engine for a `WDS_CONN_<NAME>` that holds a provider connection string instead of a URL |
+| `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | per-connection flags for the variable of the same name |
 | `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app; otherwise anonymous |
 | `WDS_SECRET_KEY` | AES key (base64, 32 bytes) for stored connection secrets; generated into `/data/.key` if absent |
 | `DB_PATH` | application SQLite database, default `/data/webdatastudio.db` |
@@ -107,6 +109,14 @@ applies to; a test fails the build if that list falls behind.
 
 URL schemes map to engines: `postgres`, `postgresql`, `mysql`, `mariadb`, `sqlserver`, `mssql`,
 `sqlite`, `oracle`, `duckdb`, `clickhouse`, `mongodb`, `redis`.
+
+A `WDS_CONN_<NAME>` may also carry the provider's own connection string — the form an orchestrator
+already has. Say which engine it is:
+
+```bash
+WDS_CONN_SHOP="Host=db;Port=5432;Username=app;Password=pw;Database=shop"
+WDS_CONN_SHOP_ENGINE=postgresql
+```
 
 Connections defined in the environment are re-read on every start, are read-only in the UI, and
 carry a badge. Connections added in the UI live in `/data` with their passwords encrypted at rest.

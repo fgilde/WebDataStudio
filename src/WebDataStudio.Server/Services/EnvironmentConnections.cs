@@ -12,6 +12,10 @@ public static class EnvironmentConnections
     private const string ArrayVariable = "WDS_CONNECTIONS";
     private const string SinglePrefix = "WDS_CONN_";
 
+    /// Reserved endings: `WDS_CONN_SHOP_ENGINE` configures `WDS_CONN_SHOP`, it is not a
+    /// connection called SHOP_ENGINE.
+    private static readonly string[] Suffixes = ["_ENGINE", "_READONLY", "_COLOR", "_GROUP"];
+
     private sealed record Entry(string Name, string? Engine, string ConnectionString,
         bool ReadOnly, string? Color, string? Group);
 
@@ -44,13 +48,44 @@ public static class EnvironmentConnections
             if (!key.StartsWith(SinglePrefix, StringComparison.Ordinal) || string.IsNullOrWhiteSpace(value)) continue;
 
             var name = key[SinglePrefix.Length..];
-            if (!Uri.TryCreate(value, UriKind.Absolute, out var url)) continue;
-            if (ConnectionUrl.EngineFromScheme(url.Scheme) is not { } engine) continue;
+
+            // The suffixes are settings for another variable, not connections of their own.
+            if (Suffixes.Any(suffix => name.EndsWith(suffix, StringComparison.Ordinal))) continue;
             if (specs.Any(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase))) continue;
 
-            specs.Add(new ConnectionSpec(StableId(name), name, engine,
-                ConnectionUrl.ToAdoConnectionString(engine, url),
-                ReadOnly: false, Color: null, Group: null, ConnectionSource.Environment));
+            string? Setting(string suffix) =>
+                env.TryGetValue($"{SinglePrefix}{name}{suffix}", out var found) && !string.IsNullOrWhiteSpace(found)
+                    ? found.Trim()
+                    : null;
+
+            var declared = Setting("_ENGINE")?.ToLowerInvariant();
+
+            // Two accepted shapes: a URL, or a provider-native connection string plus an engine.
+            // The second is what an orchestrator hands over, because that is what its resources
+            // already produce.
+            string engine;
+            string connectionString;
+
+            if (Uri.TryCreate(value, UriKind.Absolute, out var url)
+                && ConnectionUrl.EngineFromScheme(url.Scheme) is { } fromScheme)
+            {
+                engine = declared ?? fromScheme;
+                connectionString = engine == fromScheme
+                    ? ConnectionUrl.ToAdoConnectionString(engine, url)
+                    : value;
+            }
+            else
+            {
+                if ((declared ?? EngineGuess.FromConnectionString(value)) is not { } guessed) continue;
+                engine = guessed;
+                connectionString = value;
+            }
+
+            specs.Add(new ConnectionSpec(StableId(name), name, engine, connectionString,
+                ReadOnly: string.Equals(Setting("_READONLY"), "true", StringComparison.OrdinalIgnoreCase),
+                Color: Setting("_COLOR"),
+                Group: Setting("_GROUP"),
+                ConnectionSource.Environment));
         }
 
         return specs;

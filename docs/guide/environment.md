@@ -3,7 +3,9 @@
 | Variable | Meaning |
 |---|---|
 | `WDS_CONNECTIONS` | JSON array of connection objects, applied at startup |
-| `WDS_CONN_<NAME>` | one connection as a URL; the name after the prefix becomes its label |
+| `WDS_CONN_<NAME>` | one connection as a URL or a provider connection string; the name after the prefix becomes its label |
+| `WDS_CONN_<NAME>_ENGINE` | which engine that connection string belongs to |
+| `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | flags for the connection of the same name |
 | `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app |
 | `WDS_SECRET_KEY` | AES key (base64, 32 bytes) for stored secrets; generated into `/data/.key` if absent |
 | `WDS_READONLY` | when `true`, every connection is read-only regardless of its own flag |
@@ -25,6 +27,21 @@ WDS_CONN_LOCAL=sqlite:///data/local.db
 
 Recognised schemes: `postgres`, `postgresql`, `mysql`, `mariadb`, `sqlserver`, `mssql`, `sqlite`,
 `oracle`, `duckdb`, `clickhouse`, `mongodb`, `redis`.
+
+## Connections as provider connection strings
+
+The same variable also takes the connection string a provider produces, which is what an
+orchestrator such as .NET Aspire already has in hand. Name the engine alongside it:
+
+```bash
+WDS_CONN_SHOP="Host=db;Port=5432;Username=app;Password=pw;Database=shop"
+WDS_CONN_SHOP_ENGINE=postgresql
+WDS_CONN_SHOP_GROUP=Development
+WDS_CONN_SHOP_READONLY=false
+```
+
+Without `_ENGINE` the engine is guessed from the keys in the string, and the connection is skipped
+if the guess fails — better than attaching it to the wrong driver.
 
 ## Connections as JSON
 

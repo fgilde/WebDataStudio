@@ -3,7 +3,9 @@
 | Variable | Bedeutung |
 |---|---|
 | `WDS_CONNECTIONS` | JSON-Array mit Verbindungsobjekten, wird beim Start angewendet |
-| `WDS_CONN_<NAME>` | eine Verbindung als URL; der Name hinter dem Präfix wird ihr Label |
+| `WDS_CONN_<NAME>` | eine Verbindung als URL oder als Provider-Verbindungszeichenfolge; der Name hinter dem Präfix wird ihr Label |
+| `WDS_CONN_<NAME>_ENGINE` | zu welcher Engine diese Verbindungszeichenfolge gehört |
+| `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | Flags für die gleichnamige Verbindung |
 | `WDS_USER`, `WDS_PASSWORD` | sind **beide** gesetzt, schützt ein Login-Bildschirm die Anwendung |
 | `WDS_SECRET_KEY` | AES-Schlüssel (Base64, 32 Byte) für gespeicherte Geheimnisse; sonst wird `/data/.key` erzeugt |
 | `WDS_READONLY` | bei `true` ist jede Verbindung nur lesend, unabhängig von ihrem eigenen Flag |
@@ -25,6 +27,21 @@ WDS_CONN_LOCAL=sqlite:///data/local.db
 
 Erkannte Schemata: `postgres`, `postgresql`, `mysql`, `mariadb`, `sqlserver`, `mssql`, `sqlite`,
 `oracle`, `duckdb`, `clickhouse`, `mongodb`, `redis`.
+
+## Verbindungen als Provider-Verbindungszeichenfolge
+
+Dieselbe Variable nimmt auch die Verbindungszeichenfolge, die ein Provider erzeugt — genau das, was
+ein Orchestrator wie .NET Aspire ohnehin zur Hand hat. Die Engine dazu benennen:
+
+```bash
+WDS_CONN_SHOP="Host=db;Port=5432;Username=app;Password=pw;Database=shop"
+WDS_CONN_SHOP_ENGINE=postgresql
+WDS_CONN_SHOP_GROUP=Development
+WDS_CONN_SHOP_READONLY=false
+```
+
+Ohne `_ENGINE` wird die Engine aus den Schlüsseln der Zeichenfolge erraten; schlägt das fehl, wird
+die Verbindung übersprungen — besser, als sie am falschen Treiber anzuhängen.
 
 ## Verbindungen als JSON
 

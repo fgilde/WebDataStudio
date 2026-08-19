@@ -13,7 +13,8 @@
     "smoke:editing": "node scripts/smoke-editing.mjs",
     "smoke:p9": "node scripts/smoke-p9.mjs",
     "smoke:tree": "node scripts/smoke-tree.mjs",
-    "smoke:login": "node scripts/smoke-login.mjs"
+    "smoke:login": "node scripts/smoke-login.mjs",
+    "smoke:data": "node scripts/smoke-data.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

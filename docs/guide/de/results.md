@@ -53,3 +53,10 @@ einzeln gemeldet, statt die ganze Datei abzubrechen.
 
 **Copy to another connection…** verschiebt eine Tabelle zwischen zwei Verbindungen, auch über
 Engine-Grenzen hinweg.
+
+## Eine Tabelle durchsehen
+
+Eine mit Doppelklick geöffnete Tabelle hat dieselben Aktionen **Copy** und **Export** wie ein
+Abfrage-Ergebnis: Kopieren nimmt die Seite auf dem Schirm, Export streamt die ganze Tabelle. Die
+Spaltenköpfe haben ein Menü zum Sortieren und Filtern, und beides läuft auf dem Server — eine Seite
+hält 200 von womöglich Millionen Zeilen, im Browser wäre also die falsche Menge sortiert.

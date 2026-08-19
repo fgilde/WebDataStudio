@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Pagination, Text, Tooltip,
+  ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Pagination, Text, TextInput, Tooltip,
 } from "@mantine/core";
 import {
-  IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconPlus, IconRefresh,
-  IconRestore, IconTrash, IconWand,
+  IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconFilter, IconPlus,
+  IconRefresh, IconRestore, IconSortAscending, IconSortDescending, IconTrash, IconWand,
 } from "@tabler/icons-react";
 import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
 import { browseData, lookupValues, type DataPageDto, type ForeignKeyDto } from "../api";
@@ -39,6 +39,10 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   const [bulk, setBulk] = useState<{ rowIndex: number; column: string; value: unknown }[] | null>(null);
   const [selected, setSelected] = useState<{ row: number; col: number }[]>([]);
   const [nonce, setNonce] = useState(0);
+  // Sorting and filtering happen on the server: a page holds 200 of possibly millions of rows, so
+  // doing either in the browser would order and filter the wrong set.
+  const [sort, setSort] = useState<{ column: string; desc: boolean } | null>(null);
+  const [filter, setFilter] = useState<{ column: string; value: string } | null>(null);
 
   const columns = useMemo(() => page?.columns.map(c => c.name) ?? [], [page]);
   const rowAt = useCallback((index: number) => page?.rows[index], [page]);
@@ -47,11 +51,15 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    browseData(connectionId, objectRef, { offset: (pageIndex - 1) * PAGE_SIZE, limit: PAGE_SIZE })
+    browseData(connectionId, objectRef, {
+      offset: (pageIndex - 1) * PAGE_SIZE, limit: PAGE_SIZE,
+      sort: sort?.column, desc: sort?.desc,
+      filterColumn: filter?.column, filter: filter?.value,
+    })
       .then(p => { if (!cancelled) setPage(p); })
       .catch(e => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [connectionId, objectRef, pageIndex, nonce]);
+  }, [connectionId, objectRef, pageIndex, nonce, sort, filter]);
 
   if (error) return <Text c="red" size="xs" p="xs">{error}</Text>;
   if (!page) return <Loader size="xs" m="xs" />;
@@ -149,6 +157,8 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
         <Text size="xs" c="dimmed" ml="auto">
           {page.rows.length} rows
           {page.totalEstimate ? ` of ~${page.totalEstimate}` : ""}
+          {filter ? ` · filtered on ${filter.column}` : ""}
+          {sort ? ` · sorted by ${sort.column}` : ""}
           {changeSet.isDirty && ` · ${changeSet.changes.length} pending`}
         </Text>
       </Group>
@@ -168,11 +178,42 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                   textAlign: "left", padding: "2px 8px", whiteSpace: "nowrap",
                   borderBottom: "1px solid var(--mantine-color-default-border)",
                 }}>
-                  <Group gap={3} wrap="nowrap">
-                    <Text size="xs" fw={600}>{c.name}</Text>
-                    {page.keyColumns.includes(c.name) && <Badge size="xs" variant="light">key</Badge>}
-                    {fkForColumn(c.name) && <IconArrowRight size={11} />}
-                  </Group>
+                  <Menu withinPortal closeOnItemClick={false}>
+                    <Menu.Target>
+                      <Group gap={3} wrap="nowrap" style={{ cursor: "pointer" }}>
+                        <Text size="xs" fw={600}>{c.name}</Text>
+                        {page.keyColumns.includes(c.name) && <Badge size="xs" variant="light">key</Badge>}
+                        {fkForColumn(c.name) && <IconArrowRight size={11} />}
+                        {sort?.column === c.name && (sort.desc
+                          ? <IconSortDescending size={12} /> : <IconSortAscending size={12} />)}
+                        {filter?.column === c.name && <IconFilter size={12} />}
+                      </Group>
+                    </Menu.Target>
+                    <Menu.Dropdown>
+                      <Menu.Item onClick={() => { setSort({ column: c.name, desc: false }); setPageIndex(1); }}>
+                        Sort ascending
+                      </Menu.Item>
+                      <Menu.Item onClick={() => { setSort({ column: c.name, desc: true }); setPageIndex(1); }}>
+                        Sort descending
+                      </Menu.Item>
+                      <Menu.Item disabled={sort === null} onClick={() => setSort(null)}>Clear sort</Menu.Item>
+                      <Menu.Divider />
+                      <Menu.Item>
+                        {/* One column at a time: that is what the endpoint filters by, and a
+                            pretend multi-column filter would silently ignore all but one. */}
+                        <TextInput size="xs" placeholder={`Filter ${c.name}`}
+                          value={filter?.column === c.name ? filter.value : ""}
+                          onChange={e => {
+                            const value = e.currentTarget.value;
+                            setFilter(value ? { column: c.name, value } : null);
+                            setPageIndex(1);
+                          }} />
+                      </Menu.Item>
+                      <Menu.Item disabled={filter === null} onClick={() => setFilter(null)}>
+                        Clear filter
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
                   <Text size="10px" c="dimmed">{c.dataType}</Text>
                 </th>
               ))}

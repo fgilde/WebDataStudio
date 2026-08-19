@@ -21,6 +21,22 @@ Destructive statements are written into a query tab instead of running from the 
 database, creating a table and changing an index are the exceptions — they have their own dialog,
 and every schema change still shows its SQL before it runs.
 
+## Properties
+
+**Properties…** on a connection, its database or a schema opens what that connection is: the name,
+engine, where it was defined, whether it is read-only, the SSH tunnel if there is one — and what
+the server itself reports, such as its version, the current database, encoding, time zone and
+size. The bottom of the dialog lists what the engine supports, so a missing button in the UI has a
+visible reason.
+
+The connection string is shown there too, with the password replaced by a mask. The eye reveals it
+and there are two copy buttons: one copies the string without the password, the other with it. The
+password is fetched only when one of those is pressed — it is never part of a routine page load,
+and revealing it does not survive closing the dialog.
+
+If the server does not answer, the dialog still shows the definition and says what went wrong;
+that is often exactly what it was opened to find out.
+
 ## Groups and colours
 
 A connection can carry a group and a colour. The explorer draws groups as collapsible headers and

@@ -47,3 +47,10 @@ preview, and lets you map file columns to table columns. Rows that fail are repo
 rather than aborting the whole file.
 
 **Copy to another connection…** moves a table between two connections, including across engines.
+
+## Browsing a table
+
+A table opened with a double-click gets the same **Copy** and **Export** actions as a query result:
+copy takes the page on screen, export streams the whole table. Its column headers carry a menu for
+sorting and filtering, and both run on the server — a page holds 200 of possibly millions of rows,
+so sorting in the browser would order the wrong set.

@@ -22,6 +22,22 @@ Destruktive Statements landen im Abfrage-Tab statt im Menü zu laufen. Ausnahmen
 anlegen, Tabelle anlegen und Index ändern — die haben ihren eigenen Dialog, und jede
 Schema-Änderung zeigt ihr SQL trotzdem vor der Ausführung.
 
+## Eigenschaften
+
+**Properties…** auf einer Verbindung, ihrer Datenbank oder einem Schema zeigt, was diese Verbindung
+ist: Name, Engine, wo sie definiert wurde, ob sie nur lesend ist, der SSH-Tunnel falls vorhanden —
+und was der Server selbst meldet, etwa Version, aktuelle Datenbank, Kodierung, Zeitzone und Größe.
+Unten steht, was die Engine unterstützt; eine fehlende Schaltfläche in der Oberfläche hat damit
+einen sichtbaren Grund.
+
+Auch die Verbindungszeichenfolge steht dort, das Passwort durch eine Maske ersetzt. Das Auge zeigt
+es, und es gibt zwei Kopier-Schaltflächen: eine kopiert die Zeichenfolge ohne Passwort, die andere
+mit. Das Passwort wird nur geholt, wenn eine davon gedrückt wird — es ist nie Teil eines normalen
+Seitenaufbaus, und das Aufdecken übersteht das Schließen des Dialogs nicht.
+
+Antwortet der Server nicht, zeigt der Dialog trotzdem die Definition und nennt den Fehler — meist
+ist genau das der Grund, ihn zu öffnen.
+
 ## Gruppen und Farben
 
 Eine Verbindung kann eine Gruppe und eine Farbe tragen. Der Explorer zeichnet Gruppen als

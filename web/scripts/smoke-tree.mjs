@@ -57,13 +57,19 @@ try {
   await page.getByText(/^Indexes of/).waitFor({ timeout: 15000 });
   await page.getByRole("button", { name: "Add index", exact: true }).click();
 
-  // The new row starts with a generated name; that is the field to rename.
-  await page.locator("input[value^='ix_orders_']").first().fill(indexName);
+  // The row that was just added, found by its generated name. Addressing the first row would
+  // target an index the table already has, and the designer keeps every tab panel mounted, so a
+  // positional locator can land in a hidden one.
+  //
+  // The column comes first and the name last: renaming the row makes this locator stop matching,
+  // because Playwright resolves it again on every use.
+  const row = page.locator("tbody tr").filter({ has: page.locator("input[value^='ix_orders_']") }).last();
 
-  // Pick the column the index covers.
-  await page.locator(".mantine-Modal-content .mantine-MultiSelect-input").first().click();
-  await page.getByText("person_id", { exact: true }).last().click();
+  await row.locator(".mantine-MultiSelect-input").click();
+  await page.locator("[role=option]").filter({ hasText: "person_id" }).first().click();
   await page.keyboard.press("Escape");
+
+  await row.locator("input").first().fill(indexName);
 
   await page.locator(".mantine-Modal-content").getByRole("button", { name: "Save", exact: true }).click();
   await page.getByText(/CREATE INDEX/i).first().waitFor({ timeout: 15000 });
@@ -87,6 +93,12 @@ async function connectionId() {
 }
 
 await page.screenshot({ path: "smoke-tree.png" });
+
+// Drop what this run created, so the next one starts from the same table.
+await page.request.post(`${baseUrl}/api/query/execute`, {
+  data: { connectionId: await connectionId(), sql: `DROP INDEX "${indexName}"` },
+});
+
 await browser.close();
 
 if (errors.length > 0) {

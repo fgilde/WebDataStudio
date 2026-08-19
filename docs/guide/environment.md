@@ -7,6 +7,7 @@
 | `WDS_CONN_<NAME>_ENGINE` | which engine that connection string belongs to |
 | `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | flags for the connection of the same name |
 | `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app |
+| `WDS_TITLE` | a name for this studio, shown in the header, on the login screen and in the browser tab |
 | `WDS_SECRET_KEY` | AES key (base64, 32 bytes) for stored secrets; generated into `/data/.key` if absent |
 | `WDS_READONLY` | when `true`, every connection is read-only regardless of its own flag |
 | `WDS_QUERY_TIMEOUT_SECONDS` | default statement timeout, default `300` |

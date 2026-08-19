@@ -14,8 +14,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
+  // The name of the studio belongs in the browser tab too, on the login screen already.
+  useEffect(() => {
+    document.title = state?.title ? `${state.title} · WebDataStudio` : "WebDataStudio";
+  }, [state?.title]);
+
   if (!state) return <Center h="100vh"><Loader /></Center>;
   // No credentials configured: no login screen at all.
   if (state.anonymous || state.authenticated) return <>{children}</>;
-  return <LoginPage onSuccess={refresh} />;
+  return <LoginPage title={state.title} onSuccess={refresh} />;
 }

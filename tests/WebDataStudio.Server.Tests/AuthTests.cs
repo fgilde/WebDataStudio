@@ -101,5 +101,50 @@ public class AuthEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
     }
 
-    private record MeResponse(bool Anonymous, bool Authenticated, string? Username);
+    private record MeResponse(bool Anonymous, bool Authenticated, string? Username, string? Title);
+
+    [Fact]
+    public async Task Me_carries_the_studio_title_when_one_is_set()
+    {
+        using var factory = Factory(("WDS_TITLE", "analytics studio"));
+        var body = await factory.CreateClient()
+            .GetFromJsonAsync<MeResponse>("/api/auth/me", TestContext.Current.CancellationToken);
+
+        Assert.Equal("analytics studio", body!.Title);
+    }
+
+    [Fact]
+    public async Task Me_has_no_title_when_nothing_named_the_studio()
+    {
+        using var factory = Factory();
+        var body = await factory.CreateClient()
+            .GetFromJsonAsync<MeResponse>("/api/auth/me", TestContext.Current.CancellationToken);
+
+        // Null, not an empty string: the header and the browser tab show nothing at all then.
+        Assert.Null(body!.Title);
+    }
+
+    [Fact]
+    public async Task A_blank_title_counts_as_no_title()
+    {
+        using var factory = Factory(("WDS_TITLE", "   "));
+        var body = await factory.CreateClient()
+            .GetFromJsonAsync<MeResponse>("/api/auth/me", TestContext.Current.CancellationToken);
+
+        Assert.Null(body!.Title);
+    }
+
+    [Fact]
+    public async Task The_title_is_readable_before_signing_in()
+    {
+        // The login screen shows it, so it cannot sit behind the login.
+        using var factory = Factory(("WDS_USER", "admin"), ("WDS_PASSWORD", "s3cret"),
+            ("WDS_TITLE", "production"));
+
+        var body = await factory.CreateClient()
+            .GetFromJsonAsync<MeResponse>("/api/auth/me", TestContext.Current.CancellationToken);
+
+        Assert.False(body!.Authenticated);
+        Assert.Equal("production", body.Title);
+    }
 }

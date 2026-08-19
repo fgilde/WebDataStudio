@@ -1,6 +1,10 @@
 const base = "/api";
 
-export interface Me { anonymous: boolean; authenticated: boolean; username: string | null }
+export interface Me {
+  anonymous: boolean; authenticated: boolean; username: string | null;
+  /// Name of this studio, from WDS_TITLE. Null when nothing named it.
+  title?: string | null;
+}
 export interface Connection {
   id: string; name: string; engine: string; readOnly: boolean;
   color: string | null; group: string | null; source: "Environment" | "Stored"; summary: string;

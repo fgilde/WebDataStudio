@@ -16,11 +16,18 @@ public static class AuthEndpoints
         var options = app.Services.GetRequiredService<AuthOptions>();
         var api = app.MapGroup("/api");
 
+        // A name for this studio, shown in the header and the browser tab. Empty by default, so
+        // an unnamed studio looks exactly as it did before.
+        var title = app.Services.GetRequiredService<IConfiguration>()["WDS_TITLE"]?.Trim();
+        if (string.IsNullOrEmpty(title)) title = null;
+
         api.MapGet("/auth/me", (HttpContext ctx) => Results.Ok(new
         {
             anonymous = options.Anonymous,
             authenticated = options.Anonymous || (ctx.User.Identity?.IsAuthenticated ?? false),
             username = options.Anonymous ? null : ctx.User.Identity?.Name,
+            // The login screen needs it too, so it rides along with the one call that always runs.
+            title,
         })).AllowAnonymous();
 
         api.MapPost("/auth/login", async (HttpContext ctx, LoginRequest body) =>

@@ -25,6 +25,23 @@ public class EnvironmentConnectionsTests
     }
 
     [Fact]
+    public void A_name_with_two_underscores_keeps_them()
+    {
+        // ASP.NET's environment provider maps a double underscore to a colon, so a connection an
+        // orchestrator called "ABP - SPARK" (WDS_CONN_ABP___SPARK) used to show up as
+        // "ABP:_SPARK" in the explorer.
+        var result = EnvironmentConnections.Parse(new Dictionary<string, string?>
+        {
+            ["WDS_CONN_ABP:_SPARK"] = "Data Source=/tmp/shop.db",
+            ["WDS_CONN_ABP:_SPARK_ENGINE"] = "sqlite",
+        });
+
+        var spec = Assert.Single(result);
+        Assert.Equal("ABP___SPARK", spec.Name);
+        Assert.Equal("sqlite", spec.Engine);
+    }
+
+    [Fact]
     public void Parses_the_json_array_variable()
     {
         var result = EnvironmentConnections.Parse(new Dictionary<string, string?>

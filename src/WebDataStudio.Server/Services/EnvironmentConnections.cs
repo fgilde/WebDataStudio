@@ -47,14 +47,18 @@ public static class EnvironmentConnections
         {
             if (!key.StartsWith(SinglePrefix, StringComparison.Ordinal) || string.IsNullOrWhiteSpace(value)) continue;
 
-            var name = key[SinglePrefix.Length..];
+            // The key as configuration sees it: ASP.NET's environment provider turns a double
+            // underscore into a colon, so WDS_CONN_ABP___SPARK arrives as WDS_CONN_ABP:_SPARK.
+            // Lookups use that spelling; the name shown to a user gets its underscores back.
+            var variable = key[SinglePrefix.Length..];
+            var name = variable.Replace(":", "__", StringComparison.Ordinal);
 
             // The suffixes are settings for another variable, not connections of their own.
             if (Suffixes.Any(suffix => name.EndsWith(suffix, StringComparison.Ordinal))) continue;
             if (specs.Any(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase))) continue;
 
             string? Setting(string suffix) =>
-                env.TryGetValue($"{SinglePrefix}{name}{suffix}", out var found) && !string.IsNullOrWhiteSpace(found)
+                env.TryGetValue($"{SinglePrefix}{variable}{suffix}", out var found) && !string.IsNullOrWhiteSpace(found)
                     ? found.Trim()
                     : null;
 

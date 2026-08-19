@@ -39,6 +39,16 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
 Every connection string you can express as an environment variable is attached at startup, so a
 studio for your development stack is one resource in the app host.
 
+Or with [Nextended.Aspire.Hosting.WebDataStudio](https://www.nuget.org/packages/Nextended.Aspire.Hosting.WebDataStudio/),
+which wires the databases of your stack into the studio for you:
+
+```csharp
+builder.AddPostgres("pg").AddDatabase("shop").WithWebDataStudio();
+builder.AddSqlServer("sql").AddDatabase("orders").WithWebDataStudio();
+```
+
+Both databases land in one studio; a second `studioName` gives you a second studio.
+
 ## Engines
 
 PostgreSQL · MySQL and MariaDB · Microsoft SQL Server · SQLite · Oracle · DuckDB · ClickHouse ·

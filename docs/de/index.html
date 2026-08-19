@@ -155,6 +155,13 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
        .WithHttpEndpoint(port: 8080, targetPort: 8080)
        .WithEnvironment("WDS_CONN_SHOP", db.Resource.ConnectionStringExpression)
        .WithVolume("wds-data", "/data");</pre>
+
+    <p class="note">
+      Oder
+      <a href="https://www.nuget.org/packages/Nextended.Aspire.Hosting.WebDataStudio/">Nextended.Aspire.Hosting.WebDataStudio</a>
+      installieren und <code>builder.AddPostgres("pg").AddDatabase("shop").WithWebDataStudio();</code>
+      schreiben — ein Aufruf je Datenbank, ein Studio, Engine automatisch erkannt.
+    </p>
   </div>
 </section>
 

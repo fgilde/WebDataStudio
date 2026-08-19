@@ -44,6 +44,20 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
        .WithVolume("wds-data", "/data");
 ```
 
+### Mit dem Aspire-Integrationspaket
+
+[Nextended.Aspire.Hosting.WebDataStudio](https://www.nuget.org/packages/Nextended.Aspire.Hosting.WebDataStudio/)
+macht daraus einen Aufruf pro Datenbank und erkennt die Engine an der Ressource:
+
+```csharp
+builder.AddPostgres("pg").AddDatabase("shop").WithWebDataStudio();
+builder.AddSqlServer("sql").AddDatabase("orders").WithWebDataStudio();
+builder.AddRedis("cache").WithWebDataStudio();
+```
+
+Alle drei landen in einem Studio. `studioName:` ergibt ein zweites, und wer es selbst mit
+`AddWebDataStudio` baut, setzt Login, Nur-Lese-Modus und Zeilenlimits gleich im App-Host.
+
 ## Als Desktop-Anwendung
 
 Den Build für deine Plattform von der

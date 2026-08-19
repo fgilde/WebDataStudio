@@ -43,7 +43,7 @@ try {
 
   const hrefs = await page.locator("a").evaluateAll(links => links.map(a => a.getAttribute("href")));
   for (const expected of ["https://www.gilde.org", "https://github.com/fgilde/WebDataStudio",
-    "https://fgilde.github.io/WebDataStudio/"]) {
+    "https://fgilde.github.io/WebDataStudio/guide/"]) {
     if (!hrefs.includes(expected)) throw new Error(`no link to ${expected}: ${hrefs.join(", ")}`);
   }
 } catch (e) { await fail("screen", e); }

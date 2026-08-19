@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { ActionIcon, AppShell, Group, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, AppShell, Divider, Group, Text, Tooltip } from "@mantine/core";
 import { IconDatabaseCog, IconLayoutBoard, IconPalette, IconTable } from "@tabler/icons-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeDrawer } from "../ThemeDrawer";
@@ -55,12 +55,14 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
                 </ActionIcon>
               </Tooltip>
             ) : null}
-            <BrandLinks />
             <Tooltip label="Theme">
               <ActionIcon variant="subtle" aria-label="Theme" onClick={() => setThemeOpen(true)}>
                 <IconPalette size={18} />
               </ActionIcon>
             </Tooltip>
+            {/* What this studio does, and where it comes from, are two different kinds of link. */}
+            <Divider orientation="vertical" my={12} mx={4} />
+            <BrandLinks />
           </Group>
         </Group>
       </AppShell.Header>

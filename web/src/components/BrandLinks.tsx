@@ -2,7 +2,9 @@ import { ActionIcon, Group, Tooltip } from "@mantine/core";
 import { IconBrandGithub } from "@tabler/icons-react";
 
 export const GITHUB_URL = "https://github.com/fgilde/WebDataStudio";
-export const DOCS_URL = "https://fgilde.github.io/WebDataStudio/";
+// Straight into the guide: the landing page is for people who do not have the studio in front of
+// them yet.
+export const DOCS_URL = "https://fgilde.github.io/WebDataStudio/guide/";
 export const GILDE_URL = "https://www.gilde.org";
 
 /// The three places this studio comes from, as icons. Used in the header; the login screen shows

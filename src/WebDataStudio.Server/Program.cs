@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using WebDataStudio.Server.Drivers;
 using WebDataStudio.Server.Endpoints;
@@ -66,8 +67,19 @@ var app = builder.Build();
 
 app.MapOpenApi();
 
-var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
-app.MapGet("/api/health", () => Results.Ok(new { status = "ok", version })).AllowAnonymous();
+// The informational version carries the commit ("1.1.42+abc1234"), which is what answers whether
+// a running container is the build somebody just pushed.
+var version = typeof(Program).Assembly
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+    ?? typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
+var built = File.GetLastWriteTimeUtc(typeof(Program).Assembly.Location);
+app.MapGet("/api/health", () => Results.Ok(new
+{
+    status = "ok",
+    version,
+    commit = version.Contains('+') ? version.Split('+')[1] : null,
+    built,
+})).AllowAnonymous();
 
 app.UseDefaultFiles();
 app.UseStaticFiles();

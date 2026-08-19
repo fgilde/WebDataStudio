@@ -1,0 +1,22 @@
+<Project>
+
+  <!-- One version for everything the repository builds. The patch number is the CI run number, so
+       it counts up without anybody editing a file; a local build stays 1.1.0-dev, which is how you
+       tell a hand-built binary from a published one. The commit rides in the informational version,
+       because "is the image running the fix I just pushed" is otherwise unanswerable from the
+       studio itself. -->
+  <PropertyGroup>
+    <!-- The SDK otherwise appends the source revision to whatever we set, which turns a readable
+         "1.1.42+abc1234" into "1.1.42+abc1234.<40 hex>". -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <WdsBuild Condition="'$(WdsBuild)' == ''">0</WdsBuild>
+    <WdsCommit Condition="'$(WdsCommit)' == ''">local</WdsCommit>
+
+    <VersionPrefix>1.1.$(WdsBuild)</VersionPrefix>
+    <VersionSuffix Condition="'$(WdsBuild)' == '0'">dev</VersionSuffix>
+    <InformationalVersion Condition="'$(WdsBuild)' == '0'">1.1.0-dev+$(WdsCommit)</InformationalVersion>
+    <InformationalVersion Condition="'$(WdsBuild)' != '0'">1.1.$(WdsBuild)+$(WdsCommit)</InformationalVersion>
+  </PropertyGroup>
+
+</Project>

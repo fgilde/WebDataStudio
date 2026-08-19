@@ -25,6 +25,7 @@ export interface CommandContext {
   saveCurrentQuery: () => void;
   exportResult: () => void;
   openSnippets: () => void;
+  showExplorer: () => void;
   switchTheme: () => void;
   saveLayout: () => void;
   resetLayout: () => void;
@@ -56,6 +57,7 @@ export function buildCommands(context: CommandContext): Command[] {
     { id: "tool.compare", label: "Open compare", group: "Tools", run: context.openCompare },
     { id: "result.export", label: "Export result", group: "Tools", shortcut: "Ctrl+E", run: context.exportResult },
 
+    { id: "view.explorer", label: "Show explorer", group: "View", shortcut: "Ctrl+B", run: context.showExplorer },
     { id: "view.theme", label: "Switch theme", group: "View", shortcut: "Ctrl+T", run: context.switchTheme },
     { id: "view.saveLayout", label: "Layout presets — save, or apply 1…9", group: "View", shortcut: "Ctrl+L", run: context.saveLayout },
     // Reachable even with every panel closed: this is the way back from a broken layout.

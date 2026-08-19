@@ -22,7 +22,9 @@ await page.getByText("DEMO", { exact: true }).waitFor({ timeout: 15000 });
 await page.getByText("DEMO", { exact: true }).click();
 await page.getByText("Tables", { exact: true }).waitFor({ timeout: 10000 });
 await page.getByText("Tables", { exact: true }).click();
-const peopleNode = page.locator("aside, div").filter({ hasText: "EXPLORER" }).getByText("people", { exact: true }).first();
+// The explorer is a dock panel now, so scope the lookup to the panel that holds the filter box.
+const explorer = page.locator(".dv-groupview").filter({ has: page.getByPlaceholder("Filter") }).first();
+const peopleNode = explorer.getByText("people", { exact: true }).first();
 await peopleNode.waitFor({ timeout: 10000 });
 
 // Structure panel fills for the selected table. Its content only renders while its dock tab is

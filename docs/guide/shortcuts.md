@@ -35,6 +35,7 @@ every action — including the ones without a shortcut.
 | `Ctrl+D` | ER diagram |
 | `Ctrl+E` | export the result |
 | `Ctrl+T` | next theme |
+| `Ctrl+B` | show the explorer, when it has been closed |
 | `Ctrl+L` | layout presets |
 | `Ctrl+L` then `1`…`9` | apply the saved layout in that slot |
 | `Ctrl+L` then `0` | reset the layout to the default |

@@ -12,6 +12,20 @@ The volume holds the application database: connections you add in the UI, query 
 queries, snippets and layouts. Connections given as environment variables are re-read on every
 start and never written there.
 
+## Which build am I running
+
+The version sits in the bottom right corner of the studio, and its tooltip carries the commit and
+the build time. `GET /api/health` returns the same three values, which is the quicker way to tell a
+pulled `:latest` from a stale local image:
+
+```bash
+curl -s http://localhost:8080/api/health
+{"status":"ok","version":"1.1.42+9f3c1ab…","commit":"9f3c1ab…","built":"2026-08-19T18:57:46Z"}
+```
+
+Published images count the patch number up on their own; a version reading `1.1.0-dev` was built
+by hand rather than pulled.
+
 ## With Docker Compose
 
 ```yaml

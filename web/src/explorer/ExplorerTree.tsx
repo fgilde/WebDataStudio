@@ -20,18 +20,22 @@ const INDENT = 16;
 // Actions that only make sense on a real object, not on a folder.
 const OBJECT_KINDS = ["Table", "View", "MaterializedView"];
 
-function ContextMenu({ items, opened, onClose, onPick, children }: {
+/// The menu opens where the pointer is. Anchoring it to the row would put it at the row's right
+/// edge — the full width of the explorer away from the click that asked for it.
+function ContextMenu({ items, at, onClose, onPick }: {
   items: ContextItem[];
-  opened: boolean;
+  at: { x: number; y: number } | null;
   onClose: () => void;
   onPick: (action: ExplorerAction) => void;
-  children: React.ReactNode;
 }) {
+  if (!at) return null;
+
   return (
-    <Popover withinPortal shadow="md" position="right-start" opened={opened} onDismiss={onClose}>
-      {/* Popover, not Menu: Mantine's Menu.Target toggles on left click, which would fight the
-          click that selects a node. Here the menu opens on right click only. */}
-      <Popover.Target>{children}</Popover.Target>
+    <Popover withinPortal shadow="md" position="bottom-start" offset={0} opened onDismiss={onClose}>
+      {/* A one-pixel anchor at the pointer, so Popover keeps its flipping and dismiss handling. */}
+      <Popover.Target>
+        <div style={{ position: "fixed", left: at.x, top: at.y, width: 1, height: 1 }} />
+      </Popover.Target>
 
       <Popover.Dropdown p={4}>
         <Stack gap={0} miw={210}>
@@ -65,8 +69,9 @@ function TreeLevel({ conn, parent, depth, filter, caps, onSelect, onAction }: {
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
-  // Controlled, because an uncontrolled Menu would swallow the left click that navigates.
-  const [menuFor, setMenuFor] = useState<string | null>(null);
+  // Controlled, because an uncontrolled menu would swallow the left click that navigates. The
+  // pointer position rides along: the menu opens where the click was.
+  const [menuFor, setMenuFor] = useState<{ ref: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,35 +101,32 @@ function TreeLevel({ conn, parent, depth, filter, caps, onSelect, onAction }: {
     <>
       {visible.map(node => (
         <div key={node.ref}>
-          <ContextMenu items={actionsFor(node.kind, caps)} opened={menuFor === node.ref}
-            onClose={() => setMenuFor(null)} onPick={action => act(action, node)}>
-            <UnstyledButton
-              w="100%" py={2}
-              style={{ paddingLeft: pad + 4, paddingRight: 4 }}
-              onClick={() => {
-                if (node.hasChildren) setOpen(o => ({ ...o, [node.ref]: !o[node.ref] }));
-                onSelect({ connectionId: conn, node });
-              }}
-              onDoubleClick={() => {
-                if (OBJECT_KINDS.includes(node.kind)) onAction("open-data", { connectionId: conn, node });
-              }}
-              onContextMenu={e => {
-                e.preventDefault();
-                onSelect({ connectionId: conn, node });
-                setMenuFor(node.ref);
-              }}>
-              <Group gap={4} wrap="nowrap">
-                {node.hasChildren
-                  ? (open[node.ref] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />)
-                  : <span style={{ width: 12 }} />}
-                {nodeIcon(node.kind)}
-                <Text size="xs" truncate>{node.label}</Text>
-                {node.detail
-                  ? <Text size="10px" c="dimmed" truncate>{node.detail}</Text>
-                  : null}
-              </Group>
-            </UnstyledButton>
-          </ContextMenu>
+          <UnstyledButton
+            w="100%" py={2}
+            style={{ paddingLeft: pad + 4, paddingRight: 4 }}
+            onClick={() => {
+              if (node.hasChildren) setOpen(o => ({ ...o, [node.ref]: !o[node.ref] }));
+              onSelect({ connectionId: conn, node });
+            }}
+            onDoubleClick={() => {
+              if (OBJECT_KINDS.includes(node.kind)) onAction("open-data", { connectionId: conn, node });
+            }}
+            onContextMenu={e => {
+              e.preventDefault();
+              onSelect({ connectionId: conn, node });
+              setMenuFor({ ref: node.ref, x: e.clientX, y: e.clientY });
+            }}>
+            <Group gap={4} wrap="nowrap">
+              {node.hasChildren
+                ? (open[node.ref] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />)
+                : <span style={{ width: 12 }} />}
+              {nodeIcon(node.kind)}
+              <Text size="xs" truncate>{node.label}</Text>
+              {node.detail
+                ? <Text size="10px" c="dimmed" truncate>{node.detail}</Text>
+                : null}
+            </Group>
+          </UnstyledButton>
 
           {node.hasChildren && open[node.ref] && (
             // A guide line keeps the nesting visible where long labels push the indentation out
@@ -139,6 +141,14 @@ function TreeLevel({ conn, parent, depth, filter, caps, onSelect, onAction }: {
           )}
         </div>
       ))}
+
+      {/* One menu per level, not per row: it is opened for whichever node was right-clicked. */}
+      <ContextMenu at={menuFor} onClose={() => setMenuFor(null)}
+        items={actionsFor(visible.find(n => n.ref === menuFor?.ref)?.kind ?? "Table", caps)}
+        onPick={action => {
+          const node = visible.find(n => n.ref === menuFor?.ref);
+          if (node) act(action, node);
+        }} />
     </>
   );
 }
@@ -153,7 +163,7 @@ export function ExplorerTree({ onSelect, onAction }: {
   const [filter, setFilter] = useState("");
   const [nonce, setNonce] = useState(0);
   const [closedGroups, setClosedGroups] = useState<Record<string, boolean>>({});
-  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [menuFor, setMenuFor] = useState<{ id: string; x: number; y: number } | null>(null);
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, [nonce]);
 
@@ -212,28 +222,25 @@ export function ExplorerTree({ onSelect, onAction }: {
 
           {!closedGroups[group] && list.map(c => (
             <div key={`${c.id}-${nonce}`}>
-              <ContextMenu items={connectionActions(capsByEngine[c.engine] ?? {})}
-                opened={menuFor === c.id} onClose={() => setMenuFor(null)}
-                onPick={action => action === "refresh"
-                  ? setNonce(n => n + 1)
-                  : onAction(action, { connectionId: c.id, node: rootNode(c) })}>
-                <UnstyledButton w="100%" px={4} py={3} pl={group ? 14 : 4}
-                  onClick={() => setOpen(o => ({ ...o, [c.id]: !o[c.id] }))}
-                  onContextMenu={e => { e.preventDefault(); setMenuFor(c.id); }}
-                  // The colour tint is the production-is-red affordance: a wrong-window DELETE is
-                  // much less likely when the whole row is the wrong colour.
-                  style={c.color ? {
-                    borderLeft: `3px solid ${c.color}`,
-                    background: `color-mix(in srgb, ${c.color} 12%, transparent)`,
-                  } : undefined}>
-                  <Group gap={4} wrap="nowrap">
-                    {open[c.id] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
-                    <Text size="xs" fw={600} c={c.color ?? undefined} truncate>{c.name}</Text>
-                    {c.readOnly && <Badge size="xs" variant="light" color="orange">RO</Badge>}
-                    {c.tunnelled && <Badge size="xs" variant="light" color="blue">SSH</Badge>}
-                  </Group>
-                </UnstyledButton>
-              </ContextMenu>
+              <UnstyledButton w="100%" px={4} py={3} pl={group ? 14 : 4}
+                onClick={() => setOpen(o => ({ ...o, [c.id]: !o[c.id] }))}
+                onContextMenu={e => {
+                  e.preventDefault();
+                  setMenuFor({ id: c.id, x: e.clientX, y: e.clientY });
+                }}
+                // The colour tint is the production-is-red affordance: a wrong-window DELETE is
+                // much less likely when the whole row is the wrong colour.
+                style={c.color ? {
+                  borderLeft: `3px solid ${c.color}`,
+                  background: `color-mix(in srgb, ${c.color} 12%, transparent)`,
+                } : undefined}>
+                <Group gap={4} wrap="nowrap">
+                  {open[c.id] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
+                  <Text size="xs" fw={600} c={c.color ?? undefined} truncate>{c.name}</Text>
+                  {c.readOnly && <Badge size="xs" variant="light" color="orange">RO</Badge>}
+                  {c.tunnelled && <Badge size="xs" variant="light" color="blue">SSH</Badge>}
+                </Group>
+              </UnstyledButton>
 
               {open[c.id] && (
                 <div style={{
@@ -248,6 +255,16 @@ export function ExplorerTree({ onSelect, onAction }: {
           ))}
         </div>
       ))}
+
+      <ContextMenu at={menuFor} onClose={() => setMenuFor(null)}
+        items={connectionActions(
+          capsByEngine[connections.find(c => c.id === menuFor?.id)?.engine ?? ""] ?? {})}
+        onPick={action => {
+          const connection = connections.find(c => c.id === menuFor?.id);
+          if (!connection) return;
+          if (action === "refresh") { setNonce(n => n + 1); return; }
+          onAction(action, { connectionId: connection.id, node: rootNode(connection) });
+        }} />
     </div>
   );
 }

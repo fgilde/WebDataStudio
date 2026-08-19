@@ -45,6 +45,10 @@ const json = (method: string, body: unknown) => ({
 
 export const me = (): Promise<Me> => fetch(`${base}/auth/me`).then(r => ok<Me>(r));
 
+export interface HealthDto { status: string; version: string; commit: string | null; built: string }
+
+export const health = (): Promise<HealthDto> => fetch(`${base}/health`).then(r => ok<HealthDto>(r));
+
 // Login must not trigger the unauthorized handler: a wrong password is an expected answer here.
 export const login = (username: string, password: string): Promise<Me> =>
   fetch(`${base}/auth/login`, json("POST", { username, password })).then(async r => {

@@ -7,9 +7,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+# The published version, passed in by CI so the studio can show which build it is running.
+ARG WDS_BUILD=0
+ARG WDS_COMMIT=local
+
 WORKDIR /src
 COPY . .
-RUN dotnet publish src/WebDataStudio.Server -c Release -o /app
+RUN dotnet publish src/WebDataStudio.Server -c Release -o /app     -p:WdsBuild=$WDS_BUILD -p:WdsCommit=$WDS_COMMIT
 
 # ---- runtime --------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

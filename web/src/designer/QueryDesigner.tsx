@@ -162,7 +162,7 @@ export function QueryDesigner({ connectionId, dialect, onOpenInTab }: {
 
             <Group gap="md">
               <Checkbox size="xs" label="Group by the plain columns" checked={model.grouping}
-                onChange={e => setModel(m => ({ ...m, grouping: e.currentTarget.checked }))} />
+                onChange={e => { const grouping = e.currentTarget.checked; setModel(m => ({ ...m, grouping })); }} />
               <NumberInput size="xs" w={120} label="Limit" min={0} value={model.limit ?? 0}
                 onChange={v => setModel(m => ({ ...m, limit: Number(v) || undefined }))} />
             </Group>

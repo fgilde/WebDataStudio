@@ -133,10 +133,10 @@ export function SavedQueriesPanel({ onOpen, currentSql, currentConnectionId }: {
         title={editing?.id ? "Edit saved query" : "Save query"}>
         <Stack gap="xs">
           <TextInput size="xs" label="Name" data-autofocus value={editing?.name ?? ""}
-            onChange={e => setEditing(q => q && { ...q, name: e.currentTarget.value })} />
+            onChange={e => { const name = e.currentTarget.value; setEditing(q => q && { ...q, name }); }} />
           {/* A folder is a plain name, not a tree: one level keeps the panel readable. */}
           <TextInput size="xs" label="Folder" placeholder="optional" value={editing?.folder ?? ""}
-            onChange={e => setEditing(q => q && { ...q, folder: e.currentTarget.value })} />
+            onChange={e => { const folder = e.currentTarget.value; setEditing(q => q && { ...q, folder }); }} />
           <Group justify="flex-end">
             <Button size="xs" variant="default" onClick={() => setEditing(null)}>Cancel</Button>
             <Button size="xs" loading={saving} disabled={!editing?.name.trim()} onClick={save}>Save</Button>

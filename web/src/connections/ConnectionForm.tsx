@@ -61,14 +61,14 @@ export function ConnectionForm({ initial, onSubmit, onCancel }: {
   return (
     <Stack>
       <TextInput label="Name" value={value.name} required
-        onChange={e => setValue(v => ({ ...v, name: e.currentTarget.value }))} />
+        onChange={e => { const name = e.currentTarget.value; setValue(v => ({ ...v, name })); }} />
       <Select label="Engine" data={ENGINES.map(e => ({ value: e.id, label: e.label }))}
         value={value.engine} onChange={id => id && setValue(v => ({ ...v, engine: id }))} />
       <Textarea label="Connection string" autosize minRows={2} value={value.connectionString}
         onChange={e => setConnectionString(e.currentTarget.value)}
         description="A provider connection string or a URL such as postgres://user:pw@host:5432/db" />
       <Switch label="Read-only" checked={value.readOnly}
-        onChange={e => setValue(v => ({ ...v, readOnly: e.currentTarget.checked }))} />
+        onChange={e => { const readOnly = e.currentTarget.checked; setValue(v => ({ ...v, readOnly })); }} />
 
       {/* Both collapsed: the common case stays a three-field form. */}
       <Accordion variant="contained" chevronPosition="left">
@@ -79,7 +79,7 @@ export function ConnectionForm({ initial, onSubmit, onCancel }: {
           <Accordion.Panel>
             <Stack gap="xs">
               <TextInput size="xs" label="Group" placeholder="production" value={value.group ?? ""}
-                onChange={e => setValue(v => ({ ...v, group: e.currentTarget.value || null }))} />
+                onChange={e => { const group = e.currentTarget.value || null; setValue(v => ({ ...v, group })); }} />
               <ColorInput size="xs" label="Colour" format="hex" value={value.color ?? ""}
                 swatches={["#e03131", "#f08c00", "#2f9e44", "#1971c2", "#9c36b5"]}
                 onChange={colour => setValue(v => ({ ...v, color: colour || null }))}

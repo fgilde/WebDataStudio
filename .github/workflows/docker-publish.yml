@@ -54,3 +54,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # The run number is the patch version, so every published image counts up on its own.
+          build-args: |
+            WDS_BUILD=${{ github.run_number }}
+            WDS_COMMIT=${{ github.sha }}

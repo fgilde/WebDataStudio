@@ -21,7 +21,7 @@ export function ParameterDialog({ names, initial, onCancel, onRun }: {
           : names?.map((name, index) => (
               <TextInput key={name} size="xs" label={name} data-autofocus={index === 0}
                 value={values[name] ?? ""}
-                onChange={e => setValues(v => ({ ...v, [name]: e.currentTarget.value }))}
+                onChange={e => { const value = e.currentTarget.value; setValues(v => ({ ...v, [name]: value })); }}
                 onKeyDown={e => { if (e.key === "Enter") onRun(values); }} />
             ))}
 

@@ -101,6 +101,8 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F13.4 | Save, apply and reset layout presets, `Ctrl+L` plus a digit per preset | done | all | Shell, command palette, theme drawer |
 | F13.5 | Deep links to an object or a query | done | all | Shell, command palette, theme drawer |
 | F13.6 | Toasts for long-running jobs | done | all | Shell, command palette, theme drawer |
+| F13.7 | The explorer is a dock panel: drag, split or close it, `Ctrl+B` brings it back | done | all | Shell |
+| F13.8 | The running build shown bottom right, with its commit and build time | done | all | Shell |
 | F14.1 | MongoDB: collection browser, JSON editor, aggregation pipeline, index management | partial: the command console runs find, aggregate and index commands; there is no separate pipeline builder | mongodb | Query tab on a MongoDB connection |
 | F14.2 | Redis: key tree, type-specific editors, TTL, command console | partial: the command console covers the supported commands including TTL; there is no dedicated key tree | redis | Query tab on a Redis connection |
 | F14.3 | Result renderer as a JSON tree, switchable to a table for flat documents | done | mongodb | Result area, document view |

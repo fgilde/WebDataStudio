@@ -20,6 +20,40 @@ const check = (label, condition) => {
 await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByText("DEMO", { exact: true }).waitFor({ timeout: 20000 });
 
+// The explorer is a dock panel, so its tab can be dragged into another group.
+const explorerTab = page.getByRole("tab", { name: "Explorer" });
+check("the explorer has a tab of its own", await explorerTab.count() === 1);
+{
+  const from = await explorerTab.boundingBox();
+  const onto = await page.getByRole("tab", { name: "Start" }).boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(onto.x + onto.width + 30, onto.y + onto.height / 2, { steps: 20 });
+  await page.waitForTimeout(200);
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  const tabs = await page.getByRole("tab").allInnerTexts();
+  check(`the drag moved it (${tabs.slice(0, 3).join(",")})`, tabs.indexOf("Explorer") > 0);
+}
+
+// The context menu belongs at the pointer, not at the right edge of the row that was clicked.
+{
+  const row = await page.getByText("DEMO", { exact: true }).boundingBox();
+  const x = Math.round(row.x + 20);
+  const y = Math.round(row.y + 5);
+  await page.mouse.click(x, y, { button: "right" });
+  await page.waitForTimeout(300);
+  const menu = await page.locator(".mantine-Popover-dropdown").first().boundingBox();
+  check(`the menu opens at the pointer (${Math.round(menu.x)},${Math.round(menu.y)} vs ${x},${y})`,
+    Math.abs(menu.x - x) < 30 && Math.abs(menu.y - y) < 40);
+  await page.keyboard.press("Escape");
+}
+
+// Back to the default arrangement before the layout part of this run.
+await page.keyboard.press("Control+l");
+await page.keyboard.press("0");
+await page.waitForTimeout(600);
+
 const history = page.getByRole("button", { name: "History", exact: true });
 const flashing = () => page.locator(".wds-flash").count();
 

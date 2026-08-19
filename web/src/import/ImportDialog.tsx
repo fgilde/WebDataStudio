@@ -139,7 +139,7 @@ export function ImportDialog({ target, onClose, onDone }: {
                   <Text size="xs" c="dimmed">→</Text>
                   <TextInput size="xs" flex={1} placeholder="skip this column"
                     value={mapping[column] ?? ""}
-                    onChange={e => setMapping(m => ({ ...m, [column]: e.currentTarget.value }))} />
+                    onChange={e => { const value = e.currentTarget.value; setMapping(m => ({ ...m, [column]: value })); }} />
                 </Group>
               ))}
             </Stack>

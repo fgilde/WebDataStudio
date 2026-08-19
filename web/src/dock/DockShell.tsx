@@ -23,6 +23,7 @@ import { QueryDesigner } from "../designer/QueryDesigner";
 import { SavedQueriesPanel } from "../query/SavedQueriesPanel";
 import { SnippetManager } from "../editor/SnippetManager";
 import { CommandPalette, ShortcutsHelp } from "../shell/CommandPalette";
+import { VersionBadge } from "../shell/VersionBadge";
 import { LayoutPresetsModal, presetForSlot, useLayoutPresets } from "../shell/LayoutPresets";
 import { buildCommands } from "../shell/commands";
 import { buildDeepLink, parseDeepLink } from "../shell/deepLink";
@@ -66,6 +67,19 @@ interface ShellState {
   runStatement: (connectionId: string, sql: string) => void;
   openData: (connectionId: string, objectRef: string, tableName: string) => void;
   dialectOf: (connectionId: string) => DialectId;
+  // The explorer is a dock panel like any other, so it can be dragged, split off or closed. What
+  // it needs from the shell travels through here instead of through props.
+  explorer: {
+    nonce: number;
+    activeConnection: string;
+    select: (selection: ExplorerSelection) => void;
+    action: (action: ExplorerAction, selection: ExplorerSelection) => void;
+    newQuery: () => void;
+    focusPanel: (id: string) => void;
+    openTool: (component: string, title: string, connectionId: string) => void;
+    openLayouts: () => void;
+    openPalette: () => void;
+  };
 }
 
 const ShellContext = createContext<ShellState | null>(null);
@@ -197,7 +211,78 @@ function WelcomePanel() {
   );
 }
 
+function ExplorerDockPanel() {
+  const { explorer } = useShell();
+  const connection = explorer.activeConnection;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <Group gap={2} px={4} pt={4} wrap="nowrap">
+        <Tooltip label="New query">
+          <ActionIcon size="sm" variant="subtle" aria-label="New query" disabled={!connection}
+            onClick={explorer.newQuery}>
+            <IconSquarePlus size={15} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="History">
+          <ActionIcon size="sm" variant="subtle" aria-label="History"
+            onClick={() => explorer.focusPanel("history")}>
+            <IconHistory size={15} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Diagram">
+          <ActionIcon size="sm" variant="subtle" aria-label="Diagram" disabled={!connection}
+            onClick={() => explorer.openTool("diagram", "Diagram", connection)}>
+            <IconSitemap size={15} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Compare">
+          <ActionIcon size="sm" variant="subtle" aria-label="Compare" disabled={!connection}
+            onClick={() => explorer.openTool("compare", "Compare", connection)}>
+            <IconGitCompare size={15} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Administration">
+          <ActionIcon size="sm" variant="subtle" aria-label="Administration" disabled={!connection}
+            onClick={() => explorer.openTool("admin", "Admin", connection)}>
+            <IconSettingsCog size={15} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Query builder">
+          <ActionIcon size="sm" variant="subtle" aria-label="Query builder" disabled={!connection}
+            onClick={() => explorer.openTool("builder", "Builder", connection)}>
+            <IconTable size={15} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Saved queries">
+          <ActionIcon size="sm" variant="subtle" aria-label="Saved queries"
+            onClick={() => explorer.focusPanel("saved")}>
+            <IconBookmarks size={15} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Layout presets">
+          <ActionIcon size="sm" variant="subtle" aria-label="Layout presets"
+            onClick={explorer.openLayouts}>
+            <IconLayoutBoard size={15} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Command palette (Ctrl+K)">
+          <ActionIcon size="sm" variant="subtle" aria-label="Command palette"
+            onClick={explorer.openPalette}>
+            <IconCommand size={15} />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
+
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <ExplorerTree key={explorer.nonce} onSelect={explorer.select} onAction={explorer.action} />
+      </div>
+    </div>
+  );
+}
+
 const components = {
+  explorer: ExplorerDockPanel,
   structure: StructurePanel, query: QueryPanel, history: HistoryDockPanel, welcome: WelcomePanel,
   data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel, designer: DesignerPanel,
   diagram: DiagramDockPanel, admin: AdminDockPanel, compare: CompareDockPanel,
@@ -210,6 +295,14 @@ function buildDefaultLayout(
   api: DockviewApi, centerGroup: React.MutableRefObject<DockviewGroupPanel | null>) {
   const welcome = api.addPanel({ id: "welcome", component: "welcome", title: "Start" });
   centerGroup.current = welcome.group;
+
+  // The explorer is a panel too, so it can be moved or closed like the rest. It is added after the
+  // centre group so the editor keeps the middle.
+  api.addPanel({
+    id: "explorer", component: "explorer", title: "Explorer",
+    position: { referencePanel: welcome.id, direction: "left" },
+    initialWidth: 280,
+  });
 
   const structure = api.addPanel({
     id: "structure", component: "structure", title: "Structure",
@@ -615,6 +708,20 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     flashPanel(api.current?.getPanel(id)?.group.element);
   }, [focusPanel]);
 
+  // The explorer can be closed like any other panel, so there has to be a way back that is not
+  // "reset everything".
+  const showExplorer = useCallback(() => {
+    if (api.current?.getPanel("explorer")) { focusPanel("explorer"); return; }
+    api.current?.addPanel({
+      id: "explorer", component: "explorer", title: "Explorer",
+      position: centerGroup.current
+        ? { referenceGroup: centerGroup.current, direction: "left" }
+        : undefined,
+      initialWidth: 280,
+    });
+    flashPanel(api.current?.getPanel("explorer")?.group.element);
+  }, [focusPanel]);
+
   const resetLayout = useCallback(() => {
     // The way back from a layout with every panel closed: rebuild the default arrangement.
     api.current?.clear();
@@ -655,6 +762,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       if (tab) exportQuery(tab.connectionId, tab.sql);
     },
     openSnippets: () => setSnippetsOpen(true),
+    showExplorer,
     switchTheme: () => document.dispatchEvent(new CustomEvent("wds:cycle-theme")),
     saveLayout: () => setLayoutsOpen(true),
     resetLayout,
@@ -666,7 +774,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}${link}`);
     },
     showShortcuts: () => setShortcutsOpen(true),
-  }), [activeConnection, focusPanel, newTab, openTool, resetLayout, selection, tabs, exportQuery]);
+  }), [activeConnection, focusPanel, newTab, openTool, resetLayout, selection, showExplorer, tabs, exportQuery]);
 
   // Ctrl+K everywhere, "?" only outside a text field — otherwise it eats a question mark.
   useEffect(() => {
@@ -702,6 +810,11 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         setPaletteOpen(true);
         return;
       }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        showExplorer();
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "o") {
         event.preventDefault();
         setGotoOpen(true);
@@ -715,7 +828,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeConnection, applyLayout, presets, resetLayout]);
+  }, [activeConnection, applyLayout, presets, resetLayout, showExplorer]);
 
   // A deep link opens its target once the connections are known.
   const followedLink = useRef(false);
@@ -731,80 +844,25 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
   }, [connections, openData]);
 
   return (
-    <ShellContext.Provider value={{ selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement, openData, dialectOf, exportObject }}>
-      <div style={{ display: "flex", height: "100%" }}>
-        <div style={{
-          width: 280, flexShrink: 0, display: "flex", flexDirection: "column",
-          borderRight: "1px solid var(--mantine-color-default-border)",
-        }}>
-          <Group gap={4} px={4} pt={4} justify="space-between">
-            <Text size="xs" fw={600} c="dimmed">EXPLORER</Text>
-            <Group gap={2}>
-              <Tooltip label="New query">
-                <ActionIcon size="sm" variant="subtle" aria-label="New query" disabled={!activeConnection}
-                  onClick={() => newTab(activeConnection)}>
-                  <IconSquarePlus size={15} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="History">
-                <ActionIcon size="sm" variant="subtle" aria-label="History"
-                  onClick={() => focusPanel("history")}>
-                  <IconHistory size={15} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Diagram">
-                <ActionIcon size="sm" variant="subtle" aria-label="Diagram" disabled={!activeConnection}
-                  onClick={() => openTool("diagram", "Diagram", activeConnection)}>
-                  <IconSitemap size={15} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Compare">
-                <ActionIcon size="sm" variant="subtle" aria-label="Compare" disabled={!activeConnection}
-                  onClick={() => openTool("compare", "Compare", activeConnection)}>
-                  <IconGitCompare size={15} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Administration">
-                <ActionIcon size="sm" variant="subtle" aria-label="Administration" disabled={!activeConnection}
-                  onClick={() => openTool("admin", "Admin", activeConnection)}>
-                  <IconSettingsCog size={15} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Query builder">
-                <ActionIcon size="sm" variant="subtle" aria-label="Query builder" disabled={!activeConnection}
-                  onClick={() => openTool("builder", "Builder", activeConnection)}>
-                  <IconTable size={15} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Saved queries">
-                <ActionIcon size="sm" variant="subtle" aria-label="Saved queries"
-                  onClick={() => focusPanel("saved")}>
-                  <IconBookmarks size={15} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Layout presets">
-                <ActionIcon size="sm" variant="subtle" aria-label="Layout presets"
-                  onClick={() => setLayoutsOpen(true)}>
-                  <IconLayoutBoard size={15} />
-                </ActionIcon>
-              </Tooltip>
-              <Tooltip label="Command palette (Ctrl+K)">
-                <ActionIcon size="sm" variant="subtle" aria-label="Command palette"
-                  onClick={() => setPaletteOpen(true)}>
-                  <IconCommand size={15} />
-                </ActionIcon>
-              </Tooltip>
-            </Group>
-          </Group>
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <ExplorerTree key={explorerNonce} onSelect={setSelection} onAction={handleAction} />
-          </div>
-        </div>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <DockviewReact className={current.dockview} components={components} onReady={onReady} />
-        </div>
+    <ShellContext.Provider value={{
+      selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey,
+      runStatement, openData, dialectOf, exportObject,
+      explorer: {
+        nonce: explorerNonce,
+        activeConnection,
+        select: setSelection,
+        action: handleAction,
+        newQuery: () => newTab(activeConnection),
+        focusPanel,
+        openTool,
+        openLayouts: () => setLayoutsOpen(true),
+        openPalette: () => setPaletteOpen(true),
+      },
+    }}>
+      <div style={{ height: "100%", minHeight: 0 }}>
+        <DockviewReact className={current.dockview} components={components} onReady={onReady} />
       </div>
+      <VersionBadge />
 
       <ExportDialog target={exportTarget} onClose={() => setExportTarget(null)} />
       <ImportDialog target={importTarget} onClose={() => setImportTarget(null)} />

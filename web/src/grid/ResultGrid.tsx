@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Group, Menu, Text, TextInput } from "@mantine/core";
-import { IconFilter, IconSortAscending, IconSortDescending } from "@tabler/icons-react";
+import { Button, Group, Menu, Text, TextInput } from "@mantine/core";
+import {
+  IconEye, IconEyeOff, IconFilter, IconSortAscending, IconSortDescending,
+} from "@tabler/icons-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { StatementResult } from "../query/resultStore";
 import { CellValue } from "./CellValue";
@@ -142,6 +144,29 @@ export function ResultGrid({ result, onSelectionChange }: {
       <Group gap={6} p={4} wrap="nowrap">
         <TextInput size="xs" flex={1} placeholder="Search in result"
           value={search} onChange={e => setSearch(e.currentTarget.value)} />
+        {/* Hidden columns are otherwise invisible by definition: this is the way back to them. */}
+        {hidden.size > 0 ? (
+          <Menu withinPortal closeOnItemClick={false} position="bottom-end">
+            <Menu.Target>
+              <Button size="compact-xs" variant="subtle" color="gray"
+                aria-label={`${hidden.size} hidden columns`}
+                leftSection={<IconEyeOff size={13} />}>{hidden.size}</Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>Hidden columns</Menu.Label>
+              {[...hidden].map(index => (
+                <Menu.Item key={index} leftSection={<IconEye size={13} />}
+                  onClick={() => setHidden(h => {
+                    const next = new Set(h);
+                    next.delete(index);
+                    return next;
+                  })}>{result.columns[index]?.name ?? `#${index}`}</Menu.Item>
+              ))}
+              <Menu.Divider />
+              <Menu.Item onClick={() => setHidden(new Set())}>Show all columns</Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        ) : null}
         <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap" }}>
           {rows.length === result.rows.length
             ? `${rows.length} rows`
@@ -187,10 +212,20 @@ export function ResultGrid({ result, onSelectionChange }: {
                       <Menu.Item onClick={() => setSort({ index: c.index, desc: true })}>Sort descending</Menu.Item>
                       <Menu.Item onClick={() => setSort(null)}>Clear sort</Menu.Item>
                       <Menu.Divider />
-                      <Menu.Item>
-                        <TextInput size="xs" placeholder="Filter" value={filters[c.index] ?? ""}
-                          onChange={e => setFilters(f => ({ ...f, [c.index]: e.currentTarget.value }))} />
-                      </Menu.Item>
+                      {/* Not inside a Menu.Item: that is a button, so the input never got the
+                          focus and the menu ate every keystroke as a navigation key. */}
+                      <div style={{ padding: "4px 8px" }}
+                        onClick={event => event.stopPropagation()}
+                        onKeyDown={event => event.stopPropagation()}>
+                        <TextInput size="xs" placeholder="Filter" data-autofocus
+                          value={filters[c.index] ?? ""}
+                          onChange={e => {
+                            // Read the value here: the updater runs later, and by then React has
+                            // cleared currentTarget — which crashed the whole grid.
+                            const value = e.currentTarget.value;
+                            setFilters(f => ({ ...f, [c.index]: value }));
+                          }} />
+                      </div>
                       <Menu.Divider />
                       <Menu.Item onClick={() => setPinned(p => {
                         const next = new Set(p);

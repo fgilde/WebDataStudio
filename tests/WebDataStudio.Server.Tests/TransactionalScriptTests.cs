@@ -24,7 +24,7 @@ public class TransactionalScriptTests : IAsyncLifetime
 
     public ValueTask DisposeAsync()
     {
-        try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
+        TestDirectory.Remove(_dir);
         return ValueTask.CompletedTask;
     }
 

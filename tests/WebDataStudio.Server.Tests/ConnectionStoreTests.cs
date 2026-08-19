@@ -11,8 +11,7 @@ public class ConnectionStoreTests : IDisposable
 
     public void Dispose()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        Directory.Delete(_dir, recursive: true);
+        TestDirectory.Remove(_dir);
     }
 
     private static ConnectionSpec Sample(string name = "local-pg") =>

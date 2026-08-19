@@ -37,7 +37,7 @@ public sealed class DuckDbFixture : IDriverFixture
 
     public ValueTask DisposeAsync()
     {
-        if (File.Exists(_path)) File.Delete(_path);
+        TestDirectory.RemoveFile(_path);
         return ValueTask.CompletedTask;
     }
 }

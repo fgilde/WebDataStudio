@@ -13,6 +13,10 @@ const WIDTH_KEY = "grid-column-widths";
 
 const ROW_HEIGHT = 24;
 
+/// Starting width per column. Fixed rather than content-derived, because a table has to agree on
+/// its columns before the rows are measured; the header's resize handle overrides it.
+const DEFAULT_WIDTH = 160;
+
 export function ResultGrid({ result, onSelectionChange }: {
   result: StatementResult;
   onSelectionChange?: (values: unknown[]) => void;
@@ -120,6 +124,11 @@ export function ResultGrid({ result, onSelectionChange }: {
     overscan: 20,
   });
 
+  const virtualItems = virtualizer.getVirtualItems();
+  const total = virtualizer.getTotalSize();
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+  const paddingBottom = virtualItems.length > 0 ? total - virtualItems[virtualItems.length - 1].end : 0;
+
   const selectedValues = selected.map(s => rows[s.row]?.[s.col]);
   const summary = summarizeSelection(selectedValues);
 
@@ -149,12 +158,19 @@ export function ResultGrid({ result, onSelectionChange }: {
       ) : (
       <div ref={parentRef} style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
         <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%" }}>
+          {/* One column model for head and body. Without it a resized header and its cells drift
+              apart, and a wide result collapses because each part sizes itself. */}
+          <colgroup>
+            {visibleColumns.map(c => (
+              <col key={c.index} style={{ width: widths[c.name] ?? DEFAULT_WIDTH }} />
+            ))}
+          </colgroup>
           <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--mantine-color-default)" }}>
             <tr>
               {visibleColumns.map(c => (
                 <th key={c.index} style={{
                   textAlign: "left", padding: "2px 8px", whiteSpace: "nowrap", position: "relative",
-                  width: widths[c.name], minWidth: widths[c.name],
+                  overflow: "hidden",
                   borderBottom: "1px solid var(--mantine-color-default-border)",
                 }}>
                   <Menu withinPortal closeOnItemClick={false}>
@@ -211,12 +227,14 @@ export function ResultGrid({ result, onSelectionChange }: {
               ))}
             </tr>
           </thead>
-          <tbody style={{ position: "relative", height: virtualizer.getTotalSize(), display: "block" }}>
-            {virtualizer.getVirtualItems().map(item => (
-              <tr key={item.key} style={{
-                position: "absolute", top: 0, left: 0, display: "table", width: "100%",
-                tableLayout: "fixed", height: ROW_HEIGHT, transform: `translateY(${item.start}px)`,
-              }}>
+          {/* Virtualised with spacer rows rather than absolute positioning: a row taken out of
+              the table's layout does not line up with the header, which silently collapsed every
+              result wider than a few columns. */}
+          <tbody>
+            {paddingTop > 0 ? <tr style={{ height: paddingTop }} aria-hidden /> : null}
+
+            {virtualItems.map(item => (
+              <tr key={item.key} style={{ height: ROW_HEIGHT }}>
                 {visibleColumns.map(c => {
                   const isSelected = selected.some(s => s.row === item.index && s.col === c.index);
                   return (
@@ -229,7 +247,7 @@ export function ResultGrid({ result, onSelectionChange }: {
                       })}
                       style={{
                         padding: "2px 8px", whiteSpace: "nowrap", cursor: "cell", overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        textOverflow: "ellipsis", maxWidth: 0,
                         borderBottom: "1px solid var(--mantine-color-default-border)",
                         background: isSelected ? "var(--mantine-primary-color-light)" : undefined,
                       }}>
@@ -239,6 +257,8 @@ export function ResultGrid({ result, onSelectionChange }: {
                 })}
               </tr>
             ))}
+
+            {paddingBottom > 0 ? <tr style={{ height: paddingBottom }} aria-hidden /> : null}
           </tbody>
         </table>
       </div>

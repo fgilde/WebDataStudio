@@ -402,3 +402,24 @@ export interface SlowQueryDto { query: string; calls: number; totalMs: number; m
 
 export const slowQueries = (conn: string): Promise<SlowQueryDto[]> =>
   fetch(`${base}/stats/${conn}/slow-queries`).then(r => ok<SlowQueryDto[]>(r));
+
+// --- connection properties -------------------------------------------------------
+export interface PropertyEntryDto { group: string; name: string; value: string }
+export interface ConnectionPropertiesDto {
+  /// The password is replaced by a mask; `revealConnectionString` returns the real one.
+  connectionString: string;
+  hasPassword: boolean;
+  reachable: boolean;
+  error: string | null;
+  capabilities: Record<string, boolean>;
+  properties: PropertyEntryDto[];
+}
+
+export const connectionProperties = (id: string): Promise<ConnectionPropertiesDto> =>
+  fetch(`${base}/connections/${id}/properties`).then(r => ok<ConnectionPropertiesDto>(r));
+
+/// Asked for on purpose, by a button the user presses — never on a routine page load.
+export const revealConnectionString = (id: string): Promise<string> =>
+  fetch(`${base}/connections/${id}/reveal`, { method: "POST" })
+    .then(r => ok<{ connectionString: string }>(r))
+    .then(body => body.connectionString);

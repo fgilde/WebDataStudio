@@ -12,8 +12,7 @@ public class ConnectionEndpointTests : IDisposable
 
     public void Dispose()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        Directory.Delete(_dir, recursive: true);
+        TestDirectory.Remove(_dir);
     }
 
     private WebApplicationFactory<Program> Factory(params (string Key, string Value)[] env) =>

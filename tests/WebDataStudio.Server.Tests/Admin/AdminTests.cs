@@ -127,8 +127,7 @@ public class AdminEndpointTests : IAsyncLifetime
 
     public ValueTask DisposeAsync()
     {
-        SqliteConnection.ClearAllPools();
-        Directory.Delete(_dir, recursive: true);
+        TestDirectory.Remove(_dir);
         return ValueTask.CompletedTask;
     }
 
@@ -244,7 +243,6 @@ public class AdminEndpointTests : IAsyncLifetime
         command.CommandText = "SELECT count(*) FROM people";
         Assert.Equal(2L, (long)(await command.ExecuteScalarAsync(ct))!);
 
-        SqliteConnection.ClearAllPools();
     }
 
     [Fact]

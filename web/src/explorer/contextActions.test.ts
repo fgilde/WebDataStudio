@@ -77,9 +77,23 @@ describe("actionsFor", () => {
   });
 
   it("gives a connection row its own short menu", () => {
-    expect(connectionActions().map(item => item.action)).toEqual(["new-query", "refresh"]);
+    expect(connectionActions().map(item => item.action))
+      .toEqual(["new-query", "refresh", "properties"]);
     expect(connectionActions({ multiDatabase: true }).map(item => item.action))
       .toContain("new-database");
+  });
+
+  it("offers properties where there is a connection behind the node", () => {
+    for (const kind of ["Database", "Schema"]) expect(ids(kind)).toContain("properties");
+
+    // A column has no connection string of its own to show.
+    expect(ids("Column")).not.toContain("properties");
+    expect(ids("Index")).not.toContain("properties");
+  });
+
+  it("keeps properties available on an engine without DDL", () => {
+    // Reading what a connection is has nothing to do with writing to it.
+    expect(ids("Database", { ddl: false })).toContain("properties");
   });
 
   it("never lists the same action twice in one menu", () => {

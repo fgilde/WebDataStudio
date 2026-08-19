@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActionIcon, Alert, Badge, Button, Group, Loader, Pagination, Text, Tooltip,
+  ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Pagination, Text, Tooltip,
 } from "@mantine/core";
 import {
-  IconArrowRight, IconCopyPlus, IconDeviceFloppy, IconPlus, IconRestore, IconTrash, IconWand,
+  IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconPlus, IconRefresh,
+  IconRestore, IconTrash, IconWand,
 } from "@tabler/icons-react";
+import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
 import { browseData, lookupValues, type DataPageDto, type ForeignKeyDto } from "../api";
 
 /// The referenced table as a schema node reference; an unqualified name means the same schema.
@@ -24,9 +26,12 @@ export interface DataTabProps {
   tableName: string;
   foreignKeys?: ForeignKeyDto[];
   onFollowForeignKey?: (fk: ForeignKeyDto, value: unknown) => void;
+  /// Opens the export dialog on this table. Absent only where there is no shell to open it in.
+  onExport?: () => void;
 }
 
-export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], onFollowForeignKey }: DataTabProps) {
+export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], onFollowForeignKey,
+  onExport }: DataTabProps) {
   const [page, setPage] = useState<DataPageDto | null>(null);
   const [pageIndex, setPageIndex] = useState(1);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +56,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   if (error) return <Text c="red" size="xs" p="xs">{error}</Text>;
   if (!page) return <Loader size="xs" m="xs" />;
 
+  const copy = (text: string) => navigator.clipboard.writeText(text);
   const fkForColumn = (column: string) => foreignKeys.find(fk => fk.columns.includes(column));
   const isBoolean = (type: string) => /bool|bit/i.test(type);
 
@@ -98,6 +104,47 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
             disabled={!page.editable || selectedCells.length === 0}
             onClick={() => setBulk(selectedCells)}><IconWand size={14} /></ActionIcon>
         </Tooltip>
+
+        <Tooltip label="Reload this page">
+          <ActionIcon size="sm" variant="subtle" aria-label="Reload data"
+            onClick={() => setNonce(n => n + 1)}><IconRefresh size={14} /></ActionIcon>
+        </Tooltip>
+
+        {/* The same copy and export actions the query result has: reading a table through the
+            explorer is no reason to lose them. Copy takes the page on screen; export goes to the
+            server and streams the whole table. */}
+        <Menu withinPortal>
+          <Menu.Target>
+            <Button size="compact-xs" variant="default" leftSection={<IconCopy size={13} />}>
+              Copy
+            </Button>
+          </Menu.Target>
+          <Menu.Dropdown>
+            <Menu.Item onClick={() => copy(copyAsCsv(page.rows, page.columns))}>
+              This page as CSV
+            </Menu.Item>
+            <Menu.Item onClick={() => copy(copyAsJson(page.rows, page.columns))}>
+              This page as JSON
+            </Menu.Item>
+            <Menu.Item onClick={() => copy(copyAsMarkdown(page.rows, page.columns))}>
+              This page as Markdown
+            </Menu.Item>
+            <Menu.Divider />
+            <Menu.Item disabled={selectedCells.length === 0}
+              onClick={() => copy(copyAsSqlInList(selectedCells.map(c => c.value)))}>
+              Selection as SQL IN-list
+            </Menu.Item>
+          </Menu.Dropdown>
+        </Menu>
+
+        {onExport ? (
+          <Tooltip label="Export the whole table">
+            <Button size="compact-xs" variant="default" leftSection={<IconDownload size={13} />}
+              onClick={onExport}>
+              Export
+            </Button>
+          </Tooltip>
+        ) : null}
 
         <Text size="xs" c="dimmed" ml="auto">
           {page.rows.length} rows

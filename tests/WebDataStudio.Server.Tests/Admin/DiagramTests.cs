@@ -31,8 +31,7 @@ public class DiagramEndpointTests : IAsyncLifetime
 
     public ValueTask DisposeAsync()
     {
-        // No ClearAllPools here: other suites hold pooled SQLite connections in parallel.
-        try { Directory.Delete(_dir, recursive: true); } catch (IOException) { }
+        TestDirectory.Remove(_dir);
         return ValueTask.CompletedTask;
     }
 

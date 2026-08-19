@@ -30,8 +30,7 @@ public sealed class SqliteFixture : IDriverFixture
 
     public ValueTask DisposeAsync()
     {
-        SqliteConnection.ClearAllPools();
-        if (File.Exists(_path)) File.Delete(_path);
+        TestDirectory.RemoveFile(_path);
         return ValueTask.CompletedTask;
     }
 }

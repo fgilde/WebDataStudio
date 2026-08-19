@@ -28,6 +28,7 @@ import { buildCommands } from "../shell/commands";
 import { buildDeepLink, parseDeepLink } from "../shell/deepLink";
 import { GoToObject } from "../shell/GoToObject";
 import { NewDatabaseDialog, DropDatabaseDialog, type DatabaseTarget } from "../explorer/DatabaseDialogs";
+import { PropertiesDialog } from "../explorer/PropertiesDialog";
 import {
   dropColumn, dropConstraint, dropIndex, executeRoutine, rebuildIndex, refreshMaterializedView,
   selectColumn,
@@ -60,6 +61,7 @@ interface ShellState {
   updateSql: (id: string, sql: string) => void;
   openObject: (ref: string) => void;
   exportQuery: (connectionId: string, sql: string) => void;
+  exportObject: (connectionId: string, objectRef: string, label: string) => void;
   followForeignKey: (from: DataTabState, fk: ForeignKeyDto, value: unknown) => void;
   runStatement: (connectionId: string, sql: string) => void;
   openData: (connectionId: string, objectRef: string, tableName: string) => void;
@@ -114,7 +116,8 @@ function DataPanel(props: IDockviewPanelProps<{ tabId: string }>) {
       objectRef={tab.objectRef}
       tableName={tab.tableName}
       foreignKeys={tab.foreignKeys}
-      onFollowForeignKey={(fk, value) => shell.followForeignKey(tab, fk, value)} />
+      onFollowForeignKey={(fk, value) => shell.followForeignKey(tab, fk, value)}
+      onExport={() => shell.exportObject(tab.connectionId, tab.objectRef, tab.tableName)} />
   );
 }
 
@@ -257,6 +260,7 @@ export function DockShell() {
     { connectionId: string; objectRef: string; schema: string; label: string; column?: string } | null>(null);
   const [newDatabase, setNewDatabase] = useState<DatabaseTarget | null>(null);
   const [dropDatabaseTarget, setDropDatabaseTarget] = useState<DatabaseTarget | null>(null);
+  const [propertiesFor, setPropertiesFor] = useState<{ connectionId: string; label: string } | null>(null);
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, []);
 
@@ -543,15 +547,30 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         setDropDatabaseTarget({ connectionId: s.connectionId, name: s.node.label });
         break;
 
+      case "properties":
+        setPropertiesFor({
+          connectionId: s.connectionId,
+          label: connections.find(c => c.id === s.connectionId)?.name ?? s.node.label,
+        });
+        break;
+
       default:
         setSelection(s);
     }
-  }, [newTab, openData, openDesigner, qualify, engineOf, parentTableRef]);
+  }, [newTab, openData, openDesigner, qualify, engineOf, parentTableRef, connections]);
 
   const runStatement = useCallback((connectionId: string, sql: string) => newTab(connectionId, sql), [newTab]);
 
   const exportQuery = useCallback((connectionId: string, sql: string) =>
     setExportTarget({ connectionId, sql, defaultName: "result", scopes: ["result"] }), []);
+
+  const exportObject = useCallback((connectionId: string, objectRef: string, label: string) =>
+    setExportTarget({
+      connectionId, objectRef,
+      schema: objectRef.split(":", 2)[1]?.split("/")[0],
+      defaultName: label,
+      scopes: ["table", "schema"],
+    }), []);
 
   const dialectOf = useCallback((connectionId: string) =>
     dialectFor(connections.find(c => c.id === connectionId)?.engine ?? "postgresql"), [connections]);
@@ -654,7 +673,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
   }, [connections, openData]);
 
   return (
-    <ShellContext.Provider value={{ selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement, openData, dialectOf }}>
+    <ShellContext.Provider value={{ selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey, runStatement, openData, dialectOf, exportObject }}>
       <div style={{ display: "flex", height: "100%" }}>
         <div style={{
           width: 280, flexShrink: 0, display: "flex", flexDirection: "column",
@@ -744,6 +763,9 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
           </div>
         ) : null}
       </Modal>
+
+      <PropertiesDialog connectionId={propertiesFor?.connectionId ?? null}
+        label={propertiesFor?.label ?? ""} onClose={() => setPropertiesFor(null)} />
 
       <NewDatabaseDialog target={newDatabase} onClose={() => setNewDatabase(null)}
         onDone={() => setExplorerNonce(n => n + 1)} />

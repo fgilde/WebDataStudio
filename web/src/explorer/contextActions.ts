@@ -4,7 +4,7 @@ export type ExplorerAction =
   | "design" | "new-table" | "rename"
   | "manage-indexes" | "add-index"
   | "export" | "import" | "copy-table"
-  | "new-database" | "drop-database"
+  | "new-database" | "drop-database" | "properties"
   | "script-insert" | "script-update" | "script-delete" | "script-truncate" | "script-drop"
   | "script-select-column" | "script-drop-column"
   | "script-drop-index" | "script-reindex"
@@ -138,6 +138,7 @@ export function actionsFor(kind: string, caps: MenuCapabilities = {}): ContextIt
         ...CONTAINER,
         { action: "export", label: "Export schema…" },
         { action: "new-query", label: "New query here" },
+        { action: "properties", label: "Properties…", divider: true },
       ]);
 
     case "TableFolder":
@@ -145,7 +146,9 @@ export function actionsFor(kind: string, caps: MenuCapabilities = {}): ContextIt
 
     case "Database":
       return keepWritable([
+        { action: "new-query", label: "New query" },
         { action: "refresh", label: "Refresh" },
+        { action: "properties", label: "Properties…", divider: true },
         ...(caps.multiDatabase ? [
           { action: "new-database" as const, label: "New database…", divider: true },
           { action: "drop-database" as const, label: "Drop database…", danger: true },
@@ -177,5 +180,6 @@ const WRITES = new Set<ExplorerAction>([
 export const connectionActions = (caps: MenuCapabilities = {}): ContextItem[] => [
   { action: "new-query", label: "New query" },
   { action: "refresh", label: "Refresh" },
+  { action: "properties", label: "Properties…", divider: true },
   ...(caps.multiDatabase ? [{ action: "new-database" as const, label: "New database…", divider: true }] : []),
 ];

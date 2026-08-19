@@ -6,7 +6,7 @@ namespace WebDataStudio.Server.Tests;
 public class SecretProtectorTests : IDisposable
 {
     private readonly string _dir = Directory.CreateTempSubdirectory("wds-secret").FullName;
-    public void Dispose() => Directory.Delete(_dir, recursive: true);
+    public void Dispose() => TestDirectory.Remove(_dir);
 
     [Fact]
     public void Roundtrips_a_secret()

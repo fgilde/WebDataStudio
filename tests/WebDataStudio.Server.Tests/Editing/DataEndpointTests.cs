@@ -29,8 +29,7 @@ public class DataEndpointTests : IAsyncLifetime
 
     public ValueTask DisposeAsync()
     {
-        SqliteConnection.ClearAllPools();
-        Directory.Delete(_dir, recursive: true);
+        TestDirectory.Remove(_dir);
         return ValueTask.CompletedTask;
     }
 

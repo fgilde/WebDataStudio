@@ -68,6 +68,61 @@ public static class ConnectionEndpoints
             return Results.NoContent();
         });
 
+        // Everything about one connection, for the properties dialog. The connection string is
+        // masked; the caller has to ask for the password on purpose (see below).
+        api.MapGet("/{id}/properties", async (string id, ConnectionRegistry registry,
+            DriverRegistry drivers, SessionFactory factory, CancellationToken ct) =>
+        {
+            if (registry.Find(id) is not { } spec) return Results.NotFound();
+
+            var driver = drivers.Get(spec.Engine);
+            var properties = new List<PropertyEntry>
+            {
+                new("Connection", "Name", spec.Name),
+                new("Connection", "Engine", driver.Info.Label),
+                new("Connection", "Defined in", spec.Source == ConnectionSource.Environment
+                    ? "the environment (read-only in the UI)"
+                    : "this studio"),
+                new("Connection", "Access", spec.ReadOnly ? "read-only" : "read and write"),
+                new("Connection", "Group", spec.Group),
+                new("Connection", "Colour", spec.Color),
+                new("Connection", "SSH tunnel", spec.Tunnel is { } tunnel
+                    ? $"{tunnel.User}@{tunnel.Host}:{tunnel.Port}"
+                    : null),
+            };
+
+            string? failure = null;
+            try
+            {
+                var (_, session) = await factory.OpenAsync(id, ct);
+                await using (session)
+                    properties.AddRange(await ConnectionProperties.ReadAsync(driver, session, ct));
+            }
+            catch (Exception e)
+            {
+                // The definition is worth showing even when the server is unreachable — that is
+                // often exactly what the dialog is opened to find out.
+                failure = e.Message;
+            }
+
+            return Results.Ok(new
+            {
+                connectionString = ConnectionSecret.Hide(spec.ConnectionString),
+                hasPassword = ConnectionSecret.HasPassword(spec.ConnectionString),
+                reachable = failure is null,
+                error = failure,
+                capabilities = driver.Caps,
+                properties = properties.Where(p => p.Value is not null),
+            });
+        });
+
+        // The connection string with its password, asked for explicitly. Separate from the
+        // properties call so a password is never part of a routine page load.
+        api.MapPost("/{id}/reveal", (string id, ConnectionRegistry registry) =>
+            registry.Find(id) is { } spec
+                ? Results.Ok(new { connectionString = spec.ConnectionString })
+                : Results.NotFound());
+
         api.MapGet("/export", (ConnectionRegistry registry) =>
             Results.Ok(registry.All().Select(ToPortable)));
 

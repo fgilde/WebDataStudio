@@ -159,6 +159,9 @@ footer {
   border-top: 1px solid var(--line); padding: 28px 0 44px; color: var(--muted); font-size: 14px;
 }
 footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+/* The icon carries no information the text does not, so it stays out of the accessible name. */
+footer .by { display: inline-flex; align-items: center; gap: 6px; }
+footer .by img { width: 18px; height: 18px; display: block; }
 footer .spacer { margin-left: auto; }
 
 @media (prefers-color-scheme: light) {

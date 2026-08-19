@@ -8,7 +8,9 @@ public sealed record ColumnDefinition(
 
 public sealed record IndexDefinition(
     string Name, IReadOnlyList<string> Columns, bool Unique, string? Filter = null,
-    IReadOnlyList<string>? IncludeColumns = null);
+    IReadOnlyList<string>? IncludeColumns = null,
+    /// A full-text index over the listed columns, written the way the engine spells it.
+    bool FullText = false);
 
 public enum ConstraintKind { PrimaryKey, Unique, Check, ForeignKey }
 
@@ -55,7 +57,7 @@ public sealed record TableDefinition(
 
         var indexes = detail.Indexes
             .Where(i => !i.Primary)
-            .Select(i => new IndexDefinition(i.Name, i.Columns, i.Unique, i.Filter))
+            .Select(i => new IndexDefinition(i.Name, i.Columns, i.Unique, i.Filter, null, i.FullText))
             .ToList();
 
         return new TableDefinition(schema, detail.Ref.Name, columns, indexes, constraints, detail.Comment);

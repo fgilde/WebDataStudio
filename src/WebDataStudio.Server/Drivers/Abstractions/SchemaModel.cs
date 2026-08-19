@@ -34,7 +34,10 @@ public sealed record ColumnInfo(
     bool IsPrimaryKey, bool IsIdentity, string? Comment, int Position);
 
 public sealed record IndexInfo(
-    string Name, IReadOnlyList<string> Columns, bool Unique, bool Primary, string? Filter);
+    string Name, IReadOnlyList<string> Columns, bool Unique, bool Primary, string? Filter,
+    /// A full-text index. It is spelled differently per engine, so it cannot be diffed against a
+    /// plain index and is created and dropped as a whole.
+    bool FullText = false);
 
 public sealed record ForeignKeyInfo(
     string Name, IReadOnlyList<string> Columns,

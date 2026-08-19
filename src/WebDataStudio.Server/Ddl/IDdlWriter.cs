@@ -116,6 +116,12 @@ public abstract class DdlWriterBase(SqlDialect dialect) : IDdlWriter
 
     public virtual IReadOnlyList<DdlStatement> CreateIndex(string schema, string table, IndexDefinition index)
     {
+        // Full text is spelled differently by every engine that has it, and not at all by the
+        // rest. A writer that can do it overrides this; the others say so plainly.
+        if (index.FullText)
+            throw new NotSupportedException(
+                $"{GetType().Name.Replace("DdlWriter", "")} has no full-text index this app can write");
+
         var unique = index.Unique ? "UNIQUE " : "";
         var columns = string.Join(", ", index.Columns.Select(Dialect.QuoteIdentifier));
         var filter = index.Filter is { Length: > 0 } ? $" WHERE {index.Filter}" : "";

@@ -7,6 +7,21 @@ Verbindungszeichenfolge einfügen — beim Einfügen wird die Engine erkannt und
 **Test** öffnet die Verbindung einmal und meldet, was der Server gesagt hat, ohne etwas zu
 speichern.
 
+## Der Objektbaum
+
+Eine Verbindung klappt in Schemas auf, dann Ordner, dann Objekte — und ein Objekt eine Ebene
+weiter in seine Spalten, Indizes, Fremdschlüssel und Trigger, jeweils mit Typ oder den Spalten,
+die es abdeckt, neben dem Namen.
+
+Ein Rechtsklick zeigt genau das Menü, das zum Angeklickten passt: eine Tabelle bietet Daten,
+Designer, Indizes, Skripte und Export; eine Spalte eine Abfrage darauf, einen Index darüber und ein
+`DROP COLUMN`-Skript; ein Index Rebuild und Drop; ein Ordner eine neue Tabelle und Neuladen. Was
+die Engine nicht kann, fehlt, statt kaputt angeboten zu werden.
+
+Destruktive Statements landen im Abfrage-Tab statt im Menü zu laufen. Ausnahmen sind Datenbank
+anlegen, Tabelle anlegen und Index ändern — die haben ihren eigenen Dialog, und jede
+Schema-Änderung zeigt ihr SQL trotzdem vor der Ausführung.
+
 ## Gruppen und Farben
 
 Eine Verbindung kann eine Gruppe und eine Farbe tragen. Der Explorer zeichnet Gruppen als

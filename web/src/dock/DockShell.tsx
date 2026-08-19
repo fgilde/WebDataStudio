@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DockviewReact } from "dockview-react";
 import type { DockviewApi, DockviewReadyEvent, DockviewGroupPanel, IDockviewPanelProps } from "dockview-react";
-import { ActionIcon, Group, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Modal, Text, Tooltip } from "@mantine/core";
 import {
   IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconLayoutBoard, IconSettingsCog,
   IconSitemap, IconSquarePlus, IconTable,
@@ -27,6 +27,11 @@ import { LayoutPresetsModal } from "../shell/LayoutPresets";
 import { buildCommands } from "../shell/commands";
 import { buildDeepLink, parseDeepLink } from "../shell/deepLink";
 import { GoToObject } from "../shell/GoToObject";
+import { NewDatabaseDialog, DropDatabaseDialog, type DatabaseTarget } from "../explorer/DatabaseDialogs";
+import {
+  dropColumn, dropConstraint, dropIndex, executeRoutine, rebuildIndex, refreshMaterializedView,
+  selectColumn,
+} from "../sql/objectScripts";
 import {
   applyDdl, describeObject, listConnections, loadTabs, previewRename, saveTabs,
   type Connection, type ForeignKeyDto,
@@ -248,6 +253,10 @@ export function DockShell() {
   const [layoutsOpen, setLayoutsOpen] = useState(false);
   const [explorerNonce, setExplorerNonce] = useState(0);
   const [gotoOpen, setGotoOpen] = useState(false);
+  const [indexTarget, setIndexTarget] = useState<
+    { connectionId: string; objectRef: string; schema: string; label: string; column?: string } | null>(null);
+  const [newDatabase, setNewDatabase] = useState<DatabaseTarget | null>(null);
+  const [dropDatabaseTarget, setDropDatabaseTarget] = useState<DatabaseTarget | null>(null);
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, []);
 
@@ -353,8 +362,21 @@ export function DockShell() {
     return multiSchema && parsed.length > 1 ? `${parsed[0]}.${parsed[parsed.length - 1]}` : parsed[parsed.length - 1];
   }, [connections]);
 
+  /// The table a column, index, key or trigger node belongs to: its own path without the last part.
+  const parentTableRef = useCallback((ref: string) => {
+    const parts = ref.split(":", 2)[1]?.split("/") ?? [];
+    return `Table:${parts.slice(0, -1).join("/")}`;
+  }, []);
+
+  const engineOf = useCallback((connectionId: string) =>
+    connections.find(c => c.id === connectionId)?.engine ?? "postgresql", [connections]);
+
   const handleAction = useCallback(async (action: ExplorerAction, s: ExplorerSelection) => {
     const name = qualify(s.connectionId, s.node.ref);
+    const engine = engineOf(s.connectionId);
+    const schemaOf = (ref: string) => ref.split(":")[1]?.split("/")[0] ?? "";
+    const ownerRef = parentTableRef(s.node.ref);
+    const ownerName = qualify(s.connectionId, ownerRef);
 
     switch (action) {
       case "design":
@@ -454,10 +476,77 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         });
         break;
 
+      case "structure":
+        setSelection(s);
+        api.current?.getPanel("structure")?.api.setActive();
+        break;
+
+      case "copy-link":
+        await navigator.clipboard.writeText(window.location.origin + window.location.pathname
+          + buildDeepLink({ kind: "object", connectionId: s.connectionId, objectRef: s.node.ref }));
+        break;
+
+      // Indexes are edited in the designer, on its index tab — same preview and apply as any
+      // other schema change, rather than a second path that bypasses it.
+      case "manage-indexes":
+        setIndexTarget({
+          connectionId: s.connectionId,
+          objectRef: s.node.kind === "Table" ? s.node.ref : ownerRef,
+          schema: schemaOf(s.node.ref),
+          label: s.node.kind === "Table" ? s.node.label : ownerRef.split("/").pop() ?? "",
+        });
+        break;
+
+      case "add-index":
+        setIndexTarget({
+          connectionId: s.connectionId,
+          objectRef: ownerRef,
+          schema: schemaOf(s.node.ref),
+          label: ownerRef.split("/").pop() ?? "",
+          column: s.node.label,
+        });
+        break;
+
+      case "script-select-column":
+        newTab(s.connectionId, selectColumn(engine, ownerName, s.node.label));
+        break;
+
+      case "script-drop-column":
+        newTab(s.connectionId, dropColumn(engine, ownerName, s.node.label));
+        break;
+
+      case "script-drop-index":
+        newTab(s.connectionId, dropIndex(engine, ownerName, s.node.label));
+        break;
+
+      case "script-reindex":
+        newTab(s.connectionId, rebuildIndex(engine, ownerName, s.node.label));
+        break;
+
+      case "script-drop-constraint":
+        newTab(s.connectionId, dropConstraint(engine, ownerName, s.node.label));
+        break;
+
+      case "script-execute":
+        newTab(s.connectionId, executeRoutine(engine, name));
+        break;
+
+      case "script-refresh-matview":
+        newTab(s.connectionId, refreshMaterializedView(engine, name));
+        break;
+
+      case "new-database":
+        setNewDatabase({ connectionId: s.connectionId });
+        break;
+
+      case "drop-database":
+        setDropDatabaseTarget({ connectionId: s.connectionId, name: s.node.label });
+        break;
+
       default:
         setSelection(s);
     }
-  }, [newTab, openData, openDesigner, qualify]);
+  }, [newTab, openData, openDesigner, qualify, engineOf, parentTableRef]);
 
   const runStatement = useCallback((connectionId: string, sql: string) => newTab(connectionId, sql), [newTab]);
 
@@ -644,6 +733,22 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       <ImportDialog target={importTarget} onClose={() => setImportTarget(null)} />
       <CopyTableDialog source={copySource} connections={connections}
         onClose={() => setCopySource(null)} />
+
+      <Modal opened={indexTarget !== null} onClose={() => setIndexTarget(null)} size="xl"
+        title={indexTarget ? `Indexes of ${indexTarget.label}` : ""}>
+        {indexTarget ? (
+          <div style={{ height: 460 }}>
+            <TableDesigner connectionId={indexTarget.connectionId} objectRef={indexTarget.objectRef}
+              schema={indexTarget.schema} focus="indexes" seedIndexColumn={indexTarget.column}
+              onSaved={() => setIndexTarget(null)} />
+          </div>
+        ) : null}
+      </Modal>
+
+      <NewDatabaseDialog target={newDatabase} onClose={() => setNewDatabase(null)}
+        onDone={() => setExplorerNonce(n => n + 1)} />
+      <DropDatabaseDialog target={dropDatabaseTarget} onClose={() => setDropDatabaseTarget(null)}
+        onDone={() => setExplorerNonce(n => n + 1)} />
 
       <GoToObject connectionId={activeConnection} opened={gotoOpen} onClose={() => setGotoOpen(false)}
         onPick={table => openData(activeConnection, table.ref, table.name)} />

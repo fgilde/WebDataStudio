@@ -16,7 +16,7 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F1.6 | Per-connection read-only flag, enforced in the driver | done | all | Connections page, explorer |
 | F1.7 | Connection pooling, auto-reconnect, idle timeout | done | all | Connection form, explorer groups |
 | F1.8 | Import/export of connection definitions as JSON, without secrets | done | all | Connection form, explorer groups |
-| F2.1 | Lazy tree: server, database, schema, tables, views, materialised views, procedures, functions, triggers, sequences, indexes, constraints, types, users | partial: users and types live in the administration panel rather than in the tree | all | Explorer |
+| F2.1 | Lazy tree: server, database, schema, tables, views, materialised views, procedures, functions, triggers, sequences, indexes, constraints, types, users | partial: users live in the administration panel rather than in the tree; a table expands into its columns, indexes, keys and triggers | all | Explorer |
 | F2.2 | Tree filter and fuzzy search, "go to object" (Ctrl+Shift+O) | done | all | Explorer, structure panel |
 | F2.3 | Context menu: open data, show DDL, rename, drop, truncate, generate SELECT/INSERT/UPDATE/DELETE/CREATE script | done | all | Explorer, structure panel |
 | F2.4 | Object detail panel: columns, indexes, foreign keys, triggers, size, row count, comments | done | all | Explorer, structure panel |

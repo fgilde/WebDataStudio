@@ -8,6 +8,22 @@ namespace WebDataStudio.Server.Ddl;
 
 public sealed class PostgreSqlDdlWriter() : DdlWriterBase(new PostgreSqlDialect())
 {
+    /// PostgreSQL has no full-text index type: it indexes the tsvector of the columns with GIN,
+    /// which is what `to_tsvector(...) @@ to_tsquery(...)` searches against.
+    public override IReadOnlyList<DdlStatement> CreateIndex(string schema, string table, IndexDefinition index)
+    {
+        if (!index.FullText) return base.CreateIndex(schema, table, index);
+
+        var expression = string.Join(" || ' ' || ",
+            index.Columns.Select(c => $"coalesce({Dialect.QuoteIdentifier(c)}, '')"));
+
+        return [new DdlStatement(
+            $"CREATE INDEX {Dialect.QuoteIdentifier(index.Name)} ON {Qualify(schema, table)} " +
+            $"USING gin (to_tsvector('simple', {expression}));",
+            false, $"create full-text index {index.Name}")];
+    }
+
+
     public override string MapType(string neutralType) => neutralType.ToLowerInvariant() switch
     {
         "text" => "TEXT",
@@ -50,6 +66,19 @@ public sealed class PostgreSqlDdlWriter() : DdlWriterBase(new PostgreSqlDialect(
 public sealed class MySqlDdlWriter() : DdlWriterBase(new MySqlDialect())
 {
     protected override bool SupportsColumnComments => false; // MySQL carries comments inline instead
+
+    /// MySQL has a FULLTEXT index of its own, searched with MATCH … AGAINST.
+    public override IReadOnlyList<DdlStatement> CreateIndex(string schema, string table, IndexDefinition index)
+    {
+        if (!index.FullText) return base.CreateIndex(schema, table, index);
+
+        var columns = string.Join(", ", index.Columns.Select(Dialect.QuoteIdentifier));
+
+        return [new DdlStatement(
+            $"CREATE FULLTEXT INDEX {Dialect.QuoteIdentifier(index.Name)} " +
+            $"ON {Qualify(schema, table)} ({columns});",
+            false, $"create full-text index {index.Name}")];
+    }
 
     public override string MapType(string neutralType) => neutralType.ToLowerInvariant() switch
     {
@@ -183,6 +212,22 @@ public sealed class SqlServerDdlWriter() : DdlWriterBase(new SqlServerDialect())
 
 public sealed class SqliteDdlWriter() : DdlWriterBase(new SqliteDialect())
 {
+    /// SQLite puts the schema on the index, not on the table: `CREATE INDEX main.ix ON t (...)`.
+    /// Qualifying the table instead is a syntax error.
+    public override IReadOnlyList<DdlStatement> CreateIndex(string schema, string table, IndexDefinition index)
+    {
+        if (index.FullText) return base.CreateIndex(schema, table, index);
+
+        var unique = index.Unique ? "UNIQUE " : "";
+        var columns = string.Join(", ", index.Columns.Select(Dialect.QuoteIdentifier));
+        var filter = index.Filter is { Length: > 0 } ? $" WHERE {index.Filter}" : "";
+
+        return [new DdlStatement(
+            $"CREATE {unique}INDEX {Qualify(schema, index.Name)} " +
+            $"ON {Dialect.QuoteIdentifier(table)} ({columns}){filter};",
+            false, $"create index {index.Name}")];
+    }
+
     protected override bool SupportsColumnComments => false; // SQLite has no comment syntax at all
     protected override bool SupportsAddConstraint => false;  // nor ALTER TABLE ADD CONSTRAINT
 

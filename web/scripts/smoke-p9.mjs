@@ -46,7 +46,7 @@ try {
 await page.getByRole("button", { name: "New query" }).click();
 await page.locator(".monaco-editor").first().waitFor({ timeout: 15000 });
 await page.locator(".monaco-editor").first().click();
-await page.keyboard.type("SELECT id, name FROM people ORDER BY id");
+await page.keyboard.type("SELECT id, city FROM people ORDER BY id");
 
 const name = `smoke-${Date.now()}`;
 await page.getByRole("button", { name: "Saved queries" }).click();
@@ -62,7 +62,7 @@ await page.getByRole("tab", { name: /query/i }).last().click().catch(() => {});
 await page.locator(".monaco-editor").first().click();
 await page.keyboard.press("F5");
 try {
-  await page.getByText("ada", { exact: true }).first().waitFor({ timeout: 20000 });
+  await page.getByText("london", { exact: true }).first().waitFor({ timeout: 20000 });
   await page.getByText("Chart", { exact: true }).click();
   await page.locator("svg[role='img']").first().waitFor({ timeout: 10000 });
 } catch (e) { await fail("chart", e); }
@@ -71,13 +71,13 @@ try {
 await page.getByText("Grid", { exact: true }).click();
 await page.locator(".monaco-editor").first().click();
 await page.keyboard.press("Control+a");
-await page.keyboard.type("SELECT * FROM people WHERE name = $wanted");
+await page.keyboard.type("SELECT * FROM people WHERE city = $wanted");
 await page.keyboard.press("F5");
 try {
   await page.getByText("Query parameters").waitFor({ timeout: 10000 });
-  await page.getByLabel("wanted").fill("ada");
+  await page.getByLabel("wanted").fill("london");
   await page.getByLabel("Query parameters").getByRole("button", { name: "Run" }).click();
-  await page.getByText("ada", { exact: true }).first().waitFor({ timeout: 15000 });
+  await page.getByText("london", { exact: true }).first().waitFor({ timeout: 15000 });
 } catch (e) { await fail("parameters", e); }
 
 // --- query builder -----------------------------------------------------------------

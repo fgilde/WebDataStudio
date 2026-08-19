@@ -255,3 +255,83 @@ public class DdlWriterTests
         _ = engine;
     }
 }
+
+public class FullTextIndexTests
+{
+    private static readonly IndexDefinition FullText =
+        new("ix_people_search", ["name", "city"], false, null, null, FullText: true);
+
+    [Fact]
+    public void PostgreSql_indexes_the_tsvector_of_the_columns()
+    {
+        var statement = Assert.Single(
+            new PostgreSqlDdlWriter().CreateIndex("public", "people", FullText));
+
+        Assert.Contains("USING gin", statement.Sql);
+        Assert.Contains("to_tsvector('simple'", statement.Sql);
+        // Concatenating a NULL column would produce a NULL document and index nothing.
+        Assert.Contains("coalesce(\"name\", '')", statement.Sql);
+        Assert.False(statement.Destructive);
+    }
+
+    [Fact]
+    public void MySql_writes_its_own_fulltext_index()
+    {
+        var statement = Assert.Single(new MySqlDdlWriter().CreateIndex("shop", "people", FullText));
+
+        Assert.Contains("CREATE FULLTEXT INDEX", statement.Sql);
+        Assert.Contains("`name`, `city`", statement.Sql);
+    }
+
+    [Fact]
+    public void An_engine_without_full_text_says_so_instead_of_writing_a_plain_index()
+    {
+        var error = Assert.Throws<NotSupportedException>(() =>
+            new SqliteDdlWriter().CreateIndex("main", "people", FullText));
+
+        Assert.Contains("full-text", error.Message);
+    }
+
+    [Fact]
+    public void A_plain_index_is_unaffected()
+    {
+        var statement = Assert.Single(new PostgreSqlDdlWriter()
+            .CreateIndex("public", "people", new IndexDefinition("ix_name", ["name"], true)));
+
+        Assert.Contains("CREATE UNIQUE INDEX", statement.Sql);
+        Assert.DoesNotContain("gin", statement.Sql);
+    }
+}
+
+public class IndexStatementTests
+{
+    private static readonly IndexDefinition Plain = new("ix_orders_person", ["person_id"], false);
+
+    [Fact]
+    public void Sqlite_qualifies_the_index_and_not_the_table()
+    {
+        // CREATE INDEX main.ix ON t (...) is legal; ON main.t is a syntax error.
+        var statement = Assert.Single(new SqliteDdlWriter().CreateIndex("main", "orders", Plain));
+
+        Assert.Contains("INDEX \"main\".\"ix_orders_person\"", statement.Sql);
+        Assert.Contains("ON \"orders\"", statement.Sql);
+        Assert.DoesNotContain("ON \"main\".\"orders\"", statement.Sql);
+    }
+
+    [Fact]
+    public void Sqlite_keeps_the_partial_predicate()
+    {
+        var statement = Assert.Single(new SqliteDdlWriter()
+            .CreateIndex("main", "orders", Plain with { Filter = "total > 0" }));
+
+        Assert.Contains("WHERE total > 0", statement.Sql);
+    }
+
+    [Fact]
+    public void PostgreSql_qualifies_the_table()
+    {
+        var statement = Assert.Single(new PostgreSqlDdlWriter().CreateIndex("public", "orders", Plain));
+
+        Assert.Contains("ON \"public\".\"orders\"", statement.Sql);
+    }
+}

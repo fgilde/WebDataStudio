@@ -11,14 +11,20 @@ import {
   type ConstraintDefinition, type IndexDefinition, type TableDefinition,
 } from "./definition";
 import { applyDdl, loadDdl, previewDdl, type DdlPreviewDto } from "../api";
+import { useDriverCaps } from "../explorer/useDriverCaps";
 
-export function TableDesigner({ connectionId, objectRef, schema, onSaved }: {
+export function TableDesigner({ connectionId, objectRef, schema, focus, seedIndexColumn, onSaved }: {
   connectionId: string;
   /// Absent for a brand new table.
   objectRef?: string;
   schema: string;
+  /// Which tab opens first — the index actions in the explorer come straight to "indexes".
+  focus?: "columns" | "indexes" | "constraints";
+  /// Starts the editor with one new index over this column, for "add index on this column".
+  seedIndexColumn?: string;
   onSaved?: () => void;
 }) {
+  const caps = useDriverCaps(connectionId);
   const [definition, setDefinition] = useState<TableDefinition | null>(null);
   const [original, setOriginal] = useState<string | null>(null);
   const [preview, setPreview] = useState<DdlPreviewDto | null>(null);
@@ -33,12 +39,20 @@ export function TableDesigner({ connectionId, objectRef, schema, onSaved }: {
     loadDdl(connectionId, objectRef)
       .then(d => {
         if (cancelled) return;
-        setDefinition(d.definition);
+        setDefinition(seedIndexColumn
+          ? {
+            ...d.definition,
+            indexes: [...d.definition.indexes, {
+              name: `ix_${d.definition.name}_${seedIndexColumn}`,
+              columns: [seedIndexColumn], unique: false,
+            }],
+          }
+          : d.definition);
         setOriginal(d.create ?? null);
       })
       .catch(e => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [connectionId, objectRef, schema]);
+  }, [connectionId, objectRef, schema, seedIndexColumn]);
 
   if (error && !definition) return <Text c="red" size="xs" p="xs">{error}</Text>;
   if (!definition) return <Loader size="xs" m="xs" />;
@@ -73,15 +87,20 @@ export function TableDesigner({ connectionId, objectRef, schema, onSaved }: {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <Group gap={6} p={4}>
-        <TextInput size="xs" w={220} label={undefined} value={definition.name}
-          onChange={e => patch({ ...definition, name: e.currentTarget.value })} />
+        {/* Opened on the index tab, the table name is not what the user came to change — and a
+            stray edit there would rename the table. */}
+        {focus === "indexes"
+          ? <Text size="sm" fw={600}>{definition.name}</Text>
+          : <TextInput size="xs" w={220} label={undefined} value={definition.name}
+              onChange={e => patch({ ...definition, name: e.currentTarget.value })} />}
         <Button size="compact-xs" leftSection={<IconDeviceFloppy size={13} />} loading={busy} onClick={save}>
           Save
         </Button>
         {error && <Text size="xs" c="red">{error}</Text>}
       </Group>
 
-      <Tabs defaultValue="columns" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <Tabs defaultValue={focus ?? "columns"}
+        style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
         <Tabs.List>
           <Tabs.Tab value="columns">Columns</Tabs.Tab>
           <Tabs.Tab value="indexes">Indexes</Tabs.Tab>
@@ -161,7 +180,7 @@ export function TableDesigner({ connectionId, objectRef, schema, onSaved }: {
         </Tabs.Panel>
 
         <Tabs.Panel value="indexes" style={{ flex: 1, minHeight: 0 }}>
-          <IndexEditor definition={definition} onChange={patch} />
+          <IndexEditor definition={definition} onChange={patch} caps={caps} />
         </Tabs.Panel>
 
         <Tabs.Panel value="constraints" style={{ flex: 1, minHeight: 0 }}>
@@ -218,9 +237,10 @@ export function TableDesigner({ connectionId, objectRef, schema, onSaved }: {
   );
 }
 
-function IndexEditor({ definition, onChange }: {
+function IndexEditor({ definition, onChange, caps }: {
   definition: TableDefinition;
   onChange: (next: TableDefinition) => void;
+  caps: Record<string, boolean>;
 }) {
   const set = (indexes: IndexDefinition[]) => onChange({ ...definition, indexes });
 
@@ -228,8 +248,13 @@ function IndexEditor({ definition, onChange }: {
     <ScrollArea h="100%">
       <Table fz="xs">
         <Table.Thead>
-          <Table.Tr><Table.Th>Name</Table.Th><Table.Th>Columns</Table.Th>
-            <Table.Th>Unique</Table.Th><Table.Th>Filter</Table.Th><Table.Th /></Table.Tr>
+          <Table.Tr>
+            <Table.Th>Name</Table.Th><Table.Th>Columns</Table.Th><Table.Th>Unique</Table.Th>
+            {caps.fullTextIndexes ? <Table.Th>Full text</Table.Th> : null}
+            {caps.includeColumns ? <Table.Th>Include</Table.Th> : null}
+            {caps.partialIndexes ? <Table.Th>Filter</Table.Th> : null}
+            <Table.Th />
+          </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
           {definition.indexes.map((index, i) => (
@@ -246,15 +271,37 @@ function IndexEditor({ definition, onChange }: {
                     j === i ? { ...x, columns: v } : x))} />
               </Table.Td>
               <Table.Td>
-                <Switch size="xs" checked={index.unique}
+                <Switch size="xs" checked={index.unique} disabled={index.fullText}
                   onChange={e => set(definition.indexes.map((x, j) =>
                     j === i ? { ...x, unique: e.currentTarget.checked } : x))} />
               </Table.Td>
-              <Table.Td>
-                <TextInput size="xs" value={index.filter ?? ""} placeholder="partial index predicate"
-                  onChange={e => set(definition.indexes.map((x, j) =>
-                    j === i ? { ...x, filter: e.currentTarget.value || null } : x))} />
-              </Table.Td>
+              {caps.fullTextIndexes ? (
+                <Table.Td>
+                  {/* A full-text index is never unique and takes no predicate; the server writes
+                      the engine's own spelling of it. */}
+                  <Switch size="xs" checked={index.fullText ?? false}
+                    onChange={e => set(definition.indexes.map((x, j) =>
+                      j === i
+                        ? { ...x, fullText: e.currentTarget.checked, unique: false, filter: null }
+                        : x))} />
+                </Table.Td>
+              ) : null}
+              {caps.includeColumns ? (
+                <Table.Td>
+                  <MultiSelect size="xs" searchable data={definition.columns.map(c => c.name)}
+                    value={index.includeColumns ?? []} disabled={index.fullText}
+                    onChange={v => set(definition.indexes.map((x, j) =>
+                      j === i ? { ...x, includeColumns: v.length > 0 ? v : null } : x))} />
+                </Table.Td>
+              ) : null}
+              {caps.partialIndexes ? (
+                <Table.Td>
+                  <TextInput size="xs" value={index.filter ?? ""} placeholder="predicate"
+                    disabled={index.fullText}
+                    onChange={e => set(definition.indexes.map((x, j) =>
+                      j === i ? { ...x, filter: e.currentTarget.value || null } : x))} />
+                </Table.Td>
+              ) : null}
               <Table.Td>
                 <ActionIcon size="xs" variant="subtle" color="red" aria-label="Remove index"
                   onClick={() => set(definition.indexes.filter((_, j) => j !== i))}>

@@ -19,6 +19,7 @@ public sealed record DriverCapabilities
     public bool ForeignKeys { get; init; }
     public bool PartialIndexes { get; init; }
     public bool IncludeColumns { get; init; }
+    public bool FullTextIndexes { get; init; }
     public bool Backup { get; init; }
     public bool Restore { get; init; }
     public bool UserManagement { get; init; }

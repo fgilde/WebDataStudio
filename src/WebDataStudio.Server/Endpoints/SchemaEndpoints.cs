@@ -21,6 +21,13 @@ public static class SchemaEndpoints
                 {
                     var parentRef = string.IsNullOrEmpty(parent) ? null : SchemaNodeRef.Parse(parent);
                     var nodes = await driver.IntrospectAsync(session, parentRef, ct);
+
+                    // Every driver stops at the object itself. Its columns, indexes, keys and
+                    // triggers are already in DescribeAsync, so the tree grows one level deeper
+                    // here rather than in nine drivers.
+                    if (nodes.Count == 0 && parentRef is { Kind: SchemaNodeKind.Table
+                            or SchemaNodeKind.View or SchemaNodeKind.MaterializedView })
+                        nodes = ObjectChildren(parentRef, await driver.DescribeAsync(session, parentRef, ct));
                     return Results.Ok(nodes.Select(n => new
                     {
                         @ref = n.Ref.ToString(),
@@ -55,6 +62,39 @@ public static class SchemaEndpoints
     /// slash cannot silently split a segment. Object references contain slashes, so put them back —
     /// and only them, since decoding the whole value again would corrupt a name containing a literal
     /// percent sign.
+    /// The parts of an object as tree nodes: columns first, then indexes, foreign keys and
+    /// triggers. The reference of each carries its parent's path, so an action knows the table.
+    private static IReadOnlyList<SchemaNode> ObjectChildren(SchemaNodeRef parent, ObjectDetail detail)
+    {
+        SchemaNodeRef Child(SchemaNodeKind kind, string name) =>
+            new(kind, [.. parent.Path, name]);
+
+        var nodes = new List<SchemaNode>();
+
+        nodes.AddRange(detail.Columns.OrderBy(c => c.Position).Select(column => new SchemaNode(
+            Child(SchemaNodeKind.Column, column.Name),
+            column.Name, false,
+            $"{column.DataType}{(column.Nullable ? "" : " not null")}{(column.IsPrimaryKey ? " · pk" : "")}")));
+
+        nodes.AddRange(detail.Indexes.Select(index => new SchemaNode(
+            Child(SchemaNodeKind.Index, index.Name),
+            index.Name, false,
+            string.Join(", ", index.Columns)
+            + (index.Primary ? " · primary" : index.Unique ? " · unique" : "")
+            + (index.FullText ? " · full text" : ""))));
+
+        nodes.AddRange(detail.ForeignKeys.Select(key => new SchemaNode(
+            Child(SchemaNodeKind.ForeignKey, key.Name),
+            key.Name, false,
+            $"{string.Join(", ", key.Columns)} → {key.ReferencedTable}")));
+
+        nodes.AddRange(detail.Triggers.Select(trigger => new SchemaNode(
+            Child(SchemaNodeKind.Trigger, trigger.Name),
+            trigger.Name, false, $"{trigger.Timing} {trigger.Event}")));
+
+        return nodes;
+    }
+
     internal static SchemaNodeRef ParseObjectRef(string value) =>
         SchemaNodeRef.Parse(value.Replace("%2F", "/", StringComparison.OrdinalIgnoreCase));
 }

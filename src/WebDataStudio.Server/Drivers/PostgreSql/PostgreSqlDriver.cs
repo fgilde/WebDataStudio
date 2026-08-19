@@ -16,7 +16,8 @@ public sealed class PostgreSqlDriver : AdoDriverBase
         Sql = true, MultiSchema = true, MultiDatabase = true, Transactions = true, Ddl = true,
         EstimatedPlan = true, ActualPlan = true, StoredProcedures = true, Triggers = true,
         Views = true, MaterializedViews = true, Sequences = true, ForeignKeys = true,
-        PartialIndexes = true, IncludeColumns = true, Backup = true, Restore = true,
+        PartialIndexes = true, IncludeColumns = true, FullTextIndexes = true,
+        Backup = true, Restore = true,
         UserManagement = true, SessionList = true, KillSession = true, ServerStats = true,
         SlowQueryLog = true, SystemCommands = true,
     };
@@ -122,9 +123,11 @@ public sealed class PostgreSqlDriver : AdoDriverBase
                    ARRAY(SELECT pg_get_indexdef(ix.indexrelid, k + 1, true)
                            FROM generate_subscripts(ix.indkey, 1) AS k ORDER BY k),
                    ix.indisunique, ix.indisprimary,
-                   pg_get_expr(ix.indpred, ix.indrelid)
+                   pg_get_expr(ix.indpred, ix.indrelid),
+                   am.amname = 'gin'
               FROM pg_index ix
               JOIN pg_class i ON i.oid = ix.indexrelid
+              JOIN pg_am am ON am.oid = i.relam
               JOIN pg_class t ON t.oid = ix.indrelid
               JOIN pg_namespace n ON n.oid = t.relnamespace
              WHERE n.nspname = @s AND t.relname = @t
@@ -136,7 +139,8 @@ public sealed class PostgreSqlDriver : AdoDriverBase
                 indexes.Add(new IndexInfo(
                     reader.GetString(0), reader.GetFieldValue<string[]>(1),
                     reader.GetBoolean(2), reader.GetBoolean(3),
-                    reader.IsDBNull(4) ? null : reader.GetString(4)));
+                    reader.IsDBNull(4) ? null : reader.GetString(4),
+                    reader.GetBoolean(5)));
         }
 
         var foreignKeys = new List<ForeignKeyInfo>();

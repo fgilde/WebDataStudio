@@ -14,10 +14,24 @@ ones, and says whether they run in one transaction. Nothing reaches the database
 SQLite has no `ALTER COLUMN`; the designer writes the create-copy-drop-rename sequence for you and
 shows it in the preview like any other change.
 
+## Indexes
+
+**Indexes…** on a table opens the designer on its index tab: name, columns, uniqueness, a partial
+predicate and include columns where the engine has them. **Add index on this column…** on a column
+starts the same editor with that index already filled in.
+
+Where the engine has full text — PostgreSQL and MySQL — a *Full text* switch turns the index into
+the engine's own spelling of it: a GIN index over `to_tsvector(...)` on PostgreSQL, a
+`FULLTEXT INDEX` on MySQL. Everything else keeps the switch hidden rather than writing a statement
+that would fail.
+
+Index changes go through the same preview as any other schema change.
+
 ## Scripts from the context menu
 
 `Script: INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` and `DROP` open a query tab with the statement
-already written for the object you picked. Destructive statements are never run from a menu — they
+already written for the object you picked. Columns, indexes and foreign keys have their own:
+`DROP COLUMN`, `DROP INDEX`, a rebuild, `DROP CONSTRAINT`. Destructive statements are never run from a menu — they
 land in the editor, where you read them and press `F5` yourself.
 
 ## Rename

@@ -14,7 +14,7 @@ public sealed class MySqlDriver : AdoDriverBase
     {
         Sql = true, MultiDatabase = true, Transactions = true, Ddl = true,
         EstimatedPlan = true, ActualPlan = true, StoredProcedures = true, Triggers = true,
-        Views = true, ForeignKeys = true, Backup = true, Restore = true,
+        Views = true, ForeignKeys = true, FullTextIndexes = true, Backup = true, Restore = true,
         UserManagement = true, SessionList = true, KillSession = true, ServerStats = true,
         SlowQueryLog = true, SystemCommands = true,
     };
@@ -110,7 +110,7 @@ public sealed class MySqlDriver : AdoDriverBase
         var indexes = new Dictionary<string, IndexInfo>();
         await using (var cmd = Command(session,
             """
-            SELECT index_name, column_name, non_unique = 0
+            SELECT index_name, column_name, non_unique = 0, index_type = 'FULLTEXT'
               FROM information_schema.statistics
              WHERE table_schema = @s AND table_name = @t
              ORDER BY index_name, seq_in_index
@@ -122,7 +122,8 @@ public sealed class MySqlDriver : AdoDriverBase
                 var indexName = reader.GetString(0);
                 var column = reader.GetString(1);
                 if (!indexes.TryGetValue(indexName, out var existing))
-                    existing = new IndexInfo(indexName, [], reader.GetBoolean(2), indexName == "PRIMARY", null);
+                    existing = new IndexInfo(indexName, [], reader.GetBoolean(2), indexName == "PRIMARY",
+                        null, reader.GetBoolean(3));
                 indexes[indexName] = existing with { Columns = existing.Columns.Append(column).ToList() };
             }
         }

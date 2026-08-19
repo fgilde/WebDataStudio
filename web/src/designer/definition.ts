@@ -5,6 +5,8 @@ export interface ColumnDefinition {
 export interface IndexDefinition {
   name: string; columns: string[]; unique: boolean; filter?: string | null;
   includeColumns?: string[] | null;
+  /// A full-text index. Each engine spells it its own way; the server writes the right statement.
+  fullText?: boolean;
 }
 export type ConstraintKind = "PrimaryKey" | "Unique" | "Check" | "ForeignKey";
 export interface ConstraintDefinition {

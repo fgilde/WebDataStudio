@@ -6,6 +6,21 @@ Open **Connections** in the header, press **Add**, and either fill in the form o
 connection string — pasting detects the engine and fills the rest. **Test** opens the connection
 once and reports what the server said, without saving anything.
 
+## The object tree
+
+A connection expands into schemas, then folders, then objects — and an object expands one level
+further into its columns, indexes, foreign keys and triggers, each with its type or the columns it
+covers next to the name.
+
+Right-click gives the menu that fits what you clicked, and nothing else: a table offers data,
+design, indexes, scripts and export; a column offers a query on it, an index over it and a
+`DROP COLUMN` script; an index offers a rebuild and a drop; a folder offers a new table and a
+refresh. Anything the engine cannot do is left out rather than shown broken.
+
+Destructive statements are written into a query tab instead of running from the menu. Creating a
+database, creating a table and changing an index are the exceptions — they have their own dialog,
+and every schema change still shows its SQL before it runs.
+
 ## Groups and colours
 
 A connection can carry a group and a colour. The explorer draws groups as collapsible headers and

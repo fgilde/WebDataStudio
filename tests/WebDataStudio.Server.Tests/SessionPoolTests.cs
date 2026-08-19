@@ -182,3 +182,55 @@ public class SessionPoolTests
         Assert.NotNull(session);
     }
 }
+
+public class SessionWrapperTests
+{
+    private sealed class DriverOwnSession : IDbSession
+    {
+        public ConnectionSpec Spec { get; } =
+            new("c", "c", "redis", "localhost:6379", false, null, null, ConnectionSource.Stored);
+
+        // A driver that is not ADO has no DbConnection to hand out.
+        public DbConnection Connection => throw new NotSupportedException();
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class Wrapper(IDbSession inner) : IDbSessionWrapper
+    {
+        public IDbSession Inner => inner;
+        public ConnectionSpec Spec => inner.Spec;
+        public DbConnection Connection => inner.Connection;
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    [Fact]
+    public void An_unwrapped_session_is_itself()
+    {
+        var session = new DriverOwnSession();
+        Assert.Same(session, session.Unwrap());
+    }
+
+    [Fact]
+    public void Unwrap_looks_through_every_layer()
+    {
+        // The pool wraps what the tunnel already wrapped; a driver has to find its own session
+        // under both, or MongoDB and Redis stop working the moment either feature is used.
+        var session = new DriverOwnSession();
+        var wrapped = new Wrapper(new Wrapper(session));
+
+        Assert.Same(session, wrapped.Unwrap());
+    }
+
+    [Fact]
+    public async Task A_pooled_session_reports_the_session_the_driver_created()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pool = new SessionPool(new ConfigurationBuilder().Build());
+
+        var inner = new DriverOwnSession();
+        var rented = await pool.RentAsync("c", _ => Task.FromResult<IDbSession>(inner), ct);
+
+        Assert.Same(inner, rented.Unwrap());
+    }
+}

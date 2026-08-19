@@ -336,6 +336,7 @@ public sealed class RedisDriver : IDbDriver
     };
 
     private static RedisSession Cast(IDbSession session) =>
-        session as RedisSession
+        // Unwrap: a pooled or tunnelled session is a wrapper around the one this driver opened.
+        session.Unwrap() as RedisSession
         ?? throw new InvalidOperationException("this session does not belong to the Redis driver");
 }

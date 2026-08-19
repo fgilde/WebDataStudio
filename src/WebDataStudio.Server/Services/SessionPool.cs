@@ -7,11 +7,11 @@ namespace WebDataStudio.Server.Services;
 
 /// A session handed out by the pool. Disposing it returns it instead of closing it, so the
 /// endpoints keep their `await using` and know nothing about pooling.
-internal sealed class PooledSession(IDbSession inner, SessionPool pool, string connectionId) : IDbSession
+internal sealed class PooledSession(IDbSession inner, SessionPool pool, string connectionId) : IDbSessionWrapper
 {
     private bool _returned;
 
-    internal IDbSession Inner => inner;
+    public IDbSession Inner => inner;
 
     public ConnectionSpec Spec => inner.Spec;
     public DbConnection Connection => inner.Connection;

@@ -10,6 +10,20 @@ public interface IDbSession : IAsyncDisposable
     DbConnection Connection { get; }
 }
 
+/// A session that stands in front of another one — the pool and the SSH tunnel both do that.
+/// Drivers that recognise their own session type have to look through these wrappers.
+public interface IDbSessionWrapper : IDbSession
+{
+    IDbSession Inner { get; }
+}
+
+public static class DbSessionExtensions
+{
+    /// The session a driver actually created, with any wrappers peeled off.
+    public static IDbSession Unwrap(this IDbSession session) =>
+        session is IDbSessionWrapper wrapper ? wrapper.Inner.Unwrap() : session;
+}
+
 // The spec's `IDdlWriter Ddl` property is deliberately absent: nothing here writes DDL. P3 adds it
 // with a CreateTable-only writer for the SQL schema exporter, P6 grows it into the full interface.
 public interface IDbDriver

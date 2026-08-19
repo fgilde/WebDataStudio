@@ -400,6 +400,7 @@ public sealed class MongoDbDriver : IDbDriver
     }
 
     private static MongoSession Cast(IDbSession session) =>
-        session as MongoSession
+        // Unwrap: a pooled or tunnelled session is a wrapper around the one this driver opened.
+        session.Unwrap() as MongoSession
         ?? throw new InvalidOperationException("this session does not belong to the MongoDB driver");
 }

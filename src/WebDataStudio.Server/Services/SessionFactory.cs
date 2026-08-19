@@ -10,8 +10,9 @@ public sealed class UnknownConnectionException(string id)
 
 /// Holds the tunnel open for exactly as long as the session that needs it.
 internal sealed class TunnelledSession(
-    IDbSession inner, TunnelManager tunnels, TunnelSpec spec, string host, int port) : IDbSession
+    IDbSession inner, TunnelManager tunnels, TunnelSpec spec, string host, int port) : IDbSessionWrapper
 {
+    public IDbSession Inner => inner;
     public ConnectionSpec Spec => inner.Spec;
     public DbConnection Connection => inner.Connection;
 

@@ -57,9 +57,9 @@ export function buildCommands(context: CommandContext): Command[] {
     { id: "result.export", label: "Export result", group: "Tools", shortcut: "Ctrl+E", run: context.exportResult },
 
     { id: "view.theme", label: "Switch theme", group: "View", shortcut: "Ctrl+T", run: context.switchTheme },
-    { id: "view.saveLayout", label: "Save layout preset", group: "View", run: context.saveLayout },
+    { id: "view.saveLayout", label: "Layout presets — save, or apply 1…9", group: "View", shortcut: "Ctrl+L", run: context.saveLayout },
     // Reachable even with every panel closed: this is the way back from a broken layout.
-    { id: "view.resetLayout", label: "Reset layout", group: "View", run: context.resetLayout },
+    { id: "view.resetLayout", label: "Reset layout", group: "View", shortcut: "Ctrl+L then 0", run: context.resetLayout },
     { id: "view.copyLink", label: "Copy link to this object", group: "View", run: context.copyLink },
     { id: "view.shortcuts", label: "Keyboard shortcuts", group: "View", shortcut: "?", run: context.showShortcuts },
   ];

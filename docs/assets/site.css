@@ -106,6 +106,48 @@ table.compare td.part { color: #fbbf24; }
 table.compare tr:first-child th:first-child { position: sticky; left: 0; }
 
 .note { color: var(--muted); font-size: 13.5px; margin-top: 12px; }
+/* A note that leads with a logo: the icon sits on the first line, the text wraps under itself. */
+.note.with-icon { display: flex; gap: 10px; align-items: flex-start; }
+.note.with-icon img { width: 26px; height: 26px; flex-shrink: 0; margin-top: 1px; }
+
+/* --- lightbox ------------------------------------------------------------------ */
+figure.zoomable img { cursor: zoom-in; transition: border-color .15s, transform .15s; }
+figure.zoomable img:hover,
+figure.zoomable img:focus-visible { border-color: var(--teal); transform: translateY(-2px); }
+
+.lightbox {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 24px;
+  background: rgba(6, 9, 18, .92);
+  backdrop-filter: blur(4px);
+}
+.lightbox[hidden] { display: none; }
+
+.lightbox-figure {
+  margin: 0; max-width: min(1600px, 92vw); max-height: 90vh;
+  display: flex; flex-direction: column; gap: 10px; align-items: center;
+}
+.lightbox-figure img {
+  max-width: 100%; max-height: calc(90vh - 40px);
+  object-fit: contain;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg);
+}
+.lightbox-figure figcaption { color: var(--muted); font-size: 14px; text-align: center; }
+
+.lightbox-nav, .lightbox-close {
+  background: var(--card); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px;
+  cursor: pointer; line-height: 1;
+}
+.lightbox-nav { width: 44px; height: 64px; font-size: 26px; flex-shrink: 0; }
+.lightbox-close { position: absolute; top: 18px; right: 18px; width: 40px; height: 40px; font-size: 22px; }
+.lightbox-nav:hover, .lightbox-close:hover { border-color: var(--teal); color: var(--teal); }
+
+@media (max-width: 700px) {
+  .lightbox { padding: 12px; }
+  .lightbox-nav { width: 36px; height: 52px; font-size: 22px; }
+}
 
 footer {
   border-top: 1px solid var(--line); padding: 28px 0 44px; color: var(--muted); font-size: 14px;

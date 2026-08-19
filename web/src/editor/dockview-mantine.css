@@ -21,3 +21,22 @@
 .wds-active-statement {
   background-color: color-mix(in srgb, var(--mantine-primary-color-filled) 10%, transparent);
 }
+
+/* A tool pane that was activated flashes its border, so a click on History is visible even when
+   the panel was already open and nothing else on screen moves. The overlay sits outside the
+   content flow: an inset shadow on the group would be painted over by the panel's own background. */
+.wds-flash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  border: 2px solid var(--mantine-color-orange-6);
+  border-radius: 3px;
+  animation: wds-flash 700ms ease-out forwards;
+}
+@keyframes wds-flash {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  100% { opacity: 0; }
+}

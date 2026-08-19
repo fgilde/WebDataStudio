@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  ActionIcon, Button, Group, Modal, Stack, Table, Text, TextInput,
+  ActionIcon, Badge, Button, Group, Modal, Stack, Table, Text, TextInput,
 } from "@mantine/core";
 import { IconTrash } from "@tabler/icons-react";
 import { loadWorkspaceItem, saveWorkspaceItem } from "../api";
@@ -26,19 +26,33 @@ export function useLayoutPresets() {
   return { presets, save };
 }
 
-export function LayoutPresetsModal({ opened, onClose, connectionId, capture, apply, reset }: {
+/// The presets that apply to the connection in front of the user, in the order the slot numbers
+/// follow: the shortcut and the list have to agree on what "3" means.
+export const visiblePresets = (presets: LayoutPreset[], connectionId: string | null) =>
+  presets.filter(p => p.connectionId === null || p.connectionId === connectionId);
+
+/// Slots are 1-based, so Ctrl+L 1 is the first entry in the list. Slot 0 is the reset, handled by
+/// the caller.
+export const presetForSlot = (
+  presets: LayoutPreset[], connectionId: string | null, slot: number,
+): LayoutPreset | undefined => visiblePresets(presets, connectionId)[slot - 1];
+
+export function LayoutPresetsModal({
+  opened, onClose, connectionId, capture, apply, reset, presets, save,
+}: {
   opened: boolean;
   onClose: () => void;
   connectionId: string | null;
   capture: () => unknown;
   apply: (layout: unknown) => void;
   reset: () => void;
+  presets: LayoutPreset[];
+  save: (list: LayoutPreset[]) => void;
 }) {
-  const { presets, save } = useLayoutPresets();
   const [name, setName] = useState("");
   const [global, setGlobal] = useState(false);
 
-  const visible = presets.filter(p => p.connectionId === null || p.connectionId === connectionId);
+  const visible = visiblePresets(presets, connectionId);
 
   return (
     <Modal opened={opened} onClose={onClose} title="Layout presets">
@@ -62,8 +76,14 @@ export function LayoutPresetsModal({ opened, onClose, connectionId, capture, app
           <Table.Tbody>
             {visible.length === 0
               ? <Table.Tr><Table.Td><Text size="xs" c="dimmed">No presets yet.</Text></Table.Td></Table.Tr>
-              : visible.map(preset => (
+              : visible.map((preset, at) => (
                 <Table.Tr key={preset.name}>
+                  <Table.Td w={30}>
+                    {/* The slot the Ctrl+L chord applies; past nine there is no key left to press. */}
+                    {at < 9
+                      ? <Badge size="xs" variant="light" c="dimmed">{at + 1}</Badge>
+                      : null}
+                  </Table.Td>
                   <Table.Td>{preset.name}</Table.Td>
                   <Table.Td>
                     <Text size="10px" c="dimmed">
@@ -88,7 +108,7 @@ export function LayoutPresetsModal({ opened, onClose, connectionId, capture, app
 
         {/* The way back from a layout with every panel closed. */}
         <Group justify="space-between">
-          <Text size="xs" c="dimmed">Lost a panel? Reset restores the default arrangement.</Text>
+          <Text size="xs" c="dimmed">Ctrl+L then 1…9 applies a preset, Ctrl+L then 0 resets.</Text>
           <Button size="xs" variant="light" color="red"
             onClick={() => { reset(); onClose(); }}>Reset layout</Button>
         </Group>

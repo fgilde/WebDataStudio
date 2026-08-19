@@ -98,7 +98,7 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F13.1 | Command palette (Ctrl+K) covering every action | done | all | Shell, command palette, theme drawer |
 | F13.2 | Keyboard shortcuts throughout with a shortcut help overlay | done | all | Shell, command palette, theme drawer |
 | F13.3 | The 21 AspireUI themes and the theme drawer | done | all | Shell, command palette, theme drawer |
-| F13.4 | Save and reset layout presets | done | all | Shell, command palette, theme drawer |
+| F13.4 | Save, apply and reset layout presets, `Ctrl+L` plus a digit per preset | done | all | Shell, command palette, theme drawer |
 | F13.5 | Deep links to an object or a query | done | all | Shell, command palette, theme drawer |
 | F13.6 | Toasts for long-running jobs | done | all | Shell, command palette, theme drawer |
 | F14.1 | MongoDB: collection browser, JSON editor, aggregation pipeline, index management | partial: the command console runs find, aggregate and index commands; there is no separate pipeline builder | mongodb | Query tab on a MongoDB connection |

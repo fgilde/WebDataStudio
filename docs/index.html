@@ -151,11 +151,12 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
        .WithEnvironment("WDS_CONN_SHOP", db.Resource.ConnectionStringExpression)
        .WithVolume("wds-data", "/data");</pre>
 
-    <p class="note">
-      Or install
+    <p class="note with-icon">
+      <img src="assets/nextended.png" alt="Nextended">
+      <span>Or install
       <a href="https://www.nuget.org/packages/Nextended.Aspire.Hosting.WebDataStudio/">Nextended.Aspire.Hosting.WebDataStudio</a>
       and write <code>builder.AddPostgres("pg").AddDatabase("shop").WithWebDataStudio();</code> —
-      one call per database, one studio, the engine worked out for you.
+      one call per database, one studio, the engine worked out for you.</span>
     </p>
   </div>
 </section>
@@ -288,5 +289,6 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
   </div>
 </footer>
 
+<script src="assets/lightbox.js"></script>
 </body>
 </html>

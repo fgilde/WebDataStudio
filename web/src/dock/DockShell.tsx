@@ -23,7 +23,7 @@ import { QueryDesigner } from "../designer/QueryDesigner";
 import { SavedQueriesPanel } from "../query/SavedQueriesPanel";
 import { SnippetManager } from "../editor/SnippetManager";
 import { CommandPalette, ShortcutsHelp } from "../shell/CommandPalette";
-import { LayoutPresetsModal } from "../shell/LayoutPresets";
+import { LayoutPresetsModal, presetForSlot, useLayoutPresets } from "../shell/LayoutPresets";
 import { buildCommands } from "../shell/commands";
 import { buildDeepLink, parseDeepLink } from "../shell/deepLink";
 import { GoToObject } from "../shell/GoToObject";
@@ -237,6 +237,17 @@ function buildDefaultLayout(
   welcome.api.setActive();
 }
 
+/// The orange border on the group a panel lives in. Restarting the animation needs the class off,
+/// a reflow, and the class back on — otherwise activating an already-active panel shows nothing,
+/// which is exactly the case this exists for.
+function flashPanel(element: HTMLElement | undefined) {
+  if (!element) return;
+  element.classList.remove("wds-flash");
+  void element.offsetWidth;
+  element.classList.add("wds-flash");
+  window.setTimeout(() => element.classList.remove("wds-flash"), 800);
+}
+
 export function DockShell() {
   const { current } = useAppTheme();
   const [selection, setSelection] = useState<ExplorerSelection | null>(null);
@@ -247,6 +258,8 @@ export function DockShell() {
   const api = useRef<DockviewApi | null>(null);
   const centerGroup = useRef<DockviewGroupPanel | null>(null);
   const restored = useRef(false);
+  const chord = useRef(false);
+  const chordTimer = useRef(0);
   const [exportTarget, setExportTarget] = useState<ExportTarget | null>(null);
   const [importTarget, setImportTarget] = useState<ImportTarget | null>(null);
   const [copySource, setCopySource] = useState<{ connectionId: string; objectRef: string; label: string } | null>(null);
@@ -261,8 +274,19 @@ export function DockShell() {
   const [newDatabase, setNewDatabase] = useState<DatabaseTarget | null>(null);
   const [dropDatabaseTarget, setDropDatabaseTarget] = useState<DatabaseTarget | null>(null);
   const [propertiesFor, setPropertiesFor] = useState<{ connectionId: string; label: string } | null>(null);
+  // Held here, not in the modal: the Ctrl+L chord has to reach the same list the modal numbers.
+  const { presets, save: savePresets } = useLayoutPresets();
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, []);
+
+  // Every way of reaching a panel goes through here, so the flash is not something half the
+  // buttons remember to do.
+  const focusPanel = useCallback((id: string) => {
+    const panel = api.current?.getPanel(id);
+    if (!panel) return;
+    panel.api.setActive();
+    flashPanel(panel.group.element);
+  }, []);
 
   const updateSql = useCallback((id: string, sql: string) => {
     setTabs(list => list.map(t => (t.id === id ? { ...t, sql } : t)));
@@ -482,7 +506,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
       case "structure":
         setSelection(s);
-        api.current?.getPanel("structure")?.api.setActive();
+        focusPanel("structure");
         break;
 
       case "copy-link":
@@ -557,7 +581,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       default:
         setSelection(s);
     }
-  }, [newTab, openData, openDesigner, qualify, engineOf, parentTableRef, connections]);
+  }, [focusPanel, newTab, openData, openDesigner, qualify, engineOf, parentTableRef, connections]);
 
   const runStatement = useCallback((connectionId: string, sql: string) => newTab(connectionId, sql), [newTab]);
 
@@ -582,20 +606,31 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
   const openTool = useCallback((component: string, title: string, connectionId: string) => {
     if (!connectionId) return;
     const id = `${component}:${connectionId}`;
-    const existing = api.current?.getPanel(id);
-    if (existing) { existing.api.setActive(); return; }
+    if (api.current?.getPanel(id)) { focusPanel(id); return; }
 
     api.current?.addPanel({
       id, component, title, params: { connectionId },
       position: centerGroup.current ? { referenceGroup: centerGroup.current } : undefined,
     });
-  }, []);
+    flashPanel(api.current?.getPanel(id)?.group.element);
+  }, [focusPanel]);
 
   const resetLayout = useCallback(() => {
     // The way back from a layout with every panel closed: rebuild the default arrangement.
     api.current?.clear();
     if (api.current) buildDefaultLayout(api.current, centerGroup);
   }, []);
+
+  const applyLayout = useCallback((layout: unknown) => {
+    try {
+      api.current?.fromJSON(layout as never);
+      // The old centre group died with the layout; new query tabs would otherwise land nowhere.
+      centerGroup.current = api.current?.getPanel("welcome")?.group
+        ?? api.current?.groups[0] ?? null;
+    } catch {
+      resetLayout();
+    }
+  }, [resetLayout]);
 
   const commands = useMemo(() => buildCommands({
     newQuery: () => newTab(activeConnection),
@@ -609,12 +644,12 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     refreshExplorer: () => setExplorerNonce(n => n + 1),
     goToObject: () => setGotoOpen(true),
     openDiagram: () => openTool("diagram", "Diagram", activeConnection),
-    openHealth: () => api.current?.getPanel("health")?.api.setActive(),
+    openHealth: () => focusPanel("health"),
     openAdmin: () => openTool("admin", "Admin", activeConnection),
     openCompare: () => openTool("compare", "Compare", activeConnection),
-    openHistory: () => api.current?.getPanel("history")?.api.setActive(),
-    openSavedQueries: () => api.current?.getPanel("saved")?.api.setActive(),
-    saveCurrentQuery: () => api.current?.getPanel("saved")?.api.setActive(),
+    openHistory: () => focusPanel("history"),
+    openSavedQueries: () => focusPanel("saved"),
+    saveCurrentQuery: () => focusPanel("saved"),
     exportResult: () => {
       const tab = tabs[tabs.length - 1];
       if (tab) exportQuery(tab.connectionId, tab.sql);
@@ -631,13 +666,36 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}${link}`);
     },
     showShortcuts: () => setShortcutsOpen(true),
-  }), [activeConnection, newTab, openTool, resetLayout, selection, tabs, exportQuery]);
+  }), [activeConnection, focusPanel, newTab, openTool, resetLayout, selection, tabs, exportQuery]);
 
   // Ctrl+K everywhere, "?" only outside a text field — otherwise it eats a question mark.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const typing = target?.closest("input, textarea, .monaco-editor") !== null;
+
+      // Ctrl+L opens the preset list and arms the chord: the digit that follows picks a layout, 0
+      // resets. A chord keeps Ctrl+1…9 free, which the browser owns for its tabs.
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "l") {
+        event.preventDefault();
+        setLayoutsOpen(true);
+        window.clearTimeout(chordTimer.current);
+        chord.current = true;
+        chordTimer.current = window.setTimeout(() => { chord.current = false; }, 3000);
+        return;
+      }
+      if (chord.current && /^[0-9]$/.test(event.key)) {
+        event.preventDefault();
+        chord.current = false;
+        setLayoutsOpen(false);
+
+        const slot = Number(event.key);
+        if (slot === 0) { resetLayout(); return; }
+
+        const preset = presetForSlot(presets, activeConnection || null, slot);
+        if (preset) applyLayout(preset.layout);
+        return;
+      }
 
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -657,7 +715,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [activeConnection, applyLayout, presets, resetLayout]);
 
   // A deep link opens its target once the connections are known.
   const followedLink = useRef(false);
@@ -690,7 +748,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
               </Tooltip>
               <Tooltip label="History">
                 <ActionIcon size="sm" variant="subtle" aria-label="History"
-                  onClick={() => api.current?.getPanel("history")?.api.setActive()}>
+                  onClick={() => focusPanel("history")}>
                   <IconHistory size={15} />
                 </ActionIcon>
               </Tooltip>
@@ -720,7 +778,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
               </Tooltip>
               <Tooltip label="Saved queries">
                 <ActionIcon size="sm" variant="subtle" aria-label="Saved queries"
-                  onClick={() => api.current?.getPanel("saved")?.api.setActive()}>
+                  onClick={() => focusPanel("saved")}>
                   <IconBookmarks size={15} />
                 </ActionIcon>
               </Tooltip>
@@ -779,8 +837,9 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       <SnippetManager opened={snippetsOpen} onClose={() => setSnippetsOpen(false)} />
       <LayoutPresetsModal opened={layoutsOpen} onClose={() => setLayoutsOpen(false)}
         connectionId={activeConnection || null}
+        presets={presets} save={savePresets}
         capture={() => api.current?.toJSON()}
-        apply={layout => { try { api.current?.fromJSON(layout as never); } catch { resetLayout(); } }}
+        apply={applyLayout}
         reset={resetLayout} />
     </ShellContext.Provider>
   );

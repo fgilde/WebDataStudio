@@ -395,6 +395,8 @@ it works for every engine whose capability set claims support for it.
 | F13.4 | Save and reset layout presets |
 | F13.5 | Deep links to an object or a query |
 | F13.6 | Toasts for long-running jobs |
+| F13.7 | Every panel dockable, the explorer included, with a way back to it |
+| F13.8 | The running build visible in the studio and over the API |
 
 ### F14 NoSQL (tier 3)
 | ID | Feature |

@@ -3,6 +3,7 @@
 - [Overview](/)
 - [Getting started](getting-started.md)
 - [Environment variables](environment.md)
+- [Deploying the studio](deploy.md)
 - [Connections](connections.md)
 - [Query editor](editor.md)
 - [Results and export](results.md)

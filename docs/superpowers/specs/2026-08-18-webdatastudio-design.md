@@ -414,6 +414,8 @@ it works for every engine whose capability set claims support for it.
 | F15.4 | Screenshots per major feature, captured in a dark and a light theme |
 | F15.5 | README links to the site in both languages; the site links back to the repository and the GHCR image |
 | F15.6 | A link check in CI so a renamed page cannot silently break the sidebar |
+| F16.1 | Entra authentication for a managed database, resolved from the container's identity |
+| F16.2 | A studio that keeps working when its own storage does not, and says so |
 
 ## 10. Safety behaviour
 

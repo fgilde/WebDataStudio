@@ -112,3 +112,5 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F15.4 | Screenshots per major feature, captured in a dark and a light theme | done | all | docs/ site |
 | F15.5 | README links to the site in both languages; the site links back to the repository and the GHCR image | done | all | docs/ site |
 | F15.6 | A link check in CI so a renamed page cannot silently break the sidebar | done | all | docs/ site |
+| F16.1 | Entra authentication for Azure SQL: `Authentication=Active Directory Default` with the container's managed identity | done | sqlserver | Connections, deployed studio |
+| F16.2 | A data directory that is slow or unusable degrades to environment-only connections, reported in /api/health and in the window | done | all | Shell, /api/health |

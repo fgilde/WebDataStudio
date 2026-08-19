@@ -12,15 +12,21 @@ public sealed class ConnectionStore
     private readonly SecretProtector _protector;
     private readonly Lock _gate = new();
 
+    /// Why the store is unusable, or null when it is fine. A studio whose /data cannot be written
+    /// still has every connection that came from the environment, so it stays up and says so
+    /// rather than failing every request that reaches the database.
+    public string? Error { get; }
+
+    public bool Available => Error is null;
+
+    public string Path { get; }
+
     public ConnectionStore(string dbPath, SecretProtector protector)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(dbPath))!);
-        _connectionString = new SqliteConnectionStringBuilder { DataSource = dbPath }.ToString();
         _protector = protector;
+        Path = dbPath;
 
-        using var db = Open();
-        using var cmd = db.CreateCommand();
-        cmd.CommandText = """
+        var prepared = SqliteFile.Prepare(dbPath, """
             CREATE TABLE IF NOT EXISTS connections (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -31,9 +37,15 @@ public sealed class ConnectionStore
                 grp TEXT NULL,
                 created_at TEXT NOT NULL
             );
-            """;
-        cmd.ExecuteNonQuery();
+            """);
+
+        _connectionString = prepared.ConnectionString;
+        Error = prepared.Error;
     }
+
+    /// Thrown by everything that writes. Reading degrades to "nothing stored" instead, because a
+    /// connection list without the stored half is still worth showing.
+    private WorkspaceUnavailableException Unavailable() => new(Path, Error);
 
     private SqliteConnection Open()
     {
@@ -44,6 +56,8 @@ public sealed class ConnectionStore
 
     public IReadOnlyList<ConnectionSpec> List()
     {
+        if (!Available) return [];
+
         lock (_gate)
         {
             using var db = Open();
@@ -62,6 +76,8 @@ public sealed class ConnectionStore
 
     public ConnectionSpec Add(ConnectionSpec spec)
     {
+        if (!Available) throw Unavailable();
+
         var stored = spec with { Id = Guid.NewGuid().ToString("n"), Source = ConnectionSource.Stored };
         lock (_gate)
         {
@@ -87,6 +103,8 @@ public sealed class ConnectionStore
 
     public void Update(ConnectionSpec spec)
     {
+        if (!Available) throw Unavailable();
+
         lock (_gate)
         {
             using var db = Open();
@@ -104,6 +122,8 @@ public sealed class ConnectionStore
 
     public void Delete(string id)
     {
+        if (!Available) throw Unavailable();
+
         lock (_gate)
         {
             using var db = Open();

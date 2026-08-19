@@ -21,18 +21,37 @@ public sealed class SecretProtector
             return;
         }
 
+        // A directory the studio cannot write is not a reason to refuse to start: without it
+        // there is nowhere to store a connection either, so a key held in memory is exactly as
+        // useful as a persisted one. The stores report the same problem with the path in it.
+        try
+        {
+            _key = LoadOrCreateKey(keyDirectory);
+        }
+        catch (Exception)
+        {
+            Ephemeral = true;
+            _key = RandomNumberGenerator.GetBytes(32);
+        }
+    }
+
+    /// True when the key lives only in this process, because its directory could not be used.
+    /// Anything encrypted with it dies with the container — which is fine, since nothing can be
+    /// stored in that state anyway.
+    public bool Ephemeral { get; }
+
+    private static byte[] LoadOrCreateKey(string keyDirectory)
+    {
         Directory.CreateDirectory(keyDirectory);
         var keyFile = Path.Combine(keyDirectory, ".key");
-        if (File.Exists(keyFile))
-        {
-            _key = Convert.FromBase64String(File.ReadAllText(keyFile).Trim());
-            return;
-        }
+        if (File.Exists(keyFile)) return Convert.FromBase64String(File.ReadAllText(keyFile).Trim());
 
-        _key = RandomNumberGenerator.GetBytes(32);
-        File.WriteAllText(keyFile, Convert.ToBase64String(_key));
+        var key = RandomNumberGenerator.GetBytes(32);
+        File.WriteAllText(keyFile, Convert.ToBase64String(key));
         if (!OperatingSystem.IsWindows())
             File.SetUnixFileMode(keyFile, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+
+        return key;
     }
 
     public string Protect(string plaintext)

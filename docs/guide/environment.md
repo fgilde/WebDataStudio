@@ -67,3 +67,11 @@ Connections added in the UI are stored in the application database with the conn
 and an SSH private key, if there is one — encrypted with AES-GCM. The key comes from
 `WDS_SECRET_KEY`, or is generated once into `/data/.key`. Keep the volume and the key together;
 without the key the stored connections cannot be read back.
+
+## Where the studio keeps its own data
+
+`DB_PATH` has to point at local storage: SQLite needs proper file locking, which a network share —
+Azure Files, NFS, SMB — does not provide. A studio whose data directory does not answer keeps
+running with the connections from the environment and reports the problem in `/api/health` and in
+the bottom right corner of the window, rather than failing every request that touches storage. See
+[Deploying the studio](deploy.md).

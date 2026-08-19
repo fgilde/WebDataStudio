@@ -45,7 +45,14 @@ const json = (method: string, body: unknown) => ({
 
 export const me = (): Promise<Me> => fetch(`${base}/auth/me`).then(r => ok<Me>(r));
 
-export interface HealthDto { status: string; version: string; commit: string | null; built: string }
+export interface HealthDto {
+  status: string;
+  version: string;
+  commit: string | null;
+  built: string;
+  store: { path: string; available: boolean; error: string | null };
+  connections: number;
+}
 
 export const health = (): Promise<HealthDto> => fetch(`${base}/health`).then(r => ok<HealthDto>(r));
 

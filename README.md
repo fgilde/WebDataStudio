@@ -97,7 +97,7 @@ applies to; a test fails the build if that list falls behind.
 | `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app; otherwise anonymous |
 | `WDS_TITLE` | a name for this studio, shown in the header and the browser tab; unset shows nothing |
 | `WDS_SECRET_KEY` | AES key (base64, 32 bytes) for stored connection secrets; generated into `/data/.key` if absent |
-| `DB_PATH` | application SQLite database, default `/data/webdatastudio.db` |
+| `DB_PATH` | application SQLite database, default `/data/webdatastudio.db`; local storage only, never a network share |
 | `WDS_QUERY_TIMEOUT_SECONDS` | default statement timeout, default 300 |
 | `WDS_MAX_ROWS` | default fetch cap per result, default 1000 |
 | `WDS_MAX_SESSIONS` | open sessions per connection, default 8 |

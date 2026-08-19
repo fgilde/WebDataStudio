@@ -45,8 +45,10 @@ builder.Services.AddSingleton(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
     var dbPath = config["DB_PATH"] ?? defaultDbPath;
+    // The directory is created by whoever can: SecretProtector falls back to a key in memory and
+    // the stores report the path they could not use, so a read-only /data starts rather than
+    // crashing on the way up.
     var dataDir = Path.GetDirectoryName(Path.GetFullPath(dbPath))!;
-    Directory.CreateDirectory(dataDir);
     return new SecretProtector(dataDir, config["WDS_SECRET_KEY"]);
 });
 builder.Services.AddSingleton(sp => new ConnectionStore(
@@ -73,13 +75,56 @@ var version = typeof(Program).Assembly
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
     ?? typeof(Program).Assembly.GetName().Version?.ToString() ?? "0.0.0";
 var built = File.GetLastWriteTimeUtc(typeof(Program).Assembly.Location);
-app.MapGet("/api/health", () => Results.Ok(new
+
+// Touch both stores now rather than on the first request that needs one. They are singletons, so
+// a /data that never answers would otherwise turn one unlucky request into a hang and every
+// following one into a queue behind it — which is exactly how an Azure Files mount fails.
+var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("WebDataStudio");
+var connectionStore = app.Services.GetRequiredService<ConnectionStore>();
+var workspaceStore = app.Services.GetRequiredService<WorkspaceStore>();
+
+foreach (var (label, path, error) in new[]
+         {
+             ("connections", connectionStore.Path, connectionStore.Error),
+             ("workspace", workspaceStore.Path, workspaceStore.Error),
+         })
 {
-    status = "ok",
+    if (error is null) startupLog.LogInformation("{Store} database ready at {Path}", label, path);
+    else startupLog.LogError("{Store} database at {Path} is not usable: {Error}", label, path, error);
+}
+
+app.MapGet("/api/health", (ConnectionRegistry registry) => Results.Ok(new
+{
+    status = connectionStore.Available && workspaceStore.Available ? "ok" : "degraded",
     version,
     commit = version.Contains('+') ? version.Split('+')[1] : null,
     built,
+    // What the studio can actually do right now, so "why is my connection missing" is one call
+    // away instead of a container-log expedition.
+    store = new
+    {
+        path = connectionStore.Path,
+        available = connectionStore.Available && workspaceStore.Available,
+        error = connectionStore.Error ?? workspaceStore.Error,
+    },
+    connections = registry.All().Count,
 })).AllowAnonymous();
+
+// A stuck data directory is a dependency failure, not a bug in the request: say so, with the path
+// in the message, instead of letting a 500 stand for it.
+app.Use(async (ctx, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (WorkspaceUnavailableException e)
+    {
+        startupLog.LogError(e, "a request needed the workspace database");
+        ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        await ctx.Response.WriteAsJsonAsync(new { message = e.Message });
+    }
+});
 
 app.UseDefaultFiles();
 app.UseStaticFiles();

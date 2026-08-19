@@ -8,6 +8,27 @@ namespace WebDataStudio.Server.Drivers.SqlServer;
 
 public sealed class SqlServerDriver : AdoDriverBase
 {
+    /// Entra authentication moved out of Microsoft.Data.SqlClient in 7.0: without registering the
+    /// provider from Microsoft.Data.SqlClient.Extensions.Azure, a connection string that says
+    /// <c>Authentication=Active Directory Default</c> cannot be opened at all. That is exactly the
+    /// string Aspire hands a deployed studio for Azure SQL, together with an AZURE_CLIENT_ID for
+    /// the container's managed identity, which the credential chain picks up on its own.
+    ///
+    /// Interactive and device-code flows are deliberately left out: nobody is standing at a
+    /// browser inside a container, and a prompt that cannot be answered would hang the request.
+    static SqlServerDriver()
+    {
+        foreach (var method in new[]
+                 {
+                     SqlAuthenticationMethod.ActiveDirectoryDefault,
+                     SqlAuthenticationMethod.ActiveDirectoryManagedIdentity,
+                     SqlAuthenticationMethod.ActiveDirectoryMSI,
+                     SqlAuthenticationMethod.ActiveDirectoryPassword,
+                     SqlAuthenticationMethod.ActiveDirectoryServicePrincipal,
+                 })
+            SqlAuthenticationProvider.SetProvider(method, new ActiveDirectoryAuthenticationProvider());
+    }
+
     public override DriverInfo Info { get; } =
         new("sqlserver", "SQL Server", 1433,
             "Server=localhost,1433;Database=master;User Id=sa;Password=;TrustServerCertificate=True");

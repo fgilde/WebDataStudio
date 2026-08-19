@@ -13,14 +13,19 @@ public sealed class WorkspaceStore
 {
     private readonly string _connectionString;
 
+    /// Why the store is unusable, or null when it is fine — see <see cref="SqliteFile"/> for why
+    /// this is a state rather than an exception at startup.
+    public string? Error { get; }
+
+    public bool Available => Error is null;
+
+    public string Path { get; }
+
     public WorkspaceStore(string dbPath)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(dbPath))!);
-        _connectionString = new SqliteConnectionStringBuilder { DataSource = dbPath }.ToString();
+        Path = dbPath;
 
-        using var db = Open();
-        using var cmd = db.CreateCommand();
-        cmd.CommandText = """
+        var prepared = SqliteFile.Prepare(dbPath, """
             CREATE TABLE IF NOT EXISTS history (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 connection_id TEXT NOT NULL,
@@ -40,12 +45,16 @@ public sealed class WorkspaceStore
                 connection_id TEXT NULL,
                 updated_at TEXT NOT NULL
             );
-            """;
-        cmd.ExecuteNonQuery();
+            """);
+
+        _connectionString = prepared.ConnectionString;
+        Error = prepared.Error;
     }
 
     private SqliteConnection Open()
     {
+        if (!Available) throw new WorkspaceUnavailableException(Path, Error);
+
         var db = new SqliteConnection(_connectionString);
         db.Open();
         return db;

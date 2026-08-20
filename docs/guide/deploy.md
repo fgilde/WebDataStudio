@@ -60,6 +60,17 @@ With [Nextended.Aspire.Hosting.WebDataStudio](https://www.nuget.org/packages/Nex
 that user, the identity and the Key Vault access for secret-backed connection strings are generated
 for you.
 
+## Behind a reverse proxy
+
+Object references contain a slash — `Table:dbo/AbpUsers` — and every API call that addresses an
+object passes it as a query value (`?ref=…`) rather than a path segment. That is not cosmetic: the
+proxy in front of a deployed studio normalises the path first, and Envoy on Azure Container Apps
+turns `%2F` back into a real slash, which used to leave the request matching no route at all. Data
+tabs, the structure panel and the index dialog answered 404 in the cloud while working locally.
+
+Nothing to configure — but if you put your own proxy in front of the studio, do not strip or rewrite
+query strings.
+
 ## Exposure
 
 There is no login screen unless `WDS_USER` and `WDS_PASSWORD` are set, which is the right default

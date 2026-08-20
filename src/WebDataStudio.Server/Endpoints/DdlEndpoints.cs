@@ -3,6 +3,7 @@ using Microsoft.Extensions.Caching.Memory;
 using WebDataStudio.Server.Ddl;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace WebDataStudio.Server.Endpoints;
 
@@ -27,7 +28,12 @@ public static class DdlEndpoints
 
     public static void MapDdlEndpoints(this WebApplication app)
     {
-        app.MapGet("/api/ddl/{conn}/{objectRef}", async (string conn, string objectRef,
+        // The object reference travels in the query string, not the path: it contains a slash
+        // ("Table:dbo/AbpUsers"), and the reverse proxy in front of a deployed studio — Envoy on
+        // Azure Container Apps, and most others — decodes %2F back to a real slash before routing.
+        // The route then no longer matches and every object lookup answered 404 in the cloud while
+        // working on a machine with nothing in front of it.
+        app.MapGet("/api/ddl/{conn}", async (string conn, [FromQuery(Name = "ref")] string objectRef,
             SessionFactory factory, CancellationToken ct) =>
         {
             try
@@ -56,7 +62,7 @@ public static class DdlEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
-        app.MapGet("/api/ddl/{conn}/{objectRef}/dependencies", async (string conn, string objectRef,
+        app.MapGet("/api/ddl/{conn}/dependencies", async (string conn, [FromQuery(Name = "ref")] string objectRef,
             SessionFactory factory, CancellationToken ct) =>
         {
             try

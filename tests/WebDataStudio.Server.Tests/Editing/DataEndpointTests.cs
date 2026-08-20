@@ -68,7 +68,7 @@ public class DataEndpointTests : IAsyncLifetime
         var client = factory.CreateClient();
         var conn = await ConnectionIdAsync(client);
 
-        var body = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}/{PeopleRef}", ct);
+        var body = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}?ref={PeopleRef}", ct);
 
         Assert.Equal(3, body.GetProperty("rows").GetArrayLength());
         Assert.True(body.GetProperty("editable").GetBoolean());
@@ -84,7 +84,7 @@ public class DataEndpointTests : IAsyncLifetime
         var conn = await ConnectionIdAsync(client);
 
         var body = await client.GetFromJsonAsync<JsonElement>(
-            $"/api/data/{conn}/{PeopleRef}?offset=1&limit=1&sort=id", ct);
+            $"/api/data/{conn}?ref={PeopleRef}&offset=1&limit=1&sort=id", ct);
 
         Assert.Equal(1, body.GetProperty("rows").GetArrayLength());
         Assert.Equal(2, body.GetProperty("rows")[0][0].GetInt32());
@@ -99,7 +99,7 @@ public class DataEndpointTests : IAsyncLifetime
         var conn = await ConnectionIdAsync(client);
 
         var body = await client.GetFromJsonAsync<JsonElement>(
-            $"/api/data/{conn}/{PeopleRef}?filterColumn=name&filter=ad", ct);
+            $"/api/data/{conn}?ref={PeopleRef}&filterColumn=name&filter=ad", ct);
 
         Assert.Equal(1, body.GetProperty("rows").GetArrayLength());
     }
@@ -112,7 +112,7 @@ public class DataEndpointTests : IAsyncLifetime
         var client = factory.CreateClient();
         var conn = await ConnectionIdAsync(client);
 
-        var body = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}/Table%3Amain%2Fnotes", ct);
+        var body = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}?ref=Table%3Amain%2Fnotes", ct);
 
         Assert.False(body.GetProperty("editable").GetBoolean());
         Assert.Contains("no primary key", body.GetProperty("reason").GetString());
@@ -127,14 +127,14 @@ public class DataEndpointTests : IAsyncLifetime
         var conn = await ConnectionIdAsync(client);
 
         var preview = await (await client.PostAsJsonAsync(
-            $"/api/data/{conn}/{PeopleRef}/preview-changes", Update(1, "changed"), ct))
+            $"/api/data/{conn}/preview-changes?ref={PeopleRef}", Update(1, "changed"), ct))
             .Content.ReadFromJsonAsync<JsonElement>(ct);
 
         Assert.Contains("UPDATE", preview.GetProperty("script").GetString());
         Assert.NotEmpty(preview.GetProperty("hash").GetString()!);
 
         // Still the old value: preview writes nothing.
-        var rows = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}/{PeopleRef}?sort=id", ct);
+        var rows = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}?ref={PeopleRef}&sort=id", ct);
         Assert.Equal("ada", rows.GetProperty("rows")[0][1].GetString());
     }
 
@@ -147,14 +147,14 @@ public class DataEndpointTests : IAsyncLifetime
         var conn = await ConnectionIdAsync(client);
 
         var preview = await (await client.PostAsJsonAsync(
-            $"/api/data/{conn}/{PeopleRef}/preview-changes", Update(1, "changed"), ct))
+            $"/api/data/{conn}/preview-changes?ref={PeopleRef}", Update(1, "changed"), ct))
             .Content.ReadFromJsonAsync<JsonElement>(ct);
 
-        var apply = await client.PostAsJsonAsync($"/api/data/{conn}/{PeopleRef}/apply-changes",
+        var apply = await client.PostAsJsonAsync($"/api/data/{conn}/apply-changes?ref={PeopleRef}",
             new { hash = preview.GetProperty("hash").GetString() }, ct);
         apply.EnsureSuccessStatusCode();
 
-        var rows = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}/{PeopleRef}?sort=id", ct);
+        var rows = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}?ref={PeopleRef}&sort=id", ct);
         Assert.Equal("changed", rows.GetProperty("rows")[0][1].GetString());
     }
 
@@ -166,7 +166,7 @@ public class DataEndpointTests : IAsyncLifetime
         var client = factory.CreateClient();
         var conn = await ConnectionIdAsync(client);
 
-        var response = await client.PostAsJsonAsync($"/api/data/{conn}/{PeopleRef}/apply-changes",
+        var response = await client.PostAsJsonAsync($"/api/data/{conn}/apply-changes?ref={PeopleRef}",
             new { hash = "stale" }, ct);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -193,14 +193,14 @@ public class DataEndpointTests : IAsyncLifetime
         };
 
         var preview = await (await client.PostAsJsonAsync(
-            $"/api/data/{conn}/{PeopleRef}/preview-changes", changes, ct)).Content.ReadFromJsonAsync<JsonElement>(ct);
+            $"/api/data/{conn}/preview-changes?ref={PeopleRef}", changes, ct)).Content.ReadFromJsonAsync<JsonElement>(ct);
 
-        var apply = await client.PostAsJsonAsync($"/api/data/{conn}/{PeopleRef}/apply-changes",
+        var apply = await client.PostAsJsonAsync($"/api/data/{conn}/apply-changes?ref={PeopleRef}",
             new { hash = preview.GetProperty("hash").GetString() }, ct);
 
         Assert.Equal(HttpStatusCode.BadRequest, apply.StatusCode);
 
-        var rows = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}/{PeopleRef}?sort=id", ct);
+        var rows = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}?ref={PeopleRef}&sort=id", ct);
         Assert.Equal("ada", rows.GetProperty("rows")[0][1].GetString());
     }
 
@@ -212,17 +212,17 @@ public class DataEndpointTests : IAsyncLifetime
         var client = factory.CreateClient();
         var conn = await ConnectionIdAsync(client);
 
-        var browse = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}/{PeopleRef}", ct);
+        var browse = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}?ref={PeopleRef}", ct);
         Assert.False(browse.GetProperty("editable").GetBoolean());
 
         // A client that ignores `editable` and previews anyway still cannot apply.
         var preview = await client.PostAsJsonAsync(
-            $"/api/data/{conn}/{PeopleRef}/preview-changes", Update(1, "nope"), ct);
+            $"/api/data/{conn}/preview-changes?ref={PeopleRef}", Update(1, "nope"), ct);
 
         if (preview.IsSuccessStatusCode)
         {
             var hash = (await preview.Content.ReadFromJsonAsync<JsonElement>(ct)).GetProperty("hash").GetString();
-            var apply = await client.PostAsJsonAsync($"/api/data/{conn}/{PeopleRef}/apply-changes",
+            var apply = await client.PostAsJsonAsync($"/api/data/{conn}/apply-changes?ref={PeopleRef}",
                 new { hash }, ct);
             Assert.Equal(HttpStatusCode.Forbidden, apply.StatusCode);
         }
@@ -237,7 +237,7 @@ public class DataEndpointTests : IAsyncLifetime
         var conn = await ConnectionIdAsync(client);
 
         var body = await client.GetFromJsonAsync<JsonElement>(
-            $"/api/data/{conn}/{PeopleRef}/lookup?column=id&search=ad", ct);
+            $"/api/data/{conn}/lookup?ref={PeopleRef}&column=id&search=ad", ct);
 
         Assert.Equal(1, body.GetArrayLength());
         Assert.Equal("ada", body[0].GetProperty("label").GetString());

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Editing;
 using WebDataStudio.Server.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace WebDataStudio.Server.Endpoints;
 
@@ -18,7 +19,12 @@ public static class DataEndpoints
         var defaultLimit = int.TryParse(app.Configuration["WDS_MAX_ROWS"], out var m) ? m : 1000;
         var timeout = int.TryParse(app.Configuration["WDS_QUERY_TIMEOUT_SECONDS"], out var t) ? t : 300;
 
-        app.MapGet("/api/data/{conn}/{objectRef}", async (string conn, string objectRef,
+        // The object reference travels in the query string, not the path: it contains a slash
+        // ("Table:dbo/AbpUsers"), and the reverse proxy in front of a deployed studio — Envoy on
+        // Azure Container Apps, and most others — decodes %2F back to a real slash before routing.
+        // The route then no longer matches and every object lookup answered 404 in the cloud while
+        // working on a machine with nothing in front of it.
+        app.MapGet("/api/data/{conn}", async (string conn, [FromQuery(Name = "ref")] string objectRef,
             int? offset, int? limit, string? sort, bool? desc, string? filterColumn, string? filter,
             SessionFactory factory, CancellationToken ct) =>
         {
@@ -90,7 +96,7 @@ public static class DataEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
-        app.MapPost("/api/data/{conn}/{objectRef}/preview-changes", async (string conn, string objectRef,
+        app.MapPost("/api/data/{conn}/preview-changes", async (string conn, [FromQuery(Name = "ref")] string objectRef,
             ChangeRequest body, SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
         {
             try
@@ -130,7 +136,7 @@ public static class DataEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
-        app.MapPost("/api/data/{conn}/{objectRef}/apply-changes", async (string conn, string objectRef,
+        app.MapPost("/api/data/{conn}/apply-changes", async (string conn, [FromQuery(Name = "ref")] string objectRef,
             ApplyRequest body, SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
         {
             if (cache.Get($"changes:{body.Hash}") is not ValueTuple<SchemaNodeRef, ChangeScript> cached)
@@ -200,7 +206,7 @@ public static class DataEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
-        app.MapGet("/api/data/{conn}/{objectRef}/lookup", async (string conn, string objectRef,
+        app.MapGet("/api/data/{conn}/lookup", async (string conn, [FromQuery(Name = "ref")] string objectRef,
             string column, string? search, SessionFactory factory, CancellationToken ct) =>
         {
             try

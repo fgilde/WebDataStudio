@@ -16,7 +16,8 @@
     "smoke:login": "node scripts/smoke-login.mjs",
     "smoke:data": "node scripts/smoke-data.mjs",
     "smoke:layout": "node scripts/smoke-layout.mjs",
-    "smoke:grid": "node scripts/smoke-grid.mjs"
+    "smoke:grid": "node scripts/smoke-grid.mjs",
+    "smoke:proxy": "node scripts/smoke-proxy.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

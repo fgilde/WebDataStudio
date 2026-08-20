@@ -87,7 +87,7 @@ public class QueryEndpointTests : IAsyncLifetime
         var conn = await ConnectionIdAsync(client);
 
         var raw = await client.GetStringAsync(
-            $"/api/schema/{conn}/object/{Uri.EscapeDataString("Table:main/people")}", ct);
+            $"/api/schema/{conn}/object?ref={Uri.EscapeDataString("Table:main/people")}", ct);
         Assert.Contains("name", raw);
     }
 

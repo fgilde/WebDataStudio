@@ -70,7 +70,7 @@ public class DdlEndpointTests : IAsyncLifetime
         var client = factory.CreateClient();
         var conn = await ConnectionIdAsync(client);
 
-        var body = await client.GetFromJsonAsync<JsonElement>($"/api/ddl/{conn}/{PeopleRef}", ct);
+        var body = await client.GetFromJsonAsync<JsonElement>($"/api/ddl/{conn}?ref={PeopleRef}", ct);
 
         Assert.Equal("people", body.GetProperty("definition").GetProperty("name").GetString());
         Assert.Contains("CREATE TABLE", body.GetProperty("create").GetString());
@@ -93,7 +93,7 @@ public class DdlEndpointTests : IAsyncLifetime
         Assert.Contains("ADD", preview.GetProperty("script").GetString());
         Assert.False(preview.GetProperty("destructive").GetBoolean());
 
-        var detail = await client.GetFromJsonAsync<JsonElement>($"/api/ddl/{conn}/{PeopleRef}", ct);
+        var detail = await client.GetFromJsonAsync<JsonElement>($"/api/ddl/{conn}?ref={PeopleRef}", ct);
         Assert.Equal(2, detail.GetProperty("definition").GetProperty("columns").GetArrayLength());
     }
 
@@ -115,7 +115,7 @@ public class DdlEndpointTests : IAsyncLifetime
             new { hash = preview.GetProperty("hash").GetString() }, ct);
         apply.EnsureSuccessStatusCode();
 
-        var detail = await client.GetFromJsonAsync<JsonElement>($"/api/ddl/{conn}/{PeopleRef}", ct);
+        var detail = await client.GetFromJsonAsync<JsonElement>($"/api/ddl/{conn}?ref={PeopleRef}", ct);
         Assert.Equal(3, detail.GetProperty("definition").GetProperty("columns").GetArrayLength());
     }
 
@@ -176,7 +176,7 @@ public class DdlEndpointTests : IAsyncLifetime
         var client = factory.CreateClient();
         var conn = await ConnectionIdAsync(client);
 
-        var current = await client.GetFromJsonAsync<JsonElement>($"/api/ddl/{conn}/{PeopleRef}", ct);
+        var current = await client.GetFromJsonAsync<JsonElement>($"/api/ddl/{conn}?ref={PeopleRef}", ct);
         var response = await client.PostAsJsonAsync($"/api/ddl/{conn}/preview", new
         {
             objectRef = "Table:main/people",

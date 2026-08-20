@@ -104,8 +104,18 @@ export const listSchema = (conn: string, parent?: string): Promise<SchemaNodeDto
   fetch(parent ? `${base}/schema/${conn}?parent=${encodeURIComponent(parent)}` : `${base}/schema/${conn}`)
     .then(r => ok<SchemaNodeDto[]>(r));
 
+/// An object reference contains a slash ("Table:dbo/AbpUsers"), so it travels as a query value
+/// rather than a path segment: a reverse proxy — Envoy in front of Azure Container Apps, among
+/// others — turns %2F back into a real slash before routing, and the request then matches no route
+/// at all. Everything that addresses an object goes through refQuery for that reason.
+const refQuery = (ref: string, extra?: URLSearchParams) => {
+  const query = new URLSearchParams({ ref });
+  extra?.forEach((value, key) => query.set(key, value));
+  return query.toString();
+};
+
 export const describeObject = (conn: string, ref: string): Promise<ObjectDetailDto> =>
-  fetch(`${base}/schema/${conn}/object/${encodeURIComponent(ref)}`).then(r => ok<ObjectDetailDto>(r));
+  fetch(`${base}/schema/${conn}/object?${refQuery(ref)}`).then(r => ok<ObjectDetailDto>(r));
 
 export interface HistoryEntryDto {
   id: number; connectionId: string; sql: string; executedAt: string;
@@ -164,24 +174,22 @@ export const browseData = (conn: string, ref: string,
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params))
     if (value !== undefined && value !== "") query.set(key, String(value));
-  const suffix = query.toString();
-  return fetch(`${base}/data/${conn}/${encodeURIComponent(ref)}${suffix ? `?${suffix}` : ""}`)
-    .then(r => ok<DataPageDto>(r));
+  return fetch(`${base}/data/${conn}?${refQuery(ref, query)}`).then(r => ok<DataPageDto>(r));
 };
 
 export const previewChanges = (conn: string, ref: string, changes: unknown[]): Promise<ChangePreviewDto> =>
-  fetch(`${base}/data/${conn}/${encodeURIComponent(ref)}/preview-changes`, json("POST", { changes }))
+  fetch(`${base}/data/${conn}/preview-changes?${refQuery(ref)}`, json("POST", { changes }))
     .then(r => ok<ChangePreviewDto>(r));
 
 export const applyChanges = (conn: string, ref: string, hash: string): Promise<void> =>
-  fetch(`${base}/data/${conn}/${encodeURIComponent(ref)}/apply-changes`, json("POST", { hash }))
+  fetch(`${base}/data/${conn}/apply-changes?${refQuery(ref)}`, json("POST", { hash }))
     .then(r => ok<void>(r));
 
 export const lookupValues = (conn: string, ref: string, column: string, search?: string):
   Promise<LookupItemDto[]> => {
   const query = new URLSearchParams({ column });
   if (search) query.set("search", search);
-  return fetch(`${base}/data/${conn}/${encodeURIComponent(ref)}/lookup?${query}`)
+  return fetch(`${base}/data/${conn}/lookup?${refQuery(ref, query)}`)
     .then(r => ok<LookupItemDto[]>(r));
 };
 
@@ -227,7 +235,7 @@ export interface DdlLoadDto { definition: TableDefinition; create: string | null
 export interface DependencyReportDto { dependsOn: string[]; usedBy: string[]; bestEffort: boolean }
 
 export const loadDdl = (conn: string, ref: string): Promise<DdlLoadDto> =>
-  fetch(`${base}/ddl/${conn}/${encodeURIComponent(ref)}`).then(r => ok<DdlLoadDto>(r));
+  fetch(`${base}/ddl/${conn}?${refQuery(ref)}`).then(r => ok<DdlLoadDto>(r));
 
 export const previewDdl = (conn: string, ref: string | null, after: TableDefinition): Promise<DdlPreviewDto> =>
   fetch(`${base}/ddl/${conn}/preview`, json("POST", { objectRef: ref, after }))
@@ -237,7 +245,7 @@ export const applyDdl = (conn: string, hash: string): Promise<void> =>
   fetch(`${base}/ddl/${conn}/apply`, json("POST", { hash })).then(r => ok<void>(r));
 
 export const dependencies = (conn: string, ref: string): Promise<DependencyReportDto> =>
-  fetch(`${base}/ddl/${conn}/${encodeURIComponent(ref)}/dependencies`)
+  fetch(`${base}/ddl/${conn}/dependencies?${refQuery(ref)}`)
     .then(r => ok<DependencyReportDto>(r));
 
 export const previewRename = (conn: string, ref: string, newName: string):

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildSelect, emptyModel, filterParameters, type QueryModel } from "./buildSelect";
+import {
+  buildSelect, buildSelectWithModel, emptyModel, filterParameters, parseModel, type QueryModel,
+} from "./buildSelect";
 
 const base = (): QueryModel => ({
   ...emptyModel(),
@@ -68,7 +70,7 @@ describe("buildSelect", () => {
     };
 
     const sql = buildSelect(model, "postgresql");
-    expect(sql).toContain('count("a"."id")');
+    expect(sql).toContain('COUNT("a"."id")');
     expect(sql).toContain('GROUP BY "a"."name"');
   });
 
@@ -89,5 +91,80 @@ describe("buildSelect", () => {
   it("qualifies a table with its schema", () => {
     const model: QueryModel = { ...base(), tables: [{ name: "people", schema: "public", alias: "a" }] };
     expect(buildSelect(model, "postgresql")).toContain('"public"."people" "a"');
+  });
+});
+
+describe("aggregates, HAVING and DISTINCT", () => {
+  const base = (): QueryModel => ({
+    ...emptyModel(),
+    tables: [{ name: "orders", schema: "main", alias: "a" }],
+  });
+
+  it("groups by every plain column as soon as one column aggregates", () => {
+    const sql = buildSelect({
+      ...base(),
+      columns: [
+        { table: "a", column: "person_id" },
+        { table: "a", column: "total", aggregate: "sum", alias: "spent" },
+      ],
+    }, "postgresql");
+
+    expect(sql).toContain('SUM("a"."total") AS "spent"');
+    expect(sql).toContain('GROUP BY "a"."person_id"');
+  });
+
+  it("renders HAVING after GROUP BY", () => {
+    const sql = buildSelect({
+      ...base(),
+      columns: [
+        { table: "a", column: "person_id" },
+        { table: "a", column: "total", aggregate: "sum" },
+      ],
+      having: [{ table: "a", column: "total", operator: ">", value: "100", aggregate: "sum" }],
+    }, "postgresql");
+
+    expect(sql.indexOf("HAVING")).toBeGreaterThan(sql.indexOf("GROUP BY"));
+    expect(sql).toContain('HAVING SUM("a"."total") > :h1');
+  });
+
+  it("renders DISTINCT", () => {
+    const sql = buildSelect({
+      ...base(), distinct: true, columns: [{ table: "a", column: "person_id" }],
+    }, "postgresql");
+
+    expect(sql).toContain("SELECT DISTINCT");
+  });
+
+  // The model rides along in a comment, which is what lets a generated query be reopened in the
+  // builder without anybody writing a SQL parser.
+  it("carries its model in a comment and reads it back", () => {
+    const model: QueryModel = {
+      ...base(), columns: [{ table: "a", column: "total", aggregate: "avg" }], distinct: false,
+    };
+    const sql = buildSelectWithModel(model, "postgresql");
+
+    expect(sql).toContain("/* wds:model");
+    expect(parseModel(sql)).toEqual(model);
+  });
+
+  // The comment travels with the SQL, so it must not carry what the user typed into a filter.
+  it("keeps filter values out of the comment", () => {
+    const sql = buildSelectWithModel({
+      ...base(),
+      columns: [{ table: "a", column: "total" }],
+      filters: [{ table: "a", column: "total", operator: ">", value: "secret-value" }],
+    }, "postgresql");
+
+    expect(sql).not.toContain("secret-value");
+    expect(parseModel(sql)!.filters[0].value).toBe("");
+  });
+
+  it("adds no comment to a query the builder cannot produce", () => {
+    expect(buildSelectWithModel(emptyModel(), "postgresql")).toBe("");
+  });
+
+  it("has no model to read out of hand-written SQL", () => {
+    expect(parseModel("SELECT 1")).toBeNull();
+    expect(parseModel("SELECT 1 /* wds:model not-json */")).toBeNull();
   });
 });

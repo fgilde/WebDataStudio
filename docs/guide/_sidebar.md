@@ -6,6 +6,7 @@
 - [Deploying the studio](deploy.md)
 - [Connections](connections.md)
 - [Query editor](editor.md)
+- [Query builder](query-builder.md)
 - [Results and export](results.md)
 - [Editing data](editing.md)
 - [Schema editing](schema.md)

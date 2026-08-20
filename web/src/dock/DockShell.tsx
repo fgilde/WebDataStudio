@@ -20,6 +20,7 @@ import { DiagramPanel } from "../diagram/DiagramPanel";
 import { AdminPanel } from "../admin/AdminPanel";
 import { ComparePanel } from "../compare/ComparePanel";
 import { QueryDesigner } from "../designer/QueryDesigner";
+import { parseModel } from "../designer/buildSelect";
 import { SavedQueriesPanel } from "../query/SavedQueriesPanel";
 import { SnippetManager } from "../editor/SnippetManager";
 import { CommandPalette, ShortcutsHelp } from "../shell/CommandPalette";
@@ -180,12 +181,17 @@ function SavedQueriesDockPanel() {
   );
 }
 
-function QueryDesignerDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+function QueryDesignerDockPanel(
+  props: IDockviewPanelProps<{ connectionId: string; sql?: string }>) {
   const shell = useShell();
   const connection = props.params.connectionId;
 
+  // A statement the builder produced carries its model in a comment; anything else opens empty.
+  const initialModel = props.params.sql ? parseModel(props.params.sql) ?? undefined : undefined;
+
   return (
     <QueryDesigner connectionId={connection} dialect={shell.dialectOf(connection)}
+      initialModel={initialModel}
       onOpenInTab={sql => shell.runStatement(connection, sql)} />
   );
 }
@@ -741,6 +747,19 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     }
   }, [resetLayout]);
 
+  // "Open this query in the builder" for a statement the builder itself generated. A fresh panel
+  // per query, because the model replaces whatever the builder currently holds.
+  const openInBuilder = useCallback((connectionId: string, sql: string) => {
+    if (!connectionId) return;
+    const id = `builder:${connectionId}:${Date.now().toString(36)}`;
+
+    api.current?.addPanel({
+      id, component: "builder", title: "Builder", params: { connectionId, sql },
+      position: centerGroup.current ? { referenceGroup: centerGroup.current } : undefined,
+    });
+    flashPanel(api.current?.getPanel(id)?.group.element);
+  }, []);
+
   const commands = useMemo(() => buildCommands({
     newQuery: () => newTab(activeConnection),
     runCurrent: () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "F5" })),
@@ -765,6 +784,10 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     },
     openSnippets: () => setSnippetsOpen(true),
     showExplorer,
+    openInBuilder: () => {
+      const tab = tabs[tabs.length - 1];
+      if (tab) openInBuilder(tab.connectionId, tab.sql);
+    },
     switchTheme: () => document.dispatchEvent(new CustomEvent("wds:cycle-theme")),
     saveLayout: () => setLayoutsOpen(true),
     resetLayout,
@@ -776,7 +799,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}${link}`);
     },
     showShortcuts: () => setShortcutsOpen(true),
-  }), [activeConnection, focusPanel, newTab, openTool, resetLayout, selection, showExplorer, tabs, exportQuery]);
+  }), [activeConnection, focusPanel, newTab, openInBuilder, openTool, resetLayout, selection, showExplorer, tabs, exportQuery]);
 
   // Ctrl+K everywhere, "?" only outside a text field — otherwise it eats a question mark.
   useEffect(() => {

@@ -114,3 +114,8 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F15.6 | A link check in CI so a renamed page cannot silently break the sidebar | done | all | docs/ site |
 | F16.1 | Entra authentication for Azure SQL: `Authentication=Active Directory Default` with the container's managed identity | done | sqlserver | Connections, deployed studio |
 | F16.2 | A data directory that is slow or unusable degrades to environment-only connections, reported in /api/health and in the window | done | all | Shell, /api/health |
+| F17.1 | Query builder on a canvas: tables as cards, joins as lines, a checkbox per column | done | all | Query builder |
+| F17.2 | Joins proposed from the foreign keys, in either direction, composite keys included | done | all | Query builder |
+| F17.3 | Live SQL and the first 50 rows of the query while it is being built | done | all | Query builder |
+| F17.4 | Aggregates with automatic GROUP BY, HAVING, DISTINCT, per-column aliases | done | all | Query builder |
+| F17.5 | A generated statement carries its model, so the query reopens in the builder | done | all | Query builder, command palette |

@@ -26,6 +26,7 @@ export interface CommandContext {
   exportResult: () => void;
   openSnippets: () => void;
   showExplorer: () => void;
+  openInBuilder: () => void;
   switchTheme: () => void;
   saveLayout: () => void;
   resetLayout: () => void;
@@ -45,6 +46,8 @@ export function buildCommands(context: CommandContext): Command[] {
     { id: "query.saved", label: "Open saved queries", group: "Query", run: context.openSavedQueries },
     { id: "query.history", label: "Open history", group: "Query", shortcut: "Ctrl+H", run: context.openHistory },
     { id: "query.snippets", label: "Manage snippets", group: "Query", run: context.openSnippets },
+    // Only does something for a statement the builder produced, which is where the model lives.
+    { id: "query.toBuilder", label: "Open this query in the builder", group: "Query", run: context.openInBuilder },
 
     { id: "connection.manage", label: "Open connection manager", group: "Connections", run: context.openConnections },
     { id: "connection.add", label: "Add connection", group: "Connections", run: context.addConnection },

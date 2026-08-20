@@ -62,6 +62,23 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
   await page.getByRole("tab", { name: "Schema" }).waitFor({ timeout: 20000 });
   await shot("compare");
 
+  // --- query builder ----------------------------------------------------------------------
+  await page.getByRole("button", { name: "Query builder" }).click();
+  const addTable = page.getByPlaceholder("Add a table");
+  await addTable.waitFor({ timeout: 20000 });
+
+  for (const table of ["people", "orders"]) {
+    await addTable.click();
+    await page.getByRole("option", { name: table, exact: true }).click();
+    await page.waitForTimeout(700);
+  }
+
+  // A column on each card, so the shot shows a query rather than two empty tables.
+  await page.locator(".react-flow__node").first().getByText("name", { exact: true }).click();
+  await page.locator(".react-flow__node").nth(1).getByText("total", { exact: true }).click();
+  await page.waitForTimeout(1400);
+  await shot("builder");
+
   // --- table designer --------------------------------------------------------------------
   const tableNode = page.locator(".mantine-UnstyledButton-root").filter({ hasText: /^Tables$/ }).first();
   await tableNode.click();

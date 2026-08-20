@@ -416,6 +416,11 @@ it works for every engine whose capability set claims support for it.
 | F15.6 | A link check in CI so a renamed page cannot silently break the sidebar |
 | F16.1 | Entra authentication for a managed database, resolved from the container's identity |
 | F16.2 | A studio that keeps working when its own storage does not, and says so |
+| F17.1 | A visual query builder that works like a canvas rather than a form |
+| F17.2 | Joins the schema already knows are proposed, not typed |
+| F17.3 | The query being built is visible as SQL and as rows |
+| F17.4 | Aggregates, grouping, HAVING and DISTINCT from the builder |
+| F17.5 | A generated query can be reopened in the builder that made it |
 
 ## 10. Safety behaviour
 

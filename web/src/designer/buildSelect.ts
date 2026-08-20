@@ -7,7 +7,11 @@ export interface QueryJoin {
   left: string; right: string; leftColumn: string; rightColumn: string; kind: JoinKind;
 }
 export interface QueryColumn { table: string; column: string; aggregate?: string; alias?: string }
-export interface QueryFilter { table: string; column: string; operator: string; value: string }
+export interface QueryFilter {
+  table: string; column: string; operator: string; value: string;
+  /// Set on a HAVING entry: the condition applies to the aggregate, not the column.
+  aggregate?: string;
+}
 export interface QueryOrder { table: string; column: string; descending: boolean }
 
 export interface QueryModel {
@@ -15,7 +19,10 @@ export interface QueryModel {
   joins: QueryJoin[];
   columns: QueryColumn[];
   filters: QueryFilter[];
+  /// Forces a GROUP BY even without an aggregate; an aggregate implies one anyway.
   grouping: boolean;
+  having?: QueryFilter[];
+  distinct?: boolean;
   order: QueryOrder[];
   limit?: number;
 }
@@ -123,9 +130,11 @@ export function buildSelect(model: QueryModel, dialect: DialectId): string {
   const reference = (column: { table: string; column: string }) =>
     `${q(column.table)}.${q(column.column)}`;
 
+  const aggregated = model.columns.some(column => column.aggregate);
+
   const select = model.columns.map(column => {
     const body = column.aggregate
-      ? `${column.aggregate}(${column.column === "*" ? "*" : reference(column)})`
+      ? `${column.aggregate.toUpperCase()}(${column.column === "*" ? "*" : reference(column)})`
       : reference(column);
     return column.alias ? `${body} AS ${q(column.alias)}` : body;
   });
@@ -148,7 +157,10 @@ export function buildSelect(model: QueryModel, dialect: DialectId): string {
   for (const table of rest)
     if (!joined.has(table.alias)) from.push(`CROSS JOIN ${qualified(table)} ${q(table.alias)}`);
 
-  const lines = [`SELECT ${select.join(", ")}`, `  FROM ${from.join("\n  ")}`];
+  const lines = [
+    `SELECT ${model.distinct ? "DISTINCT " : ""}${select.join(", ")}`,
+    `  FROM ${from.join("\n  ")}`,
+  ];
 
   if (model.filters.length > 0) {
     const conditions = model.filters.map((filter, index) => {
@@ -164,9 +176,27 @@ export function buildSelect(model: QueryModel, dialect: DialectId): string {
     lines.push(` WHERE ${conditions.join("\n   AND ")}`);
   }
 
-  if (model.grouping) {
+  // An aggregate makes the grouping mandatory: every plain column has to be in GROUP BY, or the
+  // engine rejects the statement. The checkbox stays for grouping without an aggregate.
+  if (model.grouping || aggregated) {
     const plain = model.columns.filter(c => !c.aggregate).map(reference);
     if (plain.length > 0) lines.push(` GROUP BY ${plain.join(", ")}`);
+  }
+
+  if (model.having && model.having.length > 0) {
+    const marker = dialect === "sqlserver" || dialect === "mysql" ? "@" : ":";
+    const conditions = model.having.map((entry, index) => {
+      const column = entry.aggregate
+        ? `${entry.aggregate.toUpperCase()}(${reference(entry)})`
+        : reference(entry);
+
+      if (entry.operator === "IS NULL" || entry.operator === "IS NOT NULL")
+        return `${column} ${entry.operator}`;
+
+      return `${column} ${entry.operator} ${marker}h${index + 1}`;
+    });
+
+    lines.push(` HAVING ${conditions.join("\n    AND ")}`);
   }
 
   if (model.order.length > 0)
@@ -178,8 +208,46 @@ export function buildSelect(model: QueryModel, dialect: DialectId): string {
   return lines.join("\n") + ";";
 }
 
+/// The statement plus the model that produced it, as a trailing comment. This is what goes into a
+/// query tab: the builder can reopen its own query later without anybody writing a SQL parser.
+/// The live preview uses plain `buildSelect`, because a comment in every preview is noise.
+///
+/// Filter values are stripped from the comment. They are user input that would otherwise be
+/// copied into the SQL text, into the history and into anything the query is pasted in to.
+export function buildSelectWithModel(model: QueryModel, dialect: DialectId): string {
+  const sql = buildSelect(model, dialect);
+  if (!sql) return sql;
+
+  const withoutValues: QueryModel = {
+    ...model,
+    filters: model.filters.map(filter => ({ ...filter, value: "" })),
+    having: model.having?.map(entry => ({ ...entry, value: "" })),
+  };
+
+  return `${sql}\n/* wds:model ${JSON.stringify(withoutValues)} */`;
+}
+
+const MODEL_COMMENT = /\/\* wds:model (\{[\s\S]*?\}) \*\//;
+
+/// The model a generated statement carries, or null for anything written by hand.
+export function parseModel(sql: string): QueryModel | null {
+  const match = MODEL_COMMENT.exec(sql);
+  if (!match) return null;
+
+  try {
+    const model = JSON.parse(match[1]) as QueryModel;
+    return Array.isArray(model.tables) && Array.isArray(model.columns) ? model : null;
+  } catch {
+    return null;
+  }
+}
+
 /// The values for the parameters buildSelect emitted, in the same order.
-export const filterParameters = (model: QueryModel): Record<string, string> =>
-  Object.fromEntries(model.filters
+export const filterParameters = (model: QueryModel): Record<string, string> => ({
+  ...Object.fromEntries(model.filters
     .filter(f => f.operator !== "IS NULL" && f.operator !== "IS NOT NULL")
-    .map((f, index) => [`p${index + 1}`, f.value]));
+    .map((f, index) => [`p${index + 1}`, f.value])),
+  ...Object.fromEntries((model.having ?? [])
+    .filter(f => f.operator !== "IS NULL" && f.operator !== "IS NOT NULL")
+    .map((f, index) => [`h${index + 1}`, f.value])),
+});

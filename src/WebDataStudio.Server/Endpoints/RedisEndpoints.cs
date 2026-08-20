@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using StackExchange.Redis;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Drivers.Redis;
 using WebDataStudio.Server.Services;
@@ -17,6 +18,8 @@ public static class RedisEndpoints
 {
     /// The hash a preview handed out, exactly as the data and DDL endpoints do it.
     public record ApplyRequest(string Hash);
+
+    public record PublishRequest(string Channel, string Message);
 
 
     public static void MapRedisEndpoints(this WebApplication app)
@@ -201,6 +204,161 @@ public static class RedisEndpoints
 
                     cache.Remove($"redis-bulk:{body.Hash}");
                     return Results.Ok(new { affected });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // --- what the keyspace is made of ------------------------------------------------------
+        api.MapGet("/{conn}/analysis", async (
+            string conn, int? db, int? sample, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+
+                    return Results.Ok(await RedisAnalysis.RunAsync(
+                        redis.Multiplexer, db ?? redis.DatabaseNumber,
+                        sample ?? RedisAnalysis.DefaultSample, ct));
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // --- streams, the slow log, and who is connected ---------------------------------------
+        api.MapGet("/{conn}/stream", async (
+            string conn, int? db, string key, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+
+                    var database = redis.Multiplexer.GetDatabase(db ?? redis.DatabaseNumber);
+                    return Results.Ok(await RedisOperations.StreamAsync(database, key, ct));
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (RedisServerException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        api.MapGet("/{conn}/slowlog", async (
+            string conn, int? count, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+
+                    return Results.Ok(await RedisOperations.SlowLogAsync(redis.Server, count ?? 50, ct));
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        api.MapGet("/{conn}/clients", async (
+            string conn, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+
+                    return Results.Ok(await RedisOperations.ClientsAsync(redis.Server, ct));
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // --- pub/sub ---------------------------------------------------------------------------
+        // Server-sent events rather than a socket: the browser has EventSource built in, and a
+        // subscription is one-directional by nature. It lives as long as the request does.
+        api.MapGet("/{conn}/subscribe", async (
+            string conn, string channels, HttpContext ctx, SessionFactory factory,
+            CancellationToken ct) =>
+        {
+            var (_, session) = await factory.OpenAsync(conn, ct);
+            await using (session)
+            {
+                if (session.Unwrap() is not RedisSession redis)
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
+                    return;
+                }
+
+                ctx.Response.Headers.ContentType = "text/event-stream";
+                ctx.Response.Headers.CacheControl = "no-cache";
+
+                var subscriber = redis.Multiplexer.GetSubscriber();
+                var queue = System.Threading.Channels.Channel.CreateBounded<string>(
+                    new System.Threading.Channels.BoundedChannelOptions(1_000)
+                    {
+                        // A browser that cannot keep up loses the oldest messages rather than
+                        // holding the whole firehose in memory.
+                        FullMode = System.Threading.Channels.BoundedChannelFullMode.DropOldest,
+                    });
+
+                var patterns = channels.Split(',', StringSplitOptions.RemoveEmptyEntries
+                    | StringSplitOptions.TrimEntries);
+
+                foreach (var pattern in patterns)
+                    await subscriber.SubscribeAsync(RedisChannel.Pattern(pattern), (channel, message) =>
+                        queue.Writer.TryWrite(System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            channel = channel.ToString(),
+                            message = message.ToString(),
+                            at = DateTimeOffset.UtcNow,
+                        })));
+
+                try
+                {
+                    await foreach (var payload in queue.Reader.ReadAllAsync(ct))
+                    {
+                        await ctx.Response.WriteAsync($"data: {payload}\n\n", ct);
+                        await ctx.Response.Body.FlushAsync(ct);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // The client went away, which is how a subscription ends.
+                }
+                finally
+                {
+                    foreach (var pattern in patterns)
+                        await subscriber.UnsubscribeAsync(RedisChannel.Pattern(pattern));
+                }
+            }
+        });
+
+        api.MapPost("/{conn}/publish", async (
+            string conn, PublishRequest body, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+                    if (session.Spec.ReadOnly) return ReadOnly();
+
+                    var receivers = await redis.Multiplexer.GetSubscriber()
+                        .PublishAsync(RedisChannel.Literal(body.Channel), body.Message);
+
+                    return Results.Ok(new { receivers });
                 }
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }

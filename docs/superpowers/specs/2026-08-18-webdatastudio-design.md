@@ -424,6 +424,13 @@ it works for every engine whose capability set claims support for it.
 | F23.1 | Browsing a table's data has the same column controls as a query result |
 | F23.2 | The explorer searches for objects, not for the level it happens to show |
 | F23.3 | Panels can be closed in groups, pinned, and moved into their own window |
+| F19.1 | A Redis keyspace is browsed by scanning, never by listing it |
+| F19.2 | Every Redis type is edited in the shape it has |
+| F19.3 | A Redis write is shown as the commands it will run before it runs |
+| F19.4 | Deleting or expiring by pattern acts on the set that was approved |
+| F19.5 | Where the memory in a keyspace went, sampled rather than exhaustive |
+| F19.6 | Pub/sub and stream consumer groups are visible while they happen |
+| F19.7 | The slow log and the client list of a Redis server |
 
 ## 10. Safety behaviour
 

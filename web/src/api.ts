@@ -442,3 +442,96 @@ export const revealConnectionString = (id: string): Promise<string> =>
   fetch(`${base}/connections/${id}/reveal`, { method: "POST" })
     .then(r => ok<{ connectionString: string }>(r))
     .then(body => body.connectionString);
+
+// --- redis -----------------------------------------------------------------------------------
+// Redis is browsed rather than queried, so it has endpoints of its own next to the command console.
+
+export interface RedisKeyDto {
+  key: string; type: string; ttlSeconds: number | null; sizeBytes: number | null; length: number | null;
+}
+export interface RedisKeyPageDto { keys: RedisKeyDto[]; nextCursor: number; complete: boolean }
+export interface RedisValueDto {
+  key: string; type: string; ttlSeconds: number | null; value: unknown; length: number;
+  encoding: string | null;
+}
+export interface RedisPreviewDto { hash: string; commands: string[]; destructive: boolean }
+export interface RedisBulkPreviewDto { hash: string; matchedKeys: number; sample: string[] }
+export interface RedisPrefixStat { prefix: string; keys: number; bytes: number }
+export interface RedisTypeStat { type: string; keys: number; bytes: number }
+export interface RedisAnalysisDto {
+  sampledKeys: number; complete: boolean;
+  prefixes: RedisPrefixStat[]; types: RedisTypeStat[];
+  largest: RedisKeyDto[]; expiringSoon: RedisKeyDto[];
+  totalMemoryBytes: number | null; totalKeys: number | null;
+}
+export interface RedisStreamDto {
+  length: number; firstId: string | null; lastId: string | null;
+  groups: { name: string; consumers: number; pending: number; lastDelivered: string }[];
+  pending: { id: string; consumer: string; idleMs: number; deliveryCount: number }[];
+}
+export interface RedisSlowEntryDto {
+  id: number; at: string; microSeconds: number; command: string; client: string | null;
+}
+
+export const redisDatabases = (conn: string): Promise<{ database: number; keys: number }[]> =>
+  fetch(`${base}/redis/${conn}/databases`).then(r => ok(r));
+
+export const redisKeys = (conn: string, params: {
+  db?: number; match?: string; type?: string; cursor?: number; count?: number; withSize?: boolean;
+} = {}): Promise<RedisKeyPageDto> => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params))
+    if (value !== undefined && value !== "") query.set(key, String(value));
+
+  return fetch(`${base}/redis/${conn}/keys?${query}`).then(r => ok<RedisKeyPageDto>(r));
+};
+
+export const redisValue = (conn: string, key: string, db?: number, offset = 0):
+  Promise<RedisValueDto> => {
+  const query = new URLSearchParams({ key, offset: String(offset) });
+  if (db !== undefined) query.set("db", String(db));
+
+  return fetch(`${base}/redis/${conn}/value?${query}`).then(r => ok<RedisValueDto>(r));
+};
+
+export const redisPreviewEdit = (conn: string, edit: {
+  database: number; key: string; operation: string; payload: Record<string, unknown>;
+}): Promise<RedisPreviewDto> =>
+  fetch(`${base}/redis/${conn}/value/preview`, json("POST", edit)).then(r => ok<RedisPreviewDto>(r));
+
+export const redisApplyEdit = (conn: string, hash: string): Promise<{ executed: number }> =>
+  fetch(`${base}/redis/${conn}/value/apply`, json("POST", { hash })).then(r => ok(r));
+
+export const redisPreviewBulk = (conn: string, request: {
+  database: number; match: string; type?: string | null; action: string; ttlSeconds?: number | null;
+}): Promise<RedisBulkPreviewDto> =>
+  fetch(`${base}/redis/${conn}/bulk/preview`, json("POST", request))
+    .then(r => ok<RedisBulkPreviewDto>(r));
+
+export const redisApplyBulk = (conn: string, hash: string): Promise<{ affected: number }> =>
+  fetch(`${base}/redis/${conn}/bulk/apply`, json("POST", { hash })).then(r => ok(r));
+
+export const redisAnalysis = (conn: string, db?: number): Promise<RedisAnalysisDto> => {
+  const query = new URLSearchParams();
+  if (db !== undefined) query.set("db", String(db));
+
+  return fetch(`${base}/redis/${conn}/analysis?${query}`).then(r => ok<RedisAnalysisDto>(r));
+};
+
+export const redisStream = (conn: string, key: string, db?: number): Promise<RedisStreamDto> => {
+  const query = new URLSearchParams({ key });
+  if (db !== undefined) query.set("db", String(db));
+
+  return fetch(`${base}/redis/${conn}/stream?${query}`).then(r => ok<RedisStreamDto>(r));
+};
+
+export const redisSlowLog = (conn: string): Promise<RedisSlowEntryDto[]> =>
+  fetch(`${base}/redis/${conn}/slowlog`).then(r => ok<RedisSlowEntryDto[]>(r));
+
+export const redisPublish = (conn: string, channel: string, message: string):
+  Promise<{ receivers: number }> =>
+  fetch(`${base}/redis/${conn}/publish`, json("POST", { channel, message })).then(r => ok(r));
+
+/// The subscription is server-sent events, so the browser's own EventSource carries it.
+export const redisSubscribeUrl = (conn: string, channels: string) =>
+  `${base}/redis/${conn}/subscribe?channels=${encodeURIComponent(channels)}`;

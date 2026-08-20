@@ -3,8 +3,8 @@ import { DockviewReact } from "dockview-react";
 import type { DockviewApi, DockviewReadyEvent, DockviewGroupPanel, IDockviewPanelProps } from "dockview-react";
 import { ActionIcon, Group, Modal, Text, Tooltip } from "@mantine/core";
 import {
-  IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconLayoutBoard, IconSettingsCog,
-  IconSitemap, IconSquarePlus, IconTable,
+  IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconKey, IconLayoutBoard,
+  IconSettingsCog, IconSitemap, IconSquarePlus, IconTable,
 } from "@tabler/icons-react";
 import "dockview-react/dist/styles/dockview.css";
 import "../editor/dockview-mantine.css";
@@ -20,6 +20,7 @@ import { DiagramPanel } from "../diagram/DiagramPanel";
 import { AdminPanel } from "../admin/AdminPanel";
 import { ComparePanel } from "../compare/ComparePanel";
 import { QueryDesigner } from "../designer/QueryDesigner";
+import { RedisPanel } from "../redis/RedisPanel";
 import { parseModel } from "../designer/buildSelect";
 import { SavedQueriesPanel } from "../query/SavedQueriesPanel";
 import { SnippetManager } from "../editor/SnippetManager";
@@ -57,6 +58,7 @@ interface DataTabState {
 }
 
 interface ShellState {
+  connections: Connection[];
   selection: ExplorerSelection | null;
   tabs: TabState[];
   dataTabs: DataTabState[];
@@ -81,6 +83,7 @@ interface ShellState {
     openTool: (component: string, title: string, connectionId: string) => void;
     openLayouts: () => void;
     openPalette: () => void;
+    engineOf: (connectionId: string) => string;
   };
 }
 
@@ -197,6 +200,13 @@ function QueryDesignerDockPanel(
   );
 }
 
+function RedisDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+  const shell = useShell();
+  const connection = shell.connections.find(c => c.id === props.params.connectionId);
+
+  return <RedisPanel connectionId={props.params.connectionId} readOnly={connection?.readOnly ?? false} />;
+}
+
 function DiagramDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
   const shell = useShell();
   return <DiagramPanel connectionId={props.params.connectionId} onOpenTable={shell.openData} />;
@@ -261,6 +271,15 @@ function ExplorerDockPanel() {
             <IconTable size={15} />
           </ActionIcon>
         </Tooltip>
+        {/* Only for Redis: a key browser on PostgreSQL would be a button that cannot work. */}
+        {explorer.engineOf(connection) === "redis" ? (
+          <Tooltip label="Redis browser">
+            <ActionIcon size="sm" variant="subtle" aria-label="Redis browser"
+              onClick={() => explorer.openTool("redis", "Redis", connection)}>
+              <IconKey size={15} />
+            </ActionIcon>
+          </Tooltip>
+        ) : null}
         <Tooltip label="Saved queries">
           <ActionIcon size="sm" variant="subtle" aria-label="Saved queries"
             onClick={() => explorer.focusPanel("saved")}>
@@ -293,7 +312,7 @@ const components = {
   structure: StructurePanel, query: QueryPanel, history: HistoryDockPanel, welcome: WelcomePanel,
   data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel, designer: DesignerPanel,
   diagram: DiagramDockPanel, admin: AdminDockPanel, compare: CompareDockPanel,
-  saved: SavedQueriesDockPanel, builder: QueryDesignerDockPanel,
+  saved: SavedQueriesDockPanel, builder: QueryDesignerDockPanel, redis: RedisDockPanel,
 };
 
 /// The default arrangement, in one place: the initial layout and the reset command must produce
@@ -944,6 +963,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
   return (
     <ShellContext.Provider value={{
+      connections,
       selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey,
       runStatement, openData, dialectOf, exportObject,
       explorer: {
@@ -956,6 +976,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         openTool,
         openLayouts: () => setLayoutsOpen(true),
         openPalette: () => setPaletteOpen(true),
+        engineOf: id => connections.find(c => c.id === id)?.engine ?? "",
       },
     }}>
       <TabPinsProvider value={pins}>

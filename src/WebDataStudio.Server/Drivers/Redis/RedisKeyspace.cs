@@ -110,7 +110,7 @@ public static class RedisKeyspace
 
         for (var index = 0; index < keys.Count; index++)
         {
-            var keyType = types[index].Result.ToString().ToLowerInvariant();
+            var keyType = NameOf(types[index].Result);
             if (type is { Length: > 0 } && !keyType.Equals(type, StringComparison.OrdinalIgnoreCase))
                 continue;
 
@@ -128,6 +128,14 @@ public static class RedisKeyspace
 
         return described;
     }
+
+    /// Redis's own name for a type: TYPE answers "zset", not "sortedset", and SCAN ... TYPE expects
+    /// the same spelling. Using the driver enum's name would make the filter silently match nothing.
+    internal static string NameOf(RedisType type) => type switch
+    {
+        RedisType.SortedSet => "zset",
+        _ => type.ToString().ToLowerInvariant(),
+    };
 
     /// What "length" means depends on the type: characters for a string, entries for everything
     /// else. A key that vanished between the scan and this call reads as null rather than throwing.

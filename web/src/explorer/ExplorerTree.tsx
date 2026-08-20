@@ -241,7 +241,12 @@ export function ExplorerTree({ onSelect, onAction }: {
           {!closedGroups[group] && list.map(c => (
             <div key={`${c.id}-${nonce}`}>
               <UnstyledButton w="100%" px={4} py={3} pl={group ? 14 : 4}
-                onClick={() => setOpen(o => ({ ...o, [c.id]: !o[c.id] }))}
+                onClick={() => {
+                  // Selecting it too, not just expanding: the toolbar's buttons act on "the
+                  // current connection", and clicking one is how a user says which that is.
+                  setOpen(o => ({ ...o, [c.id]: !o[c.id] }));
+                  onSelect({ connectionId: c.id, node: rootNode(c) });
+                }}
                 onContextMenu={e => {
                   e.preventDefault();
                   setMenuFor({ id: c.id, x: e.clientX, y: e.clientY });

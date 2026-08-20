@@ -58,7 +58,7 @@ public static class RedisValues
         // it is the first thing anybody investigating memory asks for.
         var encoding = await db.ExecuteAsync("OBJECT", "ENCODING", key);
 
-        return new ValueDto(key, type.ToString().ToLowerInvariant(),
+        return new ValueDto(key, RedisKeyspace.NameOf(type),
             ttl is null ? null : (long)ttl.Value.TotalSeconds,
             value, length, encoding.IsNull ? null : (string?)encoding);
     }

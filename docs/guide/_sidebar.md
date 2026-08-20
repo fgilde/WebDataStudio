@@ -15,6 +15,7 @@
 - [Comparison](comparison.md)
 - [Administration](administration.md)
 - [Diagrams](diagrams.md)
+- [Redis](redis.md)
 - [Engine capabilities](engines.md)
 - [Keyboard shortcuts](shortcuts.md)
 - [Development](development.md)

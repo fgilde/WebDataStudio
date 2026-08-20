@@ -104,7 +104,7 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F13.7 | The explorer is a dock panel: drag, split or close it, `Ctrl+B` brings it back | done | all | Shell |
 | F13.8 | The running build shown bottom right, with its commit and build time | done | all | Shell |
 | F14.1 | MongoDB: collection browser, JSON editor, aggregation pipeline, index management | partial: the command console runs find, aggregate and index commands; there is no separate pipeline builder | mongodb | Query tab on a MongoDB connection |
-| F14.2 | Redis: key tree, type-specific editors, TTL, command console | partial: the command console covers the supported commands including TTL; there is no dedicated key tree | redis | Query tab on a Redis connection |
+| F14.2 | Redis: key tree, type-specific editors, TTL, command console | done | redis | Redis panel, query tab |
 | F14.3 | Result renderer as a JSON tree, switchable to a table for flat documents | done | mongodb | Result area, document view |
 | F15.1 | GitHub Pages site served from `/docs`, docsify like AspireUI, same visual language | done | all | docs/ site |
 | F15.2 | Every page in English and German, switchable in the sidebar; docsify i18n through a `/docs/de/` tree | done | all | docs/ site |
@@ -122,3 +122,10 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F23.1 | The data tab's column menu: a filter that takes the focus, debounced against the server, and hidden columns with an indicator | done | all | Data tab |
 | F23.2 | The explorer box searches tables and views by subsequence, ranked, with the schema as context | done | all | Explorer |
 | F23.3 | Tab context menu: close, close others, close to the right, close all, pin, maximise, and a panel in its own window | done | all | Shell, tab strip |
+| F19.1 | Key browser: SCAN with a cursor, pattern and type filter on the server, size and TTL per key | done | redis | Redis panel, keys tab |
+| F19.2 | An editor per value type — string with format detection, hash, list, set, sorted set, stream | done | redis | Redis panel, keys tab |
+| F19.3 | Every write previewed as the Redis commands it will run, TTL set or removed per key | done | redis | Redis panel, keys tab |
+| F19.4 | Delete or expire by pattern, applied to the set that was previewed | done | redis | Redis panel, keys tab |
+| F19.5 | Keyspace analysis: memory by prefix, types, largest keys, what expires soonest | done | redis | Redis panel, analysis tab |
+| F19.6 | Live pub/sub with publishing, and stream consumer groups with their pending entries | done | redis | Redis panel, pub/sub tab |
+| F19.7 | Slow log and connected clients | done | redis | Redis panel, slow log tab |

@@ -1,4 +1,4 @@
-export interface QueryColumn { name: string; dataType: string; nullable: boolean }
+export interface QueryColumn { name: string; dataType: string; nullable: boolean; masked?: boolean }
 
 export type QueryChunk =
   | { type: "columns"; statement: number; columns: QueryColumn[] }

@@ -10,6 +10,8 @@ namespace WebDataStudio.Server.Endpoints;
 
 public static class DataEndpoints
 {
+    public record MaskPolicyRequest(bool? MaskByDefault, string[]? Extra, string[]? Never);
+
     public record ChangeDto(string Kind, Dictionary<string, JsonElement> Key, Dictionary<string, JsonElement> Values);
     public record ChangeRequest(List<ChangeDto> Changes);
     public record ApplyRequest(string Hash);
@@ -26,7 +28,7 @@ public static class DataEndpoints
         // working on a machine with nothing in front of it.
         app.MapGet("/api/data/{conn}", async (string conn, [FromQuery(Name = "ref")] string objectRef,
             int? offset, int? limit, string? sort, bool? desc, string? filterColumn, string? filter,
-            SessionFactory factory, CancellationToken ct) =>
+            bool? reveal, SessionFactory factory, MaskPolicyStore policies, CancellationToken ct) =>
         {
             try
             {
@@ -78,10 +80,17 @@ public static class DataEndpoints
 
                     if (error is not null) return Results.Json(new { message = error }, statusCode: 502);
 
+                    // Masked on the server, not in the browser: a value that never leaves here
+                    // cannot be read out of a network tab or a screenshot of the dev tools.
+                    // Revealing is a deliberate, separate request.
+                    var masked = reveal == true
+                        ? []
+                        : Masking.IndexesOf(columns, policies.For(conn));
+
                     return Results.Ok(new
                     {
-                        columns,
-                        rows,
+                        columns = Masking.Describe(columns, masked),
+                        rows = Masking.Apply(rows, masked),
                         editable = identity.Editable && !session.Spec.ReadOnly,
                         keyColumns = identity.KeyColumns,
                         reason = session.Spec.ReadOnly ? "this connection is read-only" : identity.Reason,
@@ -94,6 +103,30 @@ public static class DataEndpoints
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // The policy behind the masking. A word list gets a schema wrong somewhere; these two lists
+        // are how somebody who knows their schema corrects it, once, for everybody.
+        app.MapGet("/api/data/{conn}/mask-policy", (string conn, MaskPolicyStore policies) =>
+        {
+            var policy = policies.For(conn);
+            return Results.Ok(new
+            {
+                maskByDefault = policy.MaskByDefault,
+                extra = policy.Extra.OrderBy(c => c, StringComparer.OrdinalIgnoreCase),
+                never = policy.Never.OrderBy(c => c, StringComparer.OrdinalIgnoreCase),
+            });
+        });
+
+        app.MapPut("/api/data/{conn}/mask-policy", (string conn, MaskPolicyRequest body,
+            MaskPolicyStore policies) =>
+        {
+            policies.Save(conn, new MaskPolicy(
+                body.MaskByDefault ?? true,
+                new HashSet<string>(body.Extra ?? [], StringComparer.OrdinalIgnoreCase),
+                new HashSet<string>(body.Never ?? [], StringComparer.OrdinalIgnoreCase)));
+
+            return Results.NoContent();
         });
 
         app.MapPost("/api/data/{conn}/preview-changes", async (string conn, [FromQuery(Name = "ref")] string objectRef,

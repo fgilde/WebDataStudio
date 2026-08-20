@@ -466,17 +466,24 @@ reference for scope, not for code.
   `iban`, `ssn`, `credit`, `cvv`, `email` case-insensitively, whole word or snake/camel segment),
   and `record MaskPolicy(bool MaskByDefault, IReadOnlySet<string> Extra, IReadOnlySet<string> Never)`.
 
-- [ ] **Step 1: Write the failing tests** — `user_password` and `userPassword` are sensitive,
+- [x] **Step 1: Write the failing tests** — `user_password` and `userPassword` are sensitive,
       `password_changed_at` is not (it is a timestamp, not a secret), an explicit `Never` entry wins
       over the heuristic, and a masked column arrives as `"••••"` with a `masked: true` marker in
       the column metadata.
-- [ ] **Step 2: Run them** — expect failure.
-- [ ] **Step 3: Implement** the heuristic with `GeneratedRegex`, the per-connection policy stored in
+- [x] **Step 2: Run them** — expect failure.
+- [x] **Step 3: Implement** the heuristic with `GeneratedRegex`, the per-connection policy stored in
       the workspace store, masking in the read paths, and an export that refuses unless the caller
       passes `includeSensitive=true` — which is only accepted when the connection is not marked
       production-coloured.
-- [ ] **Step 4: Run them** — green.
-- [ ] **Step 5: Commit** — `feat(safety): mask what looks like a secret, and make revealing it deliberate`
+
+      *As built:* an export is **masked** rather than refused — `includeSensitive=true` returns the
+      real values, and only a connection marked production (red) refuses that. Refusing the whole
+      export because one column looks like a password blocks work the mask already makes safe.
+      Reveal in the grid is a fresh request (`?reveal=true`), and the query stream is masked too,
+      because it is the other way into the same data. The policy is editable per column from the
+      data tab's column menu (`GET`/`PUT /api/data/{conn}/mask-policy`).
+- [x] **Step 4: Run them** — green.
+- [x] **Step 5: Commit** — `feat(safety): mask what looks like a secret, and make revealing it deliberate`
 
 ### Task 4.2: Undo for data changes
 

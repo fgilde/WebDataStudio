@@ -4,11 +4,15 @@ import {
 } from "@mantine/core";
 import {
   IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
-  IconFilter, IconPlus, IconRefresh, IconRestore, IconSortAscending, IconSortDescending, IconTrash,
+  IconFilter, IconLock, IconPlus, IconRefresh, IconRestore, IconSortAscending, IconSortDescending,
+  IconTrash,
   IconWand,
 } from "@tabler/icons-react";
 import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
-import { browseData, lookupValues, type DataPageDto, type ForeignKeyDto } from "../api";
+import {
+  browseData, getMaskPolicy, lookupValues, saveMaskPolicy,
+  type DataPageDto, type ForeignKeyDto,
+} from "../api";
 
 import { CellValue } from "../grid/CellValue";
 import { MenuFilterInput } from "../grid/MenuFilterInput";
@@ -49,8 +53,26 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   // doing either in the browser would order and filter the wrong set.
   const [sort, setSort] = useState<{ column: string; desc: boolean } | null>(null);
   const [filter, setFilter] = useState<{ column: string; value: string } | null>(null);
+  // Masking happens on the server, so revealing is a fresh request rather than a render flag.
+  const [reveal, setReveal] = useState(false);
 
   const columns = useMemo(() => page?.columns.map(c => c.name) ?? [], [page]);
+
+  /// Moves one column between the policy's two lists and re-reads the page, so the change is
+  /// visible where it was made rather than after the next refresh.
+  const setMasking = async (column: string, mask: boolean) => {
+    try {
+      const policy = await getMaskPolicy(connectionId);
+      await saveMaskPolicy(connectionId, {
+        ...policy,
+        extra: mask ? [...new Set([...policy.extra, column])] : policy.extra.filter(c => c !== column),
+        never: mask ? policy.never.filter(c => c !== column) : [...new Set([...policy.never, column])],
+      });
+      setNonce(n => n + 1);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
   const rowAt = useCallback((index: number) => page?.rows[index], [page]);
   const changeSet = useChangeSet(page?.keyColumns ?? [], columns, rowAt);
 
@@ -61,11 +83,12 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
       offset: (pageIndex - 1) * PAGE_SIZE, limit: PAGE_SIZE,
       sort: sort?.column, desc: sort?.desc,
       filterColumn: filter?.column, filter: filter?.value,
+      reveal: reveal || undefined,
     })
       .then(p => { if (!cancelled) setPage(p); })
       .catch(e => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [connectionId, objectRef, pageIndex, nonce, sort, filter]);
+  }, [connectionId, objectRef, pageIndex, nonce, sort, filter, reveal]);
 
   if (error) return <Text c="red" size="xs" p="xs">{error}</Text>;
   if (!page) return <Loader size="xs" m="xs" />;
@@ -164,6 +187,21 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           </Tooltip>
         ) : null}
 
+        {/* The server replaced these values. Saying so — and offering the way to the real ones —
+            beats leaving somebody to wonder why a column reads as dots. */}
+        {page.columns.some(c => c.masked) || reveal ? (
+          <Tooltip label={reveal
+            ? "Mask sensitive columns again"
+            : `Reveal ${page.columns.filter(c => c.masked).length} masked column(s) — the values are fetched again`}>
+            <Button size="compact-xs" variant={reveal ? "light" : "subtle"}
+              color={reveal ? "orange" : "gray"}
+              leftSection={reveal ? <IconEye size={13} /> : <IconLock size={13} />}
+              onClick={() => setReveal(r => !r)}>
+              {reveal ? "Revealed" : "Masked"}
+            </Button>
+          </Tooltip>
+        ) : null}
+
         {/* Hidden columns are invisible by definition; this is the way back to them, the same
             control the query result grid has. */}
         {hidden.size > 0 ? (
@@ -218,6 +256,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                       <Group gap={3} wrap="nowrap" style={{ cursor: "pointer" }}>
                         <Text size="xs" fw={600}>{c.name}</Text>
                         {page.keyColumns.includes(c.name) && <Badge size="xs" variant="light">key</Badge>}
+                        {c.masked && <IconLock size={11} title="masked by the server" />}
                         {fkForColumn(c.name) && <IconArrowRight size={11} />}
                         {sort?.column === c.name && (sort.desc
                           ? <IconSortDescending size={12} /> : <IconSortAscending size={12} />)}
@@ -250,6 +289,12 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                       <Menu.Item leftSection={<IconEyeOff size={13} />}
                         onClick={() => setHidden(h => new Set(h).add(c.name))}>
                         Hide column
+                      </Menu.Item>
+                      {/* The word list guesses; this is how somebody who knows the schema corrects
+                          it once, for everybody who opens this connection. */}
+                      <Menu.Item leftSection={<IconLock size={13} />}
+                        onClick={() => setMasking(c.name, !c.masked)}>
+                        {c.masked ? "Never mask this column" : "Always mask this column"}
                       </Menu.Item>
                       <Menu.Item disabled={hidden.size === 0} onClick={() => setHidden(new Set())}>
                         Show all columns

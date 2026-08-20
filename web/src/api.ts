@@ -154,7 +154,9 @@ export const listExportFormats = (): Promise<ExportFormatDto[]> =>
   fetch(`${base}/export/formats`).then(r => ok<ExportFormatDto[]>(r));
 
 export interface DataPageDto {
-  columns: { name: string; dataType: string; nullable: boolean }[];
+  // `masked` is the server saying it replaced this column's values; the grid offers a reveal
+  // rather than leaving somebody wondering why a value looks like dots.
+  columns: { name: string; dataType: string; nullable: boolean; masked?: boolean }[];
   rows: unknown[][];
   editable: boolean;
   keyColumns: string[];
@@ -170,12 +172,22 @@ export interface LookupItemDto { value: unknown; label: unknown }
 
 export const browseData = (conn: string, ref: string,
   params: { offset?: number; limit?: number; sort?: string; desc?: boolean;
-            filterColumn?: string; filter?: string } = {}): Promise<DataPageDto> => {
+            filterColumn?: string; filter?: string; reveal?: boolean } = {}): Promise<DataPageDto> => {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params))
     if (value !== undefined && value !== "") query.set(key, String(value));
   return fetch(`${base}/data/${conn}?${refQuery(ref, query)}`).then(r => ok<DataPageDto>(r));
 };
+
+export interface MaskPolicyDto { maskByDefault: boolean; extra: string[]; never: string[] }
+
+export const getMaskPolicy = (conn: string): Promise<MaskPolicyDto> =>
+  fetch(`${base}/data/${conn}/mask-policy`).then(r => ok<MaskPolicyDto>(r));
+
+export const saveMaskPolicy = (conn: string, policy: MaskPolicyDto): Promise<void> =>
+  fetch(`${base}/data/${conn}/mask-policy`, {
+    method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(policy),
+  }).then(r => { if (!r.ok) throw new Error("could not save the mask policy"); });
 
 export const previewChanges = (conn: string, ref: string, changes: unknown[]): Promise<ChangePreviewDto> =>
   fetch(`${base}/data/${conn}/preview-changes?${refQuery(ref)}`, json("POST", { changes }))

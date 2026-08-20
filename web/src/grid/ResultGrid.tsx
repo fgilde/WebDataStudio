@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Group, Menu, Text, TextInput } from "@mantine/core";
 import {
-  IconEye, IconEyeOff, IconFilter, IconSortAscending, IconSortDescending,
+  IconEye, IconEyeOff, IconFilter, IconLock, IconSortAscending, IconSortDescending,
 } from "@tabler/icons-react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { StatementResult } from "../query/resultStore";
@@ -203,6 +203,7 @@ export function ResultGrid({ result, onSelectionChange }: {
                     <Menu.Target>
                       <Group gap={2} style={{ cursor: "pointer" }} wrap="nowrap">
                         <Text size="xs" fw={600}>{c.name}</Text>
+                        {c.masked && <IconLock size={11} title="masked by the server" />}
                         {sort?.index === c.index && (sort.desc
                           ? <IconSortDescending size={12} /> : <IconSortAscending size={12} />)}
                         {filters[c.index] && <IconFilter size={12} />}

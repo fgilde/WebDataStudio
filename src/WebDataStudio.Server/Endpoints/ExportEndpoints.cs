@@ -9,7 +9,7 @@ public static class ExportEndpoints
 {
     public record ExportRequest(
         string ConnectionId, string? Sql, string? ObjectRef, string? Scope, string? Schema,
-        int? MaxRows, ExportOptionsDto? Options);
+        int? MaxRows, ExportOptionsDto? Options, bool? IncludeSensitive = null);
 
     public record ExportOptionsDto(
         string? Delimiter, string? Encoding, bool? Header, string? NullText,
@@ -36,7 +36,8 @@ public static class ExportEndpoints
                 })));
 
         app.MapPost("/api/export/{format}", async (string format, ExportRequest body, HttpContext ctx,
-            ExporterRegistry registry, SessionFactory factory) =>
+            ExporterRegistry registry, SessionFactory factory, ConnectionRegistry connections,
+            MaskPolicyStore policies) =>
         {
             IResultExporter exporter;
             try { exporter = registry.Get(format); }
@@ -49,6 +50,24 @@ public static class ExportEndpoints
                     message = $"the {exporter.Label} format cannot hold a whole schema; " +
                               "export one table at a time or pick SQL, Markdown or HTML",
                 });
+
+            // A file leaves the building. Sensitive columns are masked in it unless the caller asks
+            // for them on purpose — and on a connection marked as production (red) that ask is
+            // refused outright, because "I exported prod's password column to my downloads folder"
+            // is not a mistake anyone should be able to make in one click.
+            var production = string.Equals(connections.Find(body.ConnectionId)?.Color, "red",
+                StringComparison.OrdinalIgnoreCase);
+
+            if (body.IncludeSensitive == true && production)
+                return Results.BadRequest(new
+                {
+                    message = "this connection is marked as production; sensitive columns cannot be " +
+                              "exported unmasked. Remove the production colour if that is really intended.",
+                });
+
+            var policy = body.IncludeSensitive == true
+                ? new MaskPolicy(false, new HashSet<string>(), new HashSet<string>())
+                : policies.For(body.ConnectionId);
 
             IDbDriver driver;
             IDbSession session;
@@ -94,7 +113,9 @@ public static class ExportEndpoints
                         {
                             foreach (var source in sources)
                                 await exporter.WriteAsync(file,
-                                    driver.ExecuteAsync(session, request with { Sql = source.Sql }, ctx.RequestAborted),
+                                    Masking.Stream(
+                                        driver.ExecuteAsync(session, request with { Sql = source.Sql }, ctx.RequestAborted),
+                                        policy, ctx.RequestAborted),
                                     options with { TableName = source.Name }, ctx.RequestAborted);
                         }
 
@@ -111,7 +132,9 @@ public static class ExportEndpoints
                 {
                     foreach (var source in sources)
                         await exporter.WriteAsync(ctx.Response.Body,
-                            driver.ExecuteAsync(session, request with { Sql = source.Sql }, ctx.RequestAborted),
+                            Masking.Stream(
+                                driver.ExecuteAsync(session, request with { Sql = source.Sql }, ctx.RequestAborted),
+                                policy, ctx.RequestAborted),
                             options with { TableName = source.Name }, ctx.RequestAborted);
                 }
 

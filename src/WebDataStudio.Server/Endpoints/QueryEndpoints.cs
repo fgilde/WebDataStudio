@@ -19,7 +19,7 @@ public static class QueryEndpoints
         var defaultTimeout = int.TryParse(app.Configuration["WDS_QUERY_TIMEOUT_SECONDS"], out var t) ? t : 300;
 
         app.MapPost("/api/query/execute", async (ExecuteRequest body, HttpContext ctx,
-            SessionFactory factory, QueryRunner runner) =>
+            SessionFactory factory, QueryRunner runner, MaskPolicyStore policies) =>
         {
             IDbDriver driver;
             IDbSession session;
@@ -44,12 +44,26 @@ public static class QueryEndpoints
                 body.TimeoutSeconds ?? defaultTimeout, body.Schema, body.Parameters,
                 body.Transactional ?? false);
 
+            // A query is the other way into the same data as the data tab, so it cannot be the way
+            // around the mask policy. The columns chunk decides which indexes are hidden; the row
+            // chunks that follow it are masked at those indexes.
+            var policy = policies.For(body.ConnectionId);
+            var masked = new HashSet<int>();
+
             await using (session)
             {
                 try
                 {
                     await foreach (var chunk in driver.ExecuteAsync(session, request, source.Token))
-                        await WriteAsync(ctx, Wire(chunk), source.Token);
+                    {
+                        if (chunk is ResultChunk.Columns columns)
+                        {
+                            masked.Clear();
+                            masked.UnionWith(Masking.IndexesOf(columns.Items, policy));
+                        }
+
+                        await WriteAsync(ctx, Wire(chunk, masked), source.Token);
+                    }
                 }
                 catch (OperationCanceledException)
                 {
@@ -95,10 +109,16 @@ public static class QueryEndpoints
 
     /// The wire shape from spec section 5.3. Kept separate from ResultChunk so the record
     /// hierarchy can change without breaking the client contract.
-    private static object Wire(ResultChunk chunk) => chunk switch
+    private static object Wire(ResultChunk chunk, HashSet<int> masked) => chunk switch
     {
-        ResultChunk.Columns c => new { type = "columns", statement = c.Statement, columns = c.Items },
-        ResultChunk.Rows r => new { type = "rows", statement = r.Statement, rows = r.Items },
+        ResultChunk.Columns c => new
+        {
+            type = "columns", statement = c.Statement, columns = Masking.Describe(c.Items, masked),
+        },
+        ResultChunk.Rows r => new
+        {
+            type = "rows", statement = r.Statement, rows = Masking.Apply(r.Items, masked),
+        },
         ResultChunk.Documents d => new { type = "documents", statement = d.Statement, documents = d.Items },
         ResultChunk.Progress p => new { type = "progress", statement = p.Statement, rowsRead = p.RowsRead, elapsedMs = p.ElapsedMs },
         ResultChunk.Message m => new { type = "message", statement = m.Statement, severity = m.Severity, text = m.Text },

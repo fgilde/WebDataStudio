@@ -43,6 +43,7 @@ public sealed class SqlServerDriver : AdoDriverBase
         IncludeColumns = true, Backup = true, UserManagement = true,
         SessionList = true, KillSession = true, ServerStats = true, SlowQueryLog = true,
         SystemCommands = true,
+        ActivityProgress = true, Replication = true,
     };
 
     public override SqlDialect Dialect { get; } = new SqlServerDialect();

@@ -16,6 +16,44 @@ public static class AdminEndpoints
     public static void MapAdminEndpoints(this WebApplication app)
     {
         // --- sessions --------------------------------------------------------
+        // What the server is doing right now, and who is waiting for whom. One call, because the
+        // overview tab asks for both every few seconds.
+        app.MapGet("/api/admin/activity/{conn}", async (
+            string conn, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (!driver.Caps.ActivityProgress)
+                        return Results.Ok(new ActivityDto([], []));
+
+                    return Results.Ok(await ServerActivity.ReadAsync(driver, session, ct));
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        app.MapGet("/api/admin/replication/{conn}", async (
+            string conn, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (!driver.Caps.Replication)
+                        return Results.Ok(Array.Empty<ReplicaState>());
+
+                    return Results.Ok(await ServerActivity.ReplicationAsync(driver, session, ct));
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
         app.MapGet("/api/admin/sessions/{conn}", (string conn, SessionFactory factory, CancellationToken ct) =>
             WithSession(conn, factory, ct, async (driver, session) =>
             {

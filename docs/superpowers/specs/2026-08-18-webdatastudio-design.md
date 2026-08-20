@@ -431,6 +431,12 @@ it works for every engine whose capability set claims support for it.
 | F19.5 | Where the memory in a keyspace went, sampled rather than exhaustive |
 | F19.6 | Pub/sub and stream consumer groups are visible while they happen |
 | F19.7 | The slow log and the client list of a Redis server |
+| F18.1 | One view that answers what the server is doing right now |
+| F18.2 | Long-running work is visible, with progress where the engine knows it |
+| F18.3 | A lock is shown as the chain it is, so the right session gets killed |
+| F18.4 | A recommendation can be applied, not only read |
+| F18.5 | Replicas and their lag |
+| F18.6 | Where the disk went, as areas rather than a list |
 
 ## 10. Safety behaviour
 

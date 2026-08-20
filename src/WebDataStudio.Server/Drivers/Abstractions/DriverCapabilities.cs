@@ -28,4 +28,11 @@ public sealed record DriverCapabilities
     public bool ServerStats { get; init; }
     public bool SlowQueryLog { get; init; }
     public bool SystemCommands { get; init; }
+
+    /// The server can say what it is working on right now — a vacuum's progress, a running
+    /// statement's age — and which session is waiting for which.
+    public bool ActivityProgress { get; init; }
+
+    /// The server can report its replicas and how far behind they are.
+    public bool Replication { get; init; }
 }

@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import {
-  ActionIcon, Badge, Button, Card, Group, Loader, ScrollArea, SegmentedControl, Stack, Tabs, Text, Tooltip,
+  ActionIcon, Badge, Button, Card, Code, Group, Loader, Modal, ScrollArea, SegmentedControl, Stack,
+  Tabs, Text, Tooltip,
 } from "@mantine/core";
 import { IconAlertTriangle, IconCopy, IconPlayerPlay, IconRefresh } from "@tabler/icons-react";
-import { analyzeQuery, type AnalyzeResultDto, type PlanNodeDto } from "../api";
+import {
+  analyzeQuery, applyScript, previewScript,
+  type AnalyzeResultDto, type DdlPreviewDto, type PlanNodeDto,
+} from "../api";
 import { heatColor } from "./heat";
 
 export function PlanPanel({ connectionId, sql, onRunStatement }: {
@@ -158,6 +162,17 @@ export function HealthReportPanel({ connectionId, schema }: { connectionId: stri
   const [findings, setFindings] = useState<AnalyzeResultDto["findings"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingFix, setPendingFix] = useState<string | null>(null);
+  const [preview, setPreview] = useState<DdlPreviewDto | null>(null);
+
+  // Preview first, run second — the same handshake every other write in this studio goes through.
+  useEffect(() => {
+    if (pendingFix === null) { setPreview(null); return; }
+
+    previewScript(connectionId, pendingFix)
+      .then(setPreview)
+      .catch((e: Error) => { setError(e.message); setPendingFix(null); });
+  }, [pendingFix, connectionId]);
 
   const load = async () => {
     setBusy(true);
@@ -204,9 +219,23 @@ export function HealthReportPanel({ connectionId, schema }: { connectionId: stri
                     <Text size="xs" fw={600}>{f.title}</Text>
                     <Text size="xs" c="dimmed">{f.detail}</Text>
                     {f.statement && (
-                      <Text size="xs" ff="monospace" mt={4} style={{ wordBreak: "break-all" }}>
-                        {f.statement}
-                      </Text>
+                      <>
+                        <Text size="xs" ff="monospace" mt={4} style={{ wordBreak: "break-all" }}>
+                          {f.statement}
+                        </Text>
+                        {/* A finding that names its fix should be able to run it: through the
+                            migration preview, which is the same path the table designer uses. */}
+                        <Group gap={4} mt={4}>
+                          <Button size="compact-xs" variant="default"
+                            onClick={() => setPendingFix(f.statement!)}>
+                            Apply this…
+                          </Button>
+                          <ActionIcon size="sm" variant="subtle" aria-label="Copy statement"
+                            onClick={() => navigator.clipboard.writeText(f.statement!)}>
+                            <IconCopy size={13} />
+                          </ActionIcon>
+                        </Group>
+                      </>
                     )}
                   </Card>
                 ))}
@@ -216,6 +245,28 @@ export function HealthReportPanel({ connectionId, schema }: { connectionId: stri
           {findings?.length === 0 && <Text size="xs" c="dimmed">Nothing to report.</Text>}
         </Stack>
       </ScrollArea>
+
+      <Modal opened={pendingFix !== null} onClose={() => setPendingFix(null)}
+        title="Apply this fix?" size="lg">
+        <Stack gap="sm">
+          {preview?.destructive
+            ? <Text size="xs" c="red">This drops something. Read it before you run it.</Text>
+            : null}
+          <Code block fz="xs">{preview?.script ?? pendingFix}</Code>
+          <Group justify="flex-end">
+            <Button size="xs" variant="default" onClick={() => setPendingFix(null)}>Cancel</Button>
+            <Button size="xs" color={preview?.destructive ? "red" : undefined} disabled={!preview}
+              onClick={() => {
+                if (!preview) return;
+                applyScript(connectionId, preview.hash)
+                  .then(() => { setPendingFix(null); load(); })
+                  .catch((e: Error) => { setError(e.message); setPendingFix(null); });
+              }}>
+              Run it
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </div>
   );
 }

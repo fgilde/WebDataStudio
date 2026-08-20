@@ -224,6 +224,26 @@ export const healthReport = (connectionId: string, schema?: string): Promise<{ f
 export const serverStats = (connectionId: string): Promise<ServerStatsDto> =>
   fetch(`${base}/stats/${connectionId}`).then(r => ok<ServerStatsDto>(r));
 
+export interface RunningOperationDto {
+  id: string; kind: string; target: string; percentComplete: number | null;
+  elapsedMs: number; statement: string | null;
+}
+export interface LockWaitDto {
+  blocker: string; blocked: string; resource: string; waitMs: number; statement: string | null;
+}
+export interface ActivityDto { operations: RunningOperationDto[]; waits: LockWaitDto[] }
+export interface ReplicaStateDto {
+  name: string; role: string; state: string; lagBytes: number | null; lagSeconds: number | null;
+}
+
+/// What the server is doing right now, and who is waiting for whom. One call, because the overview
+/// asks for both every few seconds.
+export const serverActivity = (connectionId: string): Promise<ActivityDto> =>
+  fetch(`${base}/admin/activity/${connectionId}`).then(r => ok<ActivityDto>(r));
+
+export const replicationState = (connectionId: string): Promise<ReplicaStateDto[]> =>
+  fetch(`${base}/admin/replication/${connectionId}`).then(r => ok<ReplicaStateDto[]>(r));
+
 import type { TableDefinition } from "./designer/definition";
 
 export interface DdlStatementDto { sql: string; destructive: boolean; description: string }
@@ -240,6 +260,15 @@ export const loadDdl = (conn: string, ref: string): Promise<DdlLoadDto> =>
 export const previewDdl = (conn: string, ref: string | null, after: TableDefinition): Promise<DdlPreviewDto> =>
   fetch(`${base}/ddl/${conn}/preview`, json("POST", { objectRef: ref, after }))
     .then(r => ok<DdlPreviewDto>(r));
+
+/// A statement the studio proposed — a fix from the health report — turned into the same previewed,
+/// hashed change the table designer produces, so it goes through one path into the database.
+export const previewScript = (conn: string, sql: string): Promise<DdlPreviewDto> =>
+  fetch(`${base}/ddl/${conn}/script/preview`, json("POST", { sql }))
+    .then(r => ok<DdlPreviewDto>(r));
+
+export const applyScript = (conn: string, hash: string): Promise<void> =>
+  fetch(`${base}/ddl/${conn}/apply`, json("POST", { hash })).then(r => ok<void>(r));
 
 export const applyDdl = (conn: string, hash: string): Promise<void> =>
   fetch(`${base}/ddl/${conn}/apply`, json("POST", { hash })).then(r => ok<void>(r));

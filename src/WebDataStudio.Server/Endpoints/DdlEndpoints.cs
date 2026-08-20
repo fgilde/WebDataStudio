@@ -11,6 +11,21 @@ public static class DdlEndpoints
 {
     public record PreviewRequest(string? ObjectRef, TableDefinition After);
     public record ApplyRequest(string Hash);
+
+    public record ScriptPreviewRequest(string Sql);
+
+    /// Anything that removes or rewrites, so the confirmation can say so. Deliberately blunt: a
+    /// false positive costs a red line of text, a false negative costs data.
+    private static bool IsDestructive(string sql) =>
+        new[] { "DROP", "TRUNCATE", "DELETE", "ALTER TABLE" }
+            .Any(word => sql.TrimStart().StartsWith(word, StringComparison.OrdinalIgnoreCase));
+
+    /// The first two words, which is what a statement is called in a list of statements.
+    private static string Describe(string sql)
+    {
+        var words = sql.TrimStart().Split([' ', '\n', '\t'], 3, StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(" ", words.Take(2)).ToUpperInvariant();
+    }
     public record RenameRequest(string ObjectRef, string NewName);
     public record RoutineRequest(string Schema, string Name, string Kind, string Body);
 
@@ -128,6 +143,46 @@ public static class DdlEndpoints
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // A finding from the health report names its own fix ("CREATE INDEX …"). This turns that
+        // statement into the same previewed, hashed change every other write goes through, so
+        // applying a recommendation is not a second, unreviewed path into the database.
+        app.MapPost("/api/ddl/{conn}/script/preview", async (string conn, ScriptPreviewRequest body,
+            SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Sql))
+                return Results.BadRequest(new { message = "there is no statement to preview" });
+
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var statements = StatementSplitter
+                        .Split(body.Sql, driver.Dialect)
+                        .Select(statement => new DdlStatement(
+                            statement.Text, IsDestructive(statement.Text), Describe(statement.Text)))
+                        .ToList();
+
+                    if (statements.Count == 0)
+                        return Results.BadRequest(new { message = "there is no statement to preview" });
+
+                    var hash = Hash(statements);
+                    cache.Set($"ddl:{hash}", (IReadOnlyList<DdlStatement>)statements, TimeSpan.FromMinutes(10));
+
+                    return Results.Ok(new
+                    {
+                        hash,
+                        statements = statements.Select(s => new { s.Sql, s.Destructive, s.Description }),
+                        script = string.Join("\n", statements.Select(s => s.Sql)),
+                        destructive = statements.Any(s => s.Destructive),
+                        transactional = driver.Caps.Transactions && driver.Info.Id != "mysql",
+                    });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 

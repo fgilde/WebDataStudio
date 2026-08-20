@@ -20,6 +20,7 @@ public sealed class PostgreSqlDriver : AdoDriverBase
         Backup = true, Restore = true,
         UserManagement = true, SessionList = true, KillSession = true, ServerStats = true,
         SlowQueryLog = true, SystemCommands = true,
+        ActivityProgress = true, Replication = true,
     };
 
     public override SqlDialect Dialect { get; } = new PostgreSqlDialect();

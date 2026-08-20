@@ -42,3 +42,39 @@ every process on the machine could read.
 
 Restore uploads a dump and asks you to type the target database's name first. It is the one action
 in the app that overwrites a whole database.
+
+## Overview
+
+The first tab answers the question the other eight could only answer between them: connections,
+cache hit ratio, how many sessions are waiting, how many statements are running, how long the
+longest has been going, and the size of the database. Each tile keeps the last five minutes of
+readings, so a number that is climbing looks different from one that is merely high.
+
+Below the tiles, everything the server is working on. PostgreSQL and SQL Server report a percentage
+for a vacuum or an index build; MySQL and Oracle report the statement and its age, which is the
+useful half. Nothing running says so instead of showing an empty table.
+
+### Who is blocking whom
+
+When sessions are waiting, the overview shows the chains rather than a list of waiters: the session
+at the root is the one holding everything up, and it is the one with the kill button. Killing a
+waiter frees nothing, so that button is only offered where it can help. A cycle — which SQL Server
+does report — is shown once rather than followed round for ever.
+
+## Replication
+
+Replicas, their state and their lag, in bytes and in seconds where the engine reports both. A server
+with no replicas says so, and so does one whose account cannot read the replication view — those are
+different problems and it matters which one you have.
+
+## Sizes
+
+The databases tab draws the sizes as a treemap above the list. A hundred databases are one glance
+here and a hundred lines to scroll in a table; the list is still underneath for the actions.
+
+## Applying a recommendation
+
+The health report names its fixes — `CREATE INDEX`, `DROP INDEX`, `VACUUM (ANALYZE)`. Each one has an
+**Apply this…** button that runs it through the same preview-and-confirm path the table designer
+uses: the script, whether it is destructive, and one place where it goes into the database. A
+recommendation nobody can act on is a recommendation nobody acts on.

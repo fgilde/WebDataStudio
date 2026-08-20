@@ -10,6 +10,9 @@ import {
   slowQueries, systemCommands, serverStats,
   type DatabaseDto, type SessionDto, type SystemCommandDto,
 } from "../api";
+import { Overview } from "./Overview";
+import { SizeTreemap } from "./SizeTreemap";
+import { Replication } from "./Replication";
 
 /// Every tab here is allowed to be empty or unavailable: the server tells us which of these an
 /// engine supports, and "not supported" is an answer, not an error.
@@ -440,8 +443,9 @@ export function AdminPanel({ connectionId, database = "" }: { connectionId: stri
   if (!connectionId) return <Text size="xs" c="dimmed" p="xs">Select a connection first.</Text>;
 
   return (
-    <Tabs defaultValue="maintenance" keepMounted={false}>
+    <Tabs defaultValue="overview" keepMounted={false}>
       <Tabs.List>
+        <Tabs.Tab value="overview">Overview</Tabs.Tab>
         <Tabs.Tab value="maintenance">Maintenance</Tabs.Tab>
         <Tabs.Tab value="sessions">Sessions</Tabs.Tab>
         <Tabs.Tab value="databases">Databases</Tabs.Tab>
@@ -449,15 +453,26 @@ export function AdminPanel({ connectionId, database = "" }: { connectionId: stri
         <Tabs.Tab value="backup">Backup</Tabs.Tab>
         <Tabs.Tab value="metrics">Metrics</Tabs.Tab>
         <Tabs.Tab value="slow">Slow queries</Tabs.Tab>
+        <Tabs.Tab value="replication">Replication</Tabs.Tab>
         <Tabs.Tab value="logs">Log</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="maintenance"><Maintenance connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="sessions"><Sessions connectionId={connectionId} /></Tabs.Panel>
-      <Tabs.Panel value="databases"><Databases connectionId={connectionId} /></Tabs.Panel>
+      <Tabs.Panel value="databases">
+        {/* The list to act on, and above it where the disk actually went. */}
+        <ScrollArea h="100%" p="xs">
+          <SizeTreemap connectionId={connectionId} />
+          <div style={{ marginTop: 12 }}>
+            <Databases connectionId={connectionId} />
+          </div>
+        </ScrollArea>
+      </Tabs.Panel>
       <Tabs.Panel value="users"><Users connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="backup"><Backup connectionId={connectionId} database={database} /></Tabs.Panel>
+      <Tabs.Panel value="overview"><Overview connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="metrics"><ServerMetrics connectionId={connectionId} /></Tabs.Panel>
+      <Tabs.Panel value="replication"><Replication connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="slow"><SlowQueries connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="logs"><Logs connectionId={connectionId} /></Tabs.Panel>
     </Tabs>

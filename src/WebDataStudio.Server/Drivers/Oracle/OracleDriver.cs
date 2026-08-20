@@ -36,6 +36,7 @@ public sealed class OracleDriver : AdoDriverBase
         MaterializedViews = true, Sequences = true, ForeignKeys = true,
         Backup = false, Restore = false, UserManagement = true, SessionList = true,
         KillSession = true, ServerStats = true, SystemCommands = true,
+        ActivityProgress = true,
     };
 
     public override SqlDialect Dialect { get; } = new OracleDialect();

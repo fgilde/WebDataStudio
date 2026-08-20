@@ -73,7 +73,9 @@ public static class PostgreSqlAnalyzer
             r => new AnalyzeFinding("duplicate-index", "warning",
                 $"Duplicate indexes on {r.GetString(0)}",
                 $"These indexes cover the same columns: {r.GetString(1)}. Every write maintains all of them.",
-                null), ct));
+                // The statement drops all but the first: a finding without the fix in it is a
+                // finding somebody has to translate by hand.
+                DropAllButFirst(r.GetString(1))), ct));
 
         findings.AddRange(await AnalyzerSupport.QueryAsync(session, $"""
             SELECT t.relname, con.conname,
@@ -125,6 +127,16 @@ public static class PostgreSqlAnalyzer
                 $"ANALYZE {r.GetString(0)};"), ct));
 
         return AnalyzerSupport.Sorted(findings);
+    }
+
+    /// The redundant half of a duplicate-index group: keep the first, drop the rest. Which one to
+    /// keep is arbitrary, and saying so is better than leaving the finding without a fix.
+    private static string? DropAllButFirst(string indexList)
+    {
+        var indexes = indexList.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (indexes.Length < 2) return null;
+
+        return string.Join("\n", indexes.Skip(1).Select(index => $"DROP INDEX {index};"));
     }
 }
 

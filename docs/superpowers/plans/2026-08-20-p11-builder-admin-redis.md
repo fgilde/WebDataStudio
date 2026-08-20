@@ -686,3 +686,106 @@ Off unless configured: no key, no calls, no mention in the UI.
 After each phase: the full server suite, `npx vitest run`, `npx oxlint src`, every smoke against a
 local instance, the link check, and a push that leaves CI green. A phase that cannot be finished
 cleanly is left out rather than half-merged, and this file records why.
+
+---
+
+## Phase 7 — The three things that were reported while this plan was running (F23)
+
+Found by reading the code rather than guessing, so each task names what is actually wrong.
+
+### Task 7.1: The data tab's column menu
+
+`web/src/data/DataTab.tsx` renders its own table and its own column menu. Its filter input sits
+inside a `Menu.Item` (`DataTab.tsx:201`) — a button, which never hands the focus on; that is the
+same defect that was fixed in `ResultGrid`, and it is the only remaining instance in the repository.
+The eager `currentTarget` read is already correct there. Two further gaps: every keystroke is a
+server round trip (`filter` is in the fetch effect's dependencies, `DataTab.tsx:44-62`) and it resets
+the page, and there is no way to hide a column at all.
+
+Reuse of `ResultGrid` was assessed and rejected: it keys column state by numeric index, owns sort and
+filter locally, filters N columns at once, and addresses rows by their position in a derived array,
+while the data tab pages, sorts and filters on the server, filters exactly one column, and addresses
+rows by source index including negative ones for inserted rows. A shared grid would need three
+abstractions for two callers. What is shared is the ten lines that caused the bug.
+
+**Files:**
+- Create: `web/src/grid/MenuFilterInput.tsx`
+- Modify: `web/src/grid/ResultGrid.tsx` (use it), `web/src/data/DataTab.tsx` (use it, debounce,
+  hidden columns)
+- Create: `web/scripts/smoke-data-menu.mjs`
+
+- [ ] **Step 1:** Write `smoke-data-menu.mjs`: open a table by double-click, open a column menu,
+      type into the filter, assert the input holds the keystrokes and the rows narrow; hide a
+      column, assert the indicator counts it and restores it.
+- [ ] **Step 2:** Run it — fails on the focus.
+- [ ] **Step 3:** Extract `MenuFilterInput` (the `div` with `stopPropagation` on click and keydown,
+      `data-autofocus`, an eager `currentTarget` read, and a `debounceMs` prop that defaults to 0 so
+      `ResultGrid` keeps its current behaviour); use it in both grids with 350 ms in the data tab.
+      Add hidden columns to the data tab keyed by column name, with the same eye indicator.
+- [ ] **Step 4:** Run the smoke and `smoke-grid`.
+- [ ] **Step 5: Commit** — `fix(data): a column menu whose filter can be typed into`
+
+### Task 7.2: An explorer filter that finds tables
+
+The box filters `node.label` of the **first** tree level only (`ExplorerTree.tsx:90-92`, and the
+recursion passes `filter=""` at `:138`). Depth 1 is schemas on PostgreSQL, MySQL, Oracle, ClickHouse,
+DuckDB and MongoDB, folders on SQLite, database indexes on Redis — never tables. So typing a table
+name empties the tree, and typing `tab` matches the folder called "Tables". A matching folder then
+shows all of its children unfiltered, which is the opposite of what was wanted.
+
+`web/src/editor/schemaCache.ts` already walks a connection and keeps every table and view with its
+schema, and `GoToObject.tsx:24-40` already has a subsequence matcher. Its `invalidate` is never
+called by anything.
+
+**Files:**
+- Create: `web/src/explorer/fuzzy.ts` (moved out of `GoToObject.tsx`), `web/src/explorer/fuzzy.test.ts`
+- Modify: `web/src/explorer/ExplorerTree.tsx`, `web/src/shell/GoToObject.tsx`,
+  `web/src/editor/schemaCache.ts` usage on refresh
+
+- [ ] **Step 1:** Write `fuzzy.test.ts`: `matches("ordit", "order_items")` is true,
+      `matches("xyz", "order_items")` is false, ranking prefers a prefix hit over a scattered one,
+      matching is case-insensitive.
+- [ ] **Step 2:** Run it — the module does not exist yet.
+- [ ] **Step 3:** Move the matcher into `fuzzy.ts`, use it from `GoToObject`. In the explorer, a
+      filter of two characters or more replaces the tree body with the matching tables and views
+      from `schemaCache`, each row showing its schema dimmed and keeping select, double-click and
+      context menu; an empty box renders today's tree. The refresh button calls
+      `schemaCache.invalidate` so the flat list cannot go stale after a DDL change.
+- [ ] **Step 4:** Run the tests and `smoke-tree`.
+- [ ] **Step 5: Commit** — `fix(explorer): filter for the objects people look for`
+
+### Task 7.3: Panel management — context menu, popout, pinned tabs
+
+dockview 8.1 has all of it already and the shell uses none of it: `DockviewReact` is passed three
+props (`DockShell.tsx:902`). `getTabContextMenuItems` returns built-in strings —
+`'close' | 'closeOthers' | 'closeAll' | 'closeLeft' | 'closeRight' | 'maximize' | 'float' |
+'popout' | 'separator' | 'pin'` — and without the prop there is no context menu at all, which is
+today's state. Pinning needs `pinnedTabs: { enabled: true }`, or `setPinned` warns and no-ops.
+`addPopoutGroup(item, options)` opens a window at `popoutUrl`, default `/popout.html` — a file this
+repository does not have, so the SPA's fallback would serve `index.html` and boot a second copy of
+the studio inside the popout. Closing the window re-docks automatically; the group is tracked
+through `getPopouts()` and `onDidAddPopoutGroup`/`onDidRemovePopoutGroup`. Styles are copied into the
+new document, but Mantine's `data-mantine-color-scheme` attribute is not.
+
+**Files:**
+- Create: `web/public/popout.html`
+- Modify: `web/src/dock/DockShell.tsx`
+- Modify: `web/scripts/smoke-layout.mjs`
+
+- [ ] **Step 1:** Extend `smoke-layout.mjs`: right-click a tab, assert the menu offers Close, Close
+      others and Close all; use Close others and assert one tab is left in that group; assert
+      `/popout.html` answers 200 and is not the SPA shell.
+- [ ] **Step 2:** Run it — no context menu exists.
+- [ ] **Step 3:** Add `getTabContextMenuItems`, with `'close'` left out for the explorer and the
+      welcome panel so the way back is not lost; `pinnedTabs: { enabled: true }`; an empty
+      `popout.html`; and an `onDidOpen` hook that copies `data-mantine-color-scheme` onto the popout
+      document so a popped-out panel is not a white rectangle in a dark studio.
+- [ ] **Step 4:** Run `smoke-layout` and `smoke`.
+- [ ] **Step 5: Commit** — `feat(shell): a tab context menu, pinned tabs and panels that pop out`
+
+### Task 7.4: Documentation
+
+- [ ] `F23.1`–`F23.3` into the spec and `docs/features.md`; a section in `docs/guide/results.md`
+      (the data tab's menu), in a new `docs/guide/explorer.md` (searching), and in
+      `docs/guide/shortcuts.md` (the tab menu and popout).
+- [ ] **Commit** — `docs: the data tab menu, explorer search and panel management`

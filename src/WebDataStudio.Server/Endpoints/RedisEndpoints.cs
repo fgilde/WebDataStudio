@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Drivers.Redis;
 using WebDataStudio.Server.Services;
@@ -14,6 +15,10 @@ namespace WebDataStudio.Server.Endpoints;
 /// confusing cast error deep in a driver.
 public static class RedisEndpoints
 {
+    /// The hash a preview handed out, exactly as the data and DDL endpoints do it.
+    public record ApplyRequest(string Hash);
+
+
     public static void MapRedisEndpoints(this WebApplication app)
     {
         var api = app.MapGroup("/api/redis");
@@ -67,6 +72,143 @@ public static class RedisEndpoints
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
+
+        // --- one key --------------------------------------------------------------------------
+        api.MapGet("/{conn}/value", async (
+            string conn, int? db, string key, long? offset, int? count,
+            SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+
+                    var database = redis.Multiplexer.GetDatabase(db ?? redis.DatabaseNumber);
+                    var value = await RedisValues.ReadAsync(
+                        database, key, offset ?? 0, count ?? RedisValues.PageSize, ct);
+
+                    return value is null
+                        ? Results.NotFound(new { message = $"'{key}' does not exist" })
+                        : Results.Ok(value);
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // Writing is two calls, like every other write in this studio: the first says what would
+        // happen, the second runs exactly that. Redis has no transaction to undo afterwards, which
+        // makes the preview the last place a mistake can be caught.
+        api.MapPost("/{conn}/value/preview", async (
+            string conn, ValueEditRequest body, SessionFactory factory, IMemoryCache cache,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+                    if (session.Spec.ReadOnly) return ReadOnly();
+
+                    var commands = RedisValues.Plan(body);
+                    var hash = RedisValues.HashOf(commands);
+
+                    cache.Set($"redis:{hash}", (body.Database, commands), TimeSpan.FromMinutes(10));
+
+                    return Results.Ok(new ValuePreviewDto(
+                        hash, commands, RedisValues.IsDestructive(body.Operation)));
+                }
+            }
+            catch (ArgumentException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        api.MapPost("/{conn}/value/apply", async (
+            string conn, ApplyRequest body, SessionFactory factory, IMemoryCache cache,
+            CancellationToken ct) =>
+        {
+            if (!cache.TryGetValue($"redis:{body.Hash}", out (int Database, IReadOnlyList<string> Commands) planned))
+                return Results.BadRequest(new { message = "this change was not previewed, or the preview expired" });
+
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+                    if (session.Spec.ReadOnly) return ReadOnly();
+
+                    var database = redis.Multiplexer.GetDatabase(planned.Database);
+                    var executed = await RedisValues.ApplyAsync(database, planned.Database, planned.Commands, ct);
+
+                    cache.Remove($"redis:{body.Hash}");
+                    return Results.Ok(new { executed });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // --- many keys at once ----------------------------------------------------------------
+        api.MapPost("/{conn}/bulk/preview", async (
+            string conn, BulkRequest body, SessionFactory factory, IMemoryCache cache,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+                    if (session.Spec.ReadOnly) return ReadOnly();
+                    if (string.IsNullOrWhiteSpace(body.Match))
+                        return Results.BadRequest(new { message = "a pattern is required; '*' would be everything" });
+
+                    var matched = await RedisBulk.MatchAsync(
+                        redis.Multiplexer, body.Database, body.Match, body.Type, ct);
+
+                    var hash = RedisValues.HashOf([body.Action, body.Match, body.Type ?? "", $"{body.TtlSeconds}", $"{matched.Count}"]);
+                    cache.Set($"redis-bulk:{hash}", (body, matched), TimeSpan.FromMinutes(10));
+
+                    return Results.Ok(new BulkPreviewDto(hash, matched.Count, matched.Take(20).ToList()));
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        api.MapPost("/{conn}/bulk/apply", async (
+            string conn, ApplyRequest body, SessionFactory factory, IMemoryCache cache,
+            CancellationToken ct) =>
+        {
+            if (!cache.TryGetValue($"redis-bulk:{body.Hash}", out (BulkRequest Request, List<string> Keys) planned))
+                return Results.BadRequest(new { message = "this change was not previewed, or the preview expired" });
+
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+                    if (session.Spec.ReadOnly) return ReadOnly();
+
+                    var affected = await RedisBulk.ApplyAsync(
+                        redis.Multiplexer, planned.Request, planned.Keys, ct);
+
+                    cache.Remove($"redis-bulk:{body.Hash}");
+                    return Results.Ok(new { affected });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        static IResult ReadOnly() => Results.Json(
+            new { message = "this connection is read-only; nothing was changed" }, statusCode: 403);
 
         static IResult NotRedis() =>
             Results.BadRequest(new { message = "this connection is not a Redis connection" });

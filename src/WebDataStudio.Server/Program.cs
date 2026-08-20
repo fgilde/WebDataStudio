@@ -163,6 +163,7 @@ app.MapAnalysisEndpoints();
 app.MapDdlEndpoints();
 app.MapCompareEndpoints();
 app.MapAdminEndpoints();
+app.MapRedisEndpoints();
 app.MapDiagramEndpoints();
 app.MapSavedQueryEndpoints();
 

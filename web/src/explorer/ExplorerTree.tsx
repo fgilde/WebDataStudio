@@ -62,8 +62,8 @@ function ContextMenu({ items, at, onClose, onPick }: {
 }
 
 // One lazily loaded level. Children are fetched on first expand and cached until a refresh.
-function TreeLevel({ conn, parent, depth, filter, caps, onSelect, onAction }: {
-  conn: string; parent?: string; depth: number; filter: string; caps: MenuCapabilities;
+function TreeLevel({ conn, parent, depth, caps, onSelect, onAction }: {
+  conn: string; parent?: string; depth: number; caps: MenuCapabilities;
   onSelect: (s: ExplorerSelection) => void;
   onAction: (action: ExplorerAction, s: ExplorerSelection) => void;
 }) {
@@ -89,8 +89,8 @@ function TreeLevel({ conn, parent, depth, filter, caps, onSelect, onAction }: {
   if (error) return <Text c="red" size="xs" pl={pad + 8}>{error}</Text>;
   if (!nodes) return <Loader size="xs" ml={pad + 8} my={4} />;
 
-  // No filtering here any more: the box searches objects through ObjectSearch, because this level
-  // is schemas, folders or database indexes depending on the engine — never the tables somebody is
+  // The box searches objects through ObjectSearch rather than filtering here: this level is
+  // schemas, folders or database numbers depending on the engine — never the tables somebody is
   // typing the name of.
   const visible = nodes;
 
@@ -138,7 +138,7 @@ function TreeLevel({ conn, parent, depth, filter, caps, onSelect, onAction }: {
               marginLeft: pad + 10,
               borderLeft: "1px solid var(--mantine-color-default-border)",
             }}>
-              <TreeLevel conn={conn} parent={node.ref} depth={1} filter="" caps={caps}
+              <TreeLevel conn={conn} parent={node.ref} depth={1} caps={caps}
                 onSelect={onSelect} onAction={onAction} />
             </div>
           )}
@@ -265,7 +265,7 @@ export function ExplorerTree({ onSelect, onAction }: {
                   marginLeft: 10,
                   borderLeft: "1px solid var(--mantine-color-default-border)",
                 }}>
-                  <TreeLevel conn={c.id} depth={1} filter={filter} caps={capsByEngine[c.engine] ?? {}}
+                  <TreeLevel conn={c.id} depth={1} caps={capsByEngine[c.engine] ?? {}}
                     onSelect={onSelect} onAction={onAction} />
                 </div>
               )}

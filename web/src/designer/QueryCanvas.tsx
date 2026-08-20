@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import {
   Background, Controls, Handle, Position, ReactFlow, ReactFlowProvider,
-  useEdgesState, useNodesState, useReactFlow, type Connection, type NodeProps,
+  useEdgesState, useNodesState, useReactFlow,
+  type Connection, type Edge, type Node, type NodeProps,
 } from "@xyflow/react";
 import { ActionIcon, Checkbox, Group, Text } from "@mantine/core";
 import { IconX } from "@tabler/icons-react";
@@ -54,8 +55,8 @@ function Canvas({ model, loaded, onModelChange }: {
   loaded: LoadedTable[];
   onModelChange: (next: QueryModel) => void;
 }) {
-  const [nodes, setNodes, onNodesChange] = useNodesState<never>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<never>([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<TableNodeData>>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const flow = useReactFlow();
 
   // The model owns the tables and joins; the canvas is rebuilt from it, with the columns a user
@@ -85,9 +86,9 @@ function Canvas({ model, loaded, onModelChange }: {
             : [...model.columns, { table: node.id, column }],
         }),
       },
-    })) as never[]);
+    })));
 
-    setEdges(graph.edges as never[]);
+    setEdges(graph.edges);
 
     // fitView only runs on mount, so a table added later would sit outside the viewport — which is
     // exactly what happens every time somebody builds a query.

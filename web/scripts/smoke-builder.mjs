@@ -54,9 +54,13 @@ const sql = await page.locator("pre").first().innerText();
 check(`the generated SQL joins both tables (${sql.split("\n")[0]})`,
   /JOIN/i.test(sql) && /people/i.test(sql) && /orders/i.test(sql));
 
-// And the preview under it shows real rows from those tables.
-await page.getByText("ada", { exact: true }).first().waitFor({ timeout: 20000 });
-check("the preview shows rows while the query is being built", true);
+// And the preview under it shows real rows from those tables. Asserted on the row count rather
+// than on a value: the editing smoke renames rows in the same demo database.
+const builder = page.locator(".dv-groupview").filter({ has: addTable }).first();
+await builder.getByText(/\d+ rows/).first().waitFor({ timeout: 20000 });
+const preview = await builder.innerText();
+check(`the preview shows rows while the query is being built (${/(\d+) rows/.exec(preview)?.[0]})`,
+  /[1-9]\d* rows/.test(preview) && /10\.5/.test(preview));
 
 // The generated statement carries its model, so the query can come back into the builder.
 await page.getByRole("button", { name: "Open in query tab" }).click();

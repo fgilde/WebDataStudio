@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal, ScrollArea, Stack, Text, TextInput, UnstyledButton } from "@mantine/core";
 import { schemaCache, type TableRef } from "../editor/schemaCache";
+import { fuzzyRank } from "../explorer/fuzzy";
 
 /// Ctrl+Shift+O: type part of a name, land on the object. Reads the same cache the completion
 /// uses, so it costs nothing after the first schema walk.
@@ -22,21 +23,15 @@ export function GoToObject({ connectionId, opened, onClose, onPick }: {
   }, [opened, connectionId]);
 
   const matches = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    // Subsequence matching: "ordit" finds "order_items", the way an IDE's go-to does.
-    const fuzzy = (value: string) => {
-      let index = 0;
-      for (const character of needle) {
-        index = value.indexOf(character, index);
-        if (index < 0) return false;
-        index++;
-      }
-      return true;
-    };
+    const needle = search.trim();
+    if (!needle) return tables.slice(0, 100);
 
-    return tables
-      .filter(t => !needle || fuzzy(t.name.toLowerCase()) || t.schema.toLowerCase().includes(needle))
-      .slice(0, 100);
+    // The same matcher the explorer's search uses, ranked so an exact name comes first.
+    const byName = fuzzyRank(tables, needle, table => table.name, 100);
+    const bySchema = tables.filter(table =>
+      table.schema.toLowerCase().includes(needle.toLowerCase()) && !byName.includes(table));
+
+    return [...byName, ...bySchema].slice(0, 100);
   }, [tables, search]);
 
   const pick = (table: TableRef | undefined) => {

@@ -5,6 +5,7 @@
 - [Environment variables](environment.md)
 - [Deploying the studio](deploy.md)
 - [Connections](connections.md)
+- [Explorer and panels](explorer.md)
 - [Query editor](editor.md)
 - [Query builder](query-builder.md)
 - [Results and export](results.md)

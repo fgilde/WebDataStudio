@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>WebDataStudio</title>
+  <!-- dockview opens this page when a panel is popped out into its own window, then moves the
+       panel's DOM into it and copies the studio's stylesheets across. It must stay empty: the
+       SPA's fallback route would otherwise serve index.html here and boot a second studio inside
+       the window. The background matches the shell so the frame is not white for a moment. -->
+  <style>
+    html, body { margin: 0; height: 100%; background: #0d1120; }
+  </style>
+</head>
+<body></body>
+</html>

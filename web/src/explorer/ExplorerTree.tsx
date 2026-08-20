@@ -5,6 +5,8 @@ import {
 import { IconChevronDown, IconChevronRight, IconRefresh, IconSearch } from "@tabler/icons-react";
 import { listConnections, listDrivers, listSchema, type Connection, type SchemaNodeDto } from "../api";
 import { nodeIcon } from "./nodeIcons";
+import { ObjectSearch } from "./ObjectSearch";
+import { schemaCache } from "../editor/schemaCache";
 import {
   actionsFor, connectionActions, type ContextItem, type ExplorerAction, type MenuCapabilities,
 } from "./contextActions";
@@ -87,9 +89,10 @@ function TreeLevel({ conn, parent, depth, filter, caps, onSelect, onAction }: {
   if (error) return <Text c="red" size="xs" pl={pad + 8}>{error}</Text>;
   if (!nodes) return <Loader size="xs" ml={pad + 8} my={4} />;
 
-  const visible = filter
-    ? nodes.filter(n => n.label.toLowerCase().includes(filter.toLowerCase()))
-    : nodes;
+  // No filtering here any more: the box searches objects through ObjectSearch, because this level
+  // is schemas, folders or database indexes depending on the engine — never the tables somebody is
+  // typing the name of.
+  const visible = nodes;
 
   const act = (action: ExplorerAction, node: SchemaNodeDto) => {
     // Refreshing is this level's own business; everything else goes up to the shell.
@@ -164,6 +167,11 @@ export function ExplorerTree({ onSelect, onAction }: {
   const [nonce, setNonce] = useState(0);
   const [closedGroups, setClosedGroups] = useState<Record<string, boolean>>({});
   const [menuFor, setMenuFor] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [searchMenu, setSearchMenu] = useState<
+    { selection: ExplorerSelection; x: number; y: number } | null>(null);
+
+  // Two characters: one is a typo waiting to happen and would search the whole server for "a".
+  const searching = filter.trim().length >= 2;
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, [nonce]);
 
@@ -201,14 +209,24 @@ export function ExplorerTree({ onSelect, onAction }: {
   return (
     <div style={{ height: "100%", overflow: "auto" }}>
       <Group gap={4} p={4} wrap="nowrap">
-        <TextInput size="xs" flex={1} placeholder="Filter" leftSection={<IconSearch size={13} />}
+        <TextInput size="xs" flex={1} placeholder="Search tables and views"
+          leftSection={<IconSearch size={13} />}
           value={filter} onChange={e => setFilter(e.currentTarget.value)} />
-        <ActionIcon size="sm" variant="subtle" aria-label="Refresh explorer" onClick={() => setNonce(n => n + 1)}>
+        <ActionIcon size="sm" variant="subtle" aria-label="Refresh explorer" onClick={() => {
+          // The search reads the same cache the editor's completion does, so a refresh has to drop
+          // it as well — otherwise the flat list keeps answering with objects that were dropped.
+          for (const connection of connections) schemaCache.invalidate(connection.id);
+          setNonce(n => n + 1);
+        }}>
           <IconRefresh size={14} />
         </ActionIcon>
       </Group>
 
-      {groups.map(([group, list]) => (
+      {searching ? (
+        <ObjectSearch connections={connections} filter={filter.trim()}
+          onSelect={onSelect} onAction={onAction}
+          onContextMenu={(selection, x, y) => setSearchMenu({ selection, x, y })} />
+      ) : groups.map(([group, list]) => (
         <div key={group}>
           {group ? (
             <UnstyledButton w="100%" px={4} py={2}
@@ -255,6 +273,16 @@ export function ExplorerTree({ onSelect, onAction }: {
           ))}
         </div>
       ))}
+
+      {/* A search result is an object, so it gets the same menu it would have in the tree. */}
+      <ContextMenu at={searchMenu} onClose={() => setSearchMenu(null)}
+        items={actionsFor(searchMenu?.selection.node.kind ?? "Table",
+          capsByEngine[connections.find(c => c.id === searchMenu?.selection.connectionId)?.engine ?? ""] ?? {})}
+        onPick={action => {
+          if (!searchMenu) return;
+          if (action === "refresh") { setNonce(n => n + 1); return; }
+          onAction(action, searchMenu.selection);
+        }} />
 
       <ContextMenu at={menuFor} onClose={() => setMenuFor(null)}
         items={connectionActions(

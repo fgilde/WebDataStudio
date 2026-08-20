@@ -60,7 +60,7 @@ await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByText("DEMO", { exact: true }).click();
 await page.getByText("Tables", { exact: true }).click();
 
-const explorer = page.locator(".dv-groupview").filter({ has: page.getByPlaceholder("Filter") }).first();
+const explorer = page.locator(".dv-groupview").filter({ has: page.getByPlaceholder("Search tables and views") }).first();
 const people = explorer.getByText("people", { exact: true }).first();
 await people.waitFor({ timeout: 20000 });
 

@@ -114,6 +114,63 @@ await page.getByRole("button", { name: "Delete smoke" }).click();
 await page.waitForTimeout(300);
 await page.keyboard.press("Escape");
 
+// --- the tab context menu -----------------------------------------------------------------------
+// Anything still open from the layout steps above would swallow the right click.
+await page.keyboard.press("Escape");
+await page.waitForTimeout(500);
+
+const tabMenuFor = async (name) => {
+  const box = await page.getByRole("tab", { name }).first().boundingBox();
+  await page.mouse.click(box.x + 20, box.y + 10, { button: "right" });
+  await page.waitForTimeout(400);
+};
+
+await tabMenuFor("Structure");
+await page.getByText("Close others", { exact: true }).waitFor({ timeout: 5000 });
+const menuText = await page.locator("body").innerText();
+check("the tab menu offers the close actions",
+  ["Close", "Close others", "Close to the right", "Close all"].every(item => menuText.includes(item)));
+check("and pinning, maximising and popping out",
+  menuText.includes("Pin") && menuText.includes("Maximize") && menuText.includes("own window"));
+
+// A pinned tab survives "close all", which is the whole point of pinning it.
+await page.getByText("Pin — keep it open").click();
+await page.waitForTimeout(300);
+await tabMenuFor("Structure");
+await page.getByText("Close all").click();
+await page.waitForTimeout(500);
+
+const survivors = await page.getByRole("tab").allInnerTexts();
+check(`the pinned tab survives close all (${survivors.join(",")})`, survivors.includes("Structure"));
+check("and so do the panels that must not be closed",
+  survivors.includes("Explorer") && survivors.includes("Start"));
+
+// Popping a panel into its own window, and getting it back when the window closes.
+await tabMenuFor("Structure");
+const [popup] = await Promise.all([
+  page.context().waitForEvent("page"),
+  page.getByText("Open in its own window").click(),
+]);
+await page.waitForTimeout(1200);
+
+check(`the panel opens in a window of its own (${new URL(popup.url()).pathname})`,
+  new URL(popup.url()).pathname === "/popout.html");
+check("the window shows the panel, not a second studio",
+  (await popup.locator("body").innerText()).includes("Select an object")
+  && !(await popup.locator("body").innerText()).includes("EXPLORER"));
+check("and it follows the studio's colour scheme",
+  await popup.evaluate(() => document.documentElement.getAttribute("data-mantine-color-scheme")) !== null);
+
+// window.close() is what the window's own close button does.
+await popup.evaluate(() => window.close());
+await page.waitForTimeout(2500);
+check("closing the window docks the panel back",
+  (await page.getByRole("tab").allInnerTexts()).includes("Structure"));
+
+await page.keyboard.press("Control+l");
+await page.keyboard.press("0");
+await page.waitForTimeout(600);
+
 check("no console errors", errors.length === 0);
 if (errors.length > 0) console.error(errors.slice(0, 5).join(" | "));
 await browser.close();

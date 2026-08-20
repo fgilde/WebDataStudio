@@ -119,3 +119,6 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F17.3 | Live SQL and the first 50 rows of the query while it is being built | done | all | Query builder |
 | F17.4 | Aggregates with automatic GROUP BY, HAVING, DISTINCT, per-column aliases | done | all | Query builder |
 | F17.5 | A generated statement carries its model, so the query reopens in the builder | done | all | Query builder, command palette |
+| F23.1 | The data tab's column menu: a filter that takes the focus, debounced against the server, and hidden columns with an indicator | done | all | Data tab |
+| F23.2 | The explorer box searches tables and views by subsequence, ranked, with the schema as context | done | all | Explorer |
+| F23.3 | Tab context menu: close, close others, close to the right, close all, pin, maximise, and a panel in its own window | done | all | Shell, tab strip |

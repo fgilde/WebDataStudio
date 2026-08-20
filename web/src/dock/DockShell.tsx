@@ -24,6 +24,7 @@ import { parseModel } from "../designer/buildSelect";
 import { SavedQueriesPanel } from "../query/SavedQueriesPanel";
 import { SnippetManager } from "../editor/SnippetManager";
 import { CommandPalette, ShortcutsHelp } from "../shell/CommandPalette";
+import { StudioTab, TabPinsProvider, type TabPins } from "./StudioTab";
 import { VersionBadge } from "../shell/VersionBadge";
 import { LayoutPresetsModal, presetForSlot, useLayoutPresets } from "../shell/LayoutPresets";
 import { buildCommands } from "../shell/commands";
@@ -336,6 +337,10 @@ function buildDefaultLayout(
   welcome.api.setActive();
 }
 
+/// Panels a close-everything action must leave alone: the explorer is the way to everything else,
+/// and the start page is what a layout is rebuilt around.
+const PROTECTED_PANELS = new Set(["explorer", "welcome"]);
+
 /// The orange border on the group a panel lives in. Restarting the animation needs the class off,
 /// a reflow, and the class back on — otherwise activating an already-active panel shows nothing,
 /// which is exactly the case this exists for.
@@ -357,6 +362,13 @@ export function DockShell() {
   const api = useRef<DockviewApi | null>(null);
   const centerGroup = useRef<DockviewGroupPanel | null>(null);
   const restored = useRef(false);
+  // Pinned tabs: dockview's own pinning is an enterprise module, and what is useful about it here
+  // is that a tab stops being closed by accident — including by "close others".
+  const [pinnedPanels, setPinnedPanels] = useState<Set<string>>(new Set());
+  // Panels currently living in their own window, so closing that window cannot lose them.
+  const poppedOut = useRef(new Map<string, {
+    component: string; title: string; params: Record<string, unknown> | undefined;
+  }>());
   const chord = useRef(false);
   const chordTimer = useRef(0);
   // Rendered, not just read: the slot numbers only show while a digit would still land.
@@ -427,6 +439,44 @@ export function DockShell() {
   const onReady = (event: DockviewReadyEvent) => {
     api.current = event.api;
     buildDefaultLayout(event.api, centerGroup);
+
+    event.api.onDidAddPopoutGroup(popout => {
+      // dockview copies the stylesheets into a popout window but not Mantine's colour-scheme
+      // attribute, so a panel popped out of a dark studio would open as a white rectangle.
+      const source = document.documentElement;
+      const target = popout.window.window?.document.documentElement;
+
+      if (target)
+        for (const attribute of ["data-mantine-color-scheme", "data-theme"])
+          if (source.hasAttribute(attribute))
+            target.setAttribute(attribute, source.getAttribute(attribute)!);
+
+      // What each panel out there is, so it can be put back. Closing the window is supposed to
+      // re-dock them, and it does not when the group they came from is gone — the panels simply
+      // disappear, which for a query tab means losing the tab.
+      for (const panel of popout.group.panels)
+        poppedOut.current.set(panel.id, {
+          component: panel.api.component,
+          title: panel.api.title ?? panel.id,
+          params: panel.params,
+        });
+    });
+
+    event.api.onDidRemovePopoutGroup(() => {
+      // After the window is gone: whatever did not come back gets rebuilt in the centre group.
+      window.setTimeout(() => {
+        for (const [id, panel] of poppedOut.current) {
+          if (api.current?.getPanel(id)) continue;
+
+          api.current?.addPanel({
+            id, component: panel.component, title: panel.title, params: panel.params,
+            position: centerGroup.current ? { referenceGroup: centerGroup.current } : undefined,
+          });
+        }
+
+        poppedOut.current.clear();
+      }, 50);
+    });
   };
 
   // Restore the tabs the server remembers, once dockview and the connection list are both ready.
@@ -760,6 +810,16 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     flashPanel(api.current?.getPanel(id)?.group.element);
   }, []);
 
+  const pins = useMemo<TabPins>(() => ({
+    isPinned: id => pinnedPanels.has(id),
+    isProtected: id => PROTECTED_PANELS.has(id),
+    togglePinned: id => setPinnedPanels(current => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    }),
+  }), [pinnedPanels]);
+
   const commands = useMemo(() => buildCommands({
     newQuery: () => newTab(activeConnection),
     runCurrent: () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "F5" })),
@@ -898,9 +958,14 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         openPalette: () => setPaletteOpen(true),
       },
     }}>
+      <TabPinsProvider value={pins}>
       <div style={{ height: "100%", minHeight: 0 }}>
-        <DockviewReact className={current.dockview} components={components} onReady={onReady} />
+        <DockviewReact className={current.dockview} components={components} onReady={onReady}
+          // Our own tab: dockview's getTabContextMenuItems and pinnedTabs are enterprise modules,
+          // and the community core ignores both options without erroring.
+          defaultTabComponent={StudioTab} />
       </div>
+      </TabPinsProvider>
       <VersionBadge />
 
       <ExportDialog target={exportTarget} onClose={() => setExportTarget(null)} />

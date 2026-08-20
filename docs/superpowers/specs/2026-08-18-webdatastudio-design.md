@@ -421,6 +421,9 @@ it works for every engine whose capability set claims support for it.
 | F17.3 | The query being built is visible as SQL and as rows |
 | F17.4 | Aggregates, grouping, HAVING and DISTINCT from the builder |
 | F17.5 | A generated query can be reopened in the builder that made it |
+| F23.1 | Browsing a table's data has the same column controls as a query result |
+| F23.2 | The explorer searches for objects, not for the level it happens to show |
+| F23.3 | Panels can be closed in groups, pinned, and moved into their own window |
 
 ## 10. Safety behaviour
 

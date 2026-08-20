@@ -1,22 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Pagination, Text, TextInput, Tooltip,
+  ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Pagination, Text, Tooltip,
 } from "@mantine/core";
 import {
-  IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconFilter, IconPlus,
-  IconRefresh, IconRestore, IconSortAscending, IconSortDescending, IconTrash, IconWand,
+  IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
+  IconFilter, IconPlus, IconRefresh, IconRestore, IconSortAscending, IconSortDescending, IconTrash,
+  IconWand,
 } from "@tabler/icons-react";
 import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
 import { browseData, lookupValues, type DataPageDto, type ForeignKeyDto } from "../api";
 
-/// The referenced table as a schema node reference; an unqualified name means the same schema.
-const refOf = (fk: ForeignKeyDto) =>
-  `Table:${fk.referencedSchema ? `${fk.referencedSchema}/` : ""}${fk.referencedTable}`;
 import { CellValue } from "../grid/CellValue";
+import { MenuFilterInput } from "../grid/MenuFilterInput";
 import { EditableCell } from "../grid/editing/EditableCell";
 import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
 import { BulkUpdateModal } from "../grid/editing/BulkUpdateModal";
 import { useChangeSet, type RowChange } from "../grid/editing/useChangeSet";
+
+/// The referenced table as a schema node reference; an unqualified name means the same schema.
+const refOf = (fk: ForeignKeyDto) =>
+  `Table:${fk.referencedSchema ? `${fk.referencedSchema}/` : ""}${fk.referencedTable}`;
 
 const PAGE_SIZE = 200;
 
@@ -34,6 +37,9 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   onExport }: DataTabProps) {
   const [page, setPage] = useState<DataPageDto | null>(null);
   const [pageIndex, setPageIndex] = useState(1);
+  // Keyed by name, like every other piece of column state in this tab — the row editor, the key
+  // badge and the foreign-key lookup all address columns by name.
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<RowChange[] | null>(null);
   const [bulk, setBulk] = useState<{ rowIndex: number; column: string; value: unknown }[] | null>(null);
@@ -65,6 +71,10 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   if (!page) return <Loader size="xs" m="xs" />;
 
   const copy = (text: string) => navigator.clipboard.writeText(text);
+  // Hidden columns are dropped from the render, not from the fetch: the row editor still needs
+  // the key columns, and the server has no idea what the browser is showing.
+  const visibleColumns = page ? page.columns.filter(c => !hidden.has(c.name)) : [];
+
   const fkForColumn = (column: string) => foreignKeys.find(fk => fk.columns.includes(column));
   const isBoolean = (type: string) => /bool|bit/i.test(type);
 
@@ -154,6 +164,31 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           </Tooltip>
         ) : null}
 
+        {/* Hidden columns are invisible by definition; this is the way back to them, the same
+            control the query result grid has. */}
+        {hidden.size > 0 ? (
+          <Menu withinPortal closeOnItemClick={false} position="bottom-end">
+            <Menu.Target>
+              <Button size="compact-xs" variant="subtle" color="gray"
+                aria-label={`${hidden.size} hidden columns`}
+                leftSection={<IconEyeOff size={13} />}>{hidden.size}</Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Label>Hidden columns</Menu.Label>
+              {[...hidden].map(name => (
+                <Menu.Item key={name} leftSection={<IconEye size={13} />}
+                  onClick={() => setHidden(h => {
+                    const next = new Set(h);
+                    next.delete(name);
+                    return next;
+                  })}>{name}</Menu.Item>
+              ))}
+              <Menu.Divider />
+              <Menu.Item onClick={() => setHidden(new Set())}>Show all columns</Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        ) : null}
+
         <Text size="xs" c="dimmed" ml="auto">
           {page.rows.length} rows
           {page.totalEstimate ? ` of ~${page.totalEstimate}` : ""}
@@ -173,7 +208,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
         <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--mantine-color-default)" }}>
             <tr>
-              {page.columns.map(c => (
+              {visibleColumns.map(c => (
                 <th key={c.name} style={{
                   textAlign: "left", padding: "2px 8px", whiteSpace: "nowrap",
                   borderBottom: "1px solid var(--mantine-color-default-border)",
@@ -198,19 +233,26 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                       </Menu.Item>
                       <Menu.Item disabled={sort === null} onClick={() => setSort(null)}>Clear sort</Menu.Item>
                       <Menu.Divider />
-                      <Menu.Item>
-                        {/* One column at a time: that is what the endpoint filters by, and a
-                            pretend multi-column filter would silently ignore all but one. */}
-                        <TextInput size="xs" placeholder={`Filter ${c.name}`}
-                          value={filter?.column === c.name ? filter.value : ""}
-                          onChange={e => {
-                            const value = e.currentTarget.value;
-                            setFilter(value ? { column: c.name, value } : null);
-                            setPageIndex(1);
-                          }} />
-                      </Menu.Item>
+                      {/* One column at a time: that is what the endpoint filters by, and a
+                          pretend multi-column filter would silently ignore all but one. The input
+                          lives outside a Menu.Item — inside one it is a button's child and never
+                          takes the focus — and it debounces, because this filter is a round trip. */}
+                      <MenuFilterInput placeholder={`Filter ${c.name}`} debounceMs={350}
+                        value={filter?.column === c.name ? filter.value : ""}
+                        onChange={value => {
+                          setFilter(value ? { column: c.name, value } : null);
+                          setPageIndex(1);
+                        }} />
                       <Menu.Item disabled={filter === null} onClick={() => setFilter(null)}>
                         Clear filter
+                      </Menu.Item>
+                      <Menu.Divider />
+                      <Menu.Item leftSection={<IconEyeOff size={13} />}
+                        onClick={() => setHidden(h => new Set(h).add(c.name))}>
+                        Hide column
+                      </Menu.Item>
+                      <Menu.Item disabled={hidden.size === 0} onClick={() => setHidden(new Set())}>
+                        Show all columns
                       </Menu.Item>
                     </Menu.Dropdown>
                   </Menu>
@@ -222,7 +264,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           <tbody>
             {page.rows.map((row, rowIndex) => (
               <tr key={rowIndex}>
-                {page.columns.map((c, colIndex) => {
+                {visibleColumns.map((c, colIndex) => {
                   const fk = fkForColumn(c.name);
                   const isSelected = selected.some(s => s.row === rowIndex && s.col === colIndex);
                   return (
@@ -261,7 +303,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
 
             {insertedRows.map(index => (
               <tr key={index} style={{ background: "color-mix(in srgb, var(--mantine-color-green-6) 8%, transparent)" }}>
-                {page.columns.map(c => (
+                {visibleColumns.map(c => (
                   <td key={c.name} style={{ padding: "1px 8px", whiteSpace: "nowrap" }}>
                     <EditableCell
                       value={changeSet.editedValue(index, c.name)}

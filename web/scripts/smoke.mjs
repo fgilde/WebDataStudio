@@ -23,7 +23,7 @@ await page.getByText("DEMO", { exact: true }).click();
 await page.getByText("Tables", { exact: true }).waitFor({ timeout: 10000 });
 await page.getByText("Tables", { exact: true }).click();
 // The explorer is a dock panel now, so scope the lookup to the panel that holds the filter box.
-const explorer = page.locator(".dv-groupview").filter({ has: page.getByPlaceholder("Filter") }).first();
+const explorer = page.locator(".dv-groupview").filter({ has: page.getByPlaceholder("Search tables and views") }).first();
 const peopleNode = explorer.getByText("people", { exact: true }).first();
 await peopleNode.waitFor({ timeout: 10000 });
 

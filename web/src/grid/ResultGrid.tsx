@@ -9,6 +9,7 @@ import { CellValue } from "./CellValue";
 import { CellViewerModal, type CellRef } from "./CellViewerModal";
 import { summarizeSelection } from "./aggregate";
 import { GroupedTable } from "./GroupedTable";
+import { MenuFilterInput } from "./MenuFilterInput";
 import { loadWorkspaceItem, saveWorkspaceItem } from "../api";
 
 const WIDTH_KEY = "grid-column-widths";
@@ -212,20 +213,11 @@ export function ResultGrid({ result, onSelectionChange }: {
                       <Menu.Item onClick={() => setSort({ index: c.index, desc: true })}>Sort descending</Menu.Item>
                       <Menu.Item onClick={() => setSort(null)}>Clear sort</Menu.Item>
                       <Menu.Divider />
-                      {/* Not inside a Menu.Item: that is a button, so the input never got the
-                          focus and the menu ate every keystroke as a navigation key. */}
-                      <div style={{ padding: "4px 8px" }}
-                        onClick={event => event.stopPropagation()}
-                        onKeyDown={event => event.stopPropagation()}>
-                        <TextInput size="xs" placeholder="Filter" data-autofocus
-                          value={filters[c.index] ?? ""}
-                          onChange={e => {
-                            // Read the value here: the updater runs later, and by then React has
-                            // cleared currentTarget — which crashed the whole grid.
-                            const value = e.currentTarget.value;
-                            setFilters(f => ({ ...f, [c.index]: value }));
-                          }} />
-                      </div>
+                      {/* Shared with the data tab, which had the same bug: an input inside a
+                          Menu.Item never takes the focus. This grid filters in memory, so no
+                          debounce. */}
+                      <MenuFilterInput value={filters[c.index] ?? ""}
+                        onChange={value => setFilters(f => ({ ...f, [c.index]: value }))} />
                       <Menu.Divider />
                       <Menu.Item onClick={() => setPinned(p => {
                         const next = new Set(p);

@@ -5,12 +5,15 @@ import {
 } from "@mantine/core";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { listSchema, describeObject, type SchemaNodeDto } from "../api";
-import { buildSelect, emptyModel, type JoinKind, type QueryModel } from "./buildSelect";
+import {
+  buildSelect, emptyModel, suggestJoin, type JoinKind, type LoadedTable, type QueryModel,
+} from "./buildSelect";
 import type { DialectId } from "../sql/splitStatements";
 
 const OPERATORS = ["=", "<>", ">", ">=", "<", "<=", "LIKE", "IN", "IS NULL", "IS NOT NULL"];
 
-interface TableColumns { alias: string; ref: string; columns: string[] }
+/// A loaded table plus the reference it came from, which the model itself does not carry.
+interface TableColumns extends LoadedTable { ref: string }
 
 /// Builds a SELECT visually and hands it to a query tab. One direction only: parsing arbitrary
 /// SQL back into this model is a different project.
@@ -57,16 +60,41 @@ export function QueryDesigner({ connectionId, dialect, onOpenInTab }: {
     const alias = String.fromCharCode(97 + loaded.length);
     const parts = ref.split(":", 2)[1]?.split("/") ?? [];
 
-    setLoaded(list => [...list, { alias, ref, columns: detail?.columns.map(c => c.name) ?? [] }]);
+    const table: TableColumns = {
+      alias,
+      ref,
+      name: parts[parts.length - 1],
+      schema: parts.length > 1 ? parts[0] : undefined,
+      columns: detail?.columns.map(c => c.name) ?? [],
+      foreignKeys: detail?.foreignKeys ?? [],
+    };
+
+    // The schema already knows how these tables relate; the first join that fits is proposed
+    // rather than typed. Everything about it stays editable below.
+    const joins = loaded
+      .map(existing => suggestJoin(existing, table))
+      .filter(join => join !== null);
+
+    setLoaded(list => [...list, table]);
     setModel(m => ({
       ...m,
-      tables: [...m.tables, {
-        name: parts[parts.length - 1],
-        schema: parts.length > 1 ? parts[0] : undefined,
-        alias,
-      }],
+      tables: [...m.tables, { name: table.name, schema: table.schema, alias }],
+      joins: joins.length > 0
+        ? [...m.joins, {
+            left: joins[0]!.left, leftColumn: joins[0]!.leftColumn,
+            right: joins[0]!.right, rightColumn: joins[0]!.rightColumn,
+            kind: joins[0]!.kind,
+          }]
+        : m.joins,
+      // The remaining pairs of a composite key are conditions in their own right.
+      filters: joins[0]?.extra
+        ? [...m.filters, ...joins[0].extra.map(pair => ({
+            table: joins[0]!.left, column: pair.leftColumn,
+            operator: "=", value: `${joins[0]!.right}.${pair.rightColumn}`,
+          }))]
+        : m.filters,
     }));
-  }, [available, connectionId, loaded.length]);
+  }, [available, connectionId, loaded]);
 
   const sql = useMemo(() => buildSelect(model, dialect), [model, dialect]);
 

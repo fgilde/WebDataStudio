@@ -20,6 +20,83 @@ export interface QueryModel {
   limit?: number;
 }
 
+/// A table the designer has loaded: the model's identity plus what the server told us about it.
+/// Foreign keys are the reason this exists — a join the schema already knows should not have to be
+/// typed by hand.
+export interface LoadedTable {
+  alias: string;
+  name: string;
+  schema?: string;
+  columns: string[];
+  foreignKeys: ForeignKey[];
+}
+
+/// The shape `describeObject` returns; declared here so this module stays free of the API types.
+export interface ForeignKey {
+  name: string;
+  columns: string[];
+  referencedSchema: string;
+  referencedTable: string;
+  referencedColumns: string[];
+  onDelete: string;
+  onUpdate: string;
+}
+
+export interface SuggestedJoin {
+  left: string; leftColumn: string; right: string; rightColumn: string; kind: JoinKind;
+  /// Further column pairs of a composite key. The first pair is the join itself; these belong in
+  /// the ON clause too, and the designer offers them as filters.
+  extra?: { leftColumn: string; rightColumn: string }[];
+}
+
+/// Reads the foreign keys of both tables and returns the join between them, whichever side happens
+/// to hold the key. Null when the two are unrelated — a cross join is then the honest answer, and
+/// the user can still type a condition.
+export function suggestJoin(left: LoadedTable, right: LoadedTable): SuggestedJoin | null {
+  // The child holds the key, so try both directions and keep the orientation of the arguments.
+  const fromRight = match(right, left);
+  if (fromRight)
+    return {
+      left: left.alias, leftColumn: fromRight.parentColumns[0],
+      right: right.alias, rightColumn: fromRight.childColumns[0],
+      kind: "INNER",
+      ...pairs(fromRight.parentColumns, fromRight.childColumns),
+    };
+
+  const fromLeft = match(left, right);
+  if (fromLeft)
+    return {
+      left: left.alias, leftColumn: fromLeft.childColumns[0],
+      right: right.alias, rightColumn: fromLeft.parentColumns[0],
+      kind: "INNER",
+      ...pairs(fromLeft.childColumns, fromLeft.parentColumns),
+    };
+
+  return null;
+}
+
+/// The foreign key on `child` that points at `parent`, if there is one. A schema only has to agree
+/// when both sides name one: SQLite and MySQL hand out keys without a schema.
+function match(child: LoadedTable, parent: LoadedTable) {
+  for (const key of child.foreignKeys) {
+    if (key.referencedTable.toLowerCase() !== parent.name.toLowerCase()) continue;
+    if (parent.schema && key.referencedSchema
+        && key.referencedSchema.toLowerCase() !== parent.schema.toLowerCase()) continue;
+    if (key.columns.length === 0 || key.columns.length !== key.referencedColumns.length) continue;
+
+    return { childColumns: key.columns, parentColumns: key.referencedColumns };
+  }
+
+  return null;
+}
+
+const pairs = (leftColumns: string[], rightColumns: string[]) =>
+  leftColumns.length > 1
+    ? { extra: leftColumns.slice(1).map((column, index) => ({
+        leftColumn: column, rightColumn: rightColumns[index + 1],
+      })) }
+    : {};
+
 export const emptyModel = (): QueryModel =>
   ({ tables: [], joins: [], columns: [], filters: [], grouping: false, order: [] });
 

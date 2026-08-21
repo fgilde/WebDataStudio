@@ -6,7 +6,7 @@ import {
   IconArrowBackUp, IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
   IconFilter, IconLock, IconPlus, IconRefresh, IconRestore, IconSortAscending, IconSortDescending,
   IconTrash,
-  IconWand,
+  IconSparkles, IconWand,
 } from "@tabler/icons-react";
 import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
 import {
@@ -18,6 +18,7 @@ import { CellValue } from "../grid/CellValue";
 import { MenuFilterInput } from "../grid/MenuFilterInput";
 import { EditableCell } from "../grid/editing/EditableCell";
 import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
+import { GenerateDialog } from "./GenerateDialog";
 import { BulkUpdateModal } from "../grid/editing/BulkUpdateModal";
 import { useChangeSet, type RowChange } from "../grid/editing/useChangeSet";
 
@@ -56,6 +57,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   // What the server says could be taken back on this table, and whether its script is open.
   const [undoState, setUndoState] = useState<UndoStateDto | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
   // Masking happens on the server, so revealing is a fresh request rather than a render flag.
   const [reveal, setReveal] = useState(false);
 
@@ -157,6 +159,10 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           <ActionIcon size="sm" variant="subtle" color="red" aria-label="Delete row"
             disabled={!page.editable || selected.length === 0}
             onClick={() => changeSet.deleteRow(selected[0].row)}><IconTrash size={14} /></ActionIcon>
+        </Tooltip>
+        <Tooltip label="Fill this table with generated rows">
+          <ActionIcon size="sm" variant="subtle" aria-label="Generate rows" disabled={!page.editable}
+            onClick={() => setGenerateOpen(true)}><IconSparkles size={14} /></ActionIcon>
         </Tooltip>
         <Tooltip label="Bulk update the selection">
           <ActionIcon size="sm" variant="subtle" aria-label="Bulk update"
@@ -387,6 +393,10 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           <Pagination size="xs" total={totalPages} value={pageIndex} onChange={setPageIndex} />
         </Group>
       )}
+
+      <GenerateDialog connectionId={connectionId} objectRef={objectRef} tableName={tableName}
+        opened={generateOpen} onClose={() => setGenerateOpen(false)}
+        onApplied={() => setNonce(n => n + 1)} />
 
       {undoOpen && (
         <ChangePreviewModal connectionId={connectionId} objectRef={objectRef} tableName={tableName}

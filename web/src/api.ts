@@ -194,6 +194,22 @@ export const hashStudioPassword = (password: string): Promise<{ hash: string }> 
   fetch(`${base}/admin/studio-users/hash`, json("POST", { password }))
     .then(r => ok<{ hash: string }>(r));
 
+export interface GenerateStrategiesDto {
+  available: string[];
+  columns: { name: string; dataType: string; nullable: boolean; strategy: string }[];
+}
+
+export const generateStrategies = (conn: string, ref: string): Promise<GenerateStrategiesDto> =>
+  fetch(`${base}/data/${conn}/generate/strategies?${refQuery(ref, new URLSearchParams())}`)
+    .then(r => ok<GenerateStrategiesDto>(r));
+
+/// Generated rows are previewed as the inserts they are; applying goes through applyChanges.
+export const previewGenerate = (conn: string, ref: string,
+  body: { rows: number; seed?: number; strategies?: Record<string, string> },
+): Promise<ChangePreviewDto & { emptyForeignKeys?: string[] }> =>
+  fetch(`${base}/data/${conn}/generate/preview?${refQuery(ref, new URLSearchParams())}`,
+    json("POST", body)).then(r => ok<ChangePreviewDto & { emptyForeignKeys?: string[] }>(r));
+
 export interface UndoStateDto { available: boolean; label: string | null; at: string | null }
 
 export const getUndoState = (conn: string, ref: string): Promise<UndoStateDto> =>

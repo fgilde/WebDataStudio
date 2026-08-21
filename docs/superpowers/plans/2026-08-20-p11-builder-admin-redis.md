@@ -631,15 +631,22 @@ reference for scope, not for code.
   and strategies `auto`, `name`, `email`, `city`, `sentence`, `int`, `decimal`, `date`, `uuid`,
   `boolean`, `fk` (pick an existing key from the referenced table).
 
-- [ ] **Step 1: Write the failing test** — generating 50 rows for a table with a foreign key
+- [x] **Step 1: Write the failing test** — generating 50 rows for a table with a foreign key
       produces only values that exist in the parent; a unique column gets distinct values; the same
       seed produces the same rows; the preview is a script that inserts exactly 50 rows.
-- [ ] **Step 2: Run it** — expect failure.
-- [ ] **Step 3: Implement** — infer a strategy per column from its name and type, generate with a
+- [x] **Step 2: Run it** — expect failure.
+- [x] **Step 3: Implement** — infer a strategy per column from its name and type, generate with a
       seeded `Random`, respect nullability and length limits, and hand the result to the existing
       preview/apply path.
-- [ ] **Step 4: Run it** — green.
-- [ ] **Step 5: Commit** — `feat(data): generate plausible test rows, foreign keys included`
+
+      *As built:* everything comes from the seed, including dates (counted back from a fixed epoch)
+      and UUIDs, so the same seed gives the same rows tomorrow as well. A column the database fills
+      in itself is skipped — the identity flag where a driver reports it, plus a lone integer
+      primary key, which is a serial, an AUTO_INCREMENT, an IDENTITY or a rowid alias in every
+      engine here. `GET /api/data/{conn}/generate/strategies` returns the guess per column so the
+      dialog can show and correct it, and the preview names foreign keys with no parent rows.
+- [x] **Step 4: Run it** — green.
+- [x] **Step 5: Commit** — `feat(data): generate plausible test rows, foreign keys included`
 
 ### Task 5.4: Notebooks
 

@@ -11,6 +11,7 @@ namespace WebDataStudio.Server.Endpoints;
 public static class DataEndpoints
 {
     public record MaskPolicyRequest(bool? MaskByDefault, string[]? Extra, string[]? Never);
+    public record GenerateDto(int? Rows, Dictionary<string, string>? Strategies, int? Seed);
 
     public record ChangeDto(string Kind, Dictionary<string, JsonElement> Key, Dictionary<string, JsonElement> Values);
     public record ChangeRequest(List<ChangeDto> Changes);
@@ -327,6 +328,100 @@ public static class DataEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
+        // What each column of this table would be filled with, so the dialog can offer the guess
+        // and let somebody correct it.
+        app.MapGet("/api/data/{conn}/generate/strategies", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var target = SchemaEndpoints.ParseObjectRef(objectRef);
+                    var detail = await driver.DescribeAsync(session, target, ct);
+
+                    return Results.Ok(new
+                    {
+                        available = DataGenerator.Strategies,
+                        columns = detail.Columns.OrderBy(c => c.Position).Select(c => new
+                        {
+                            name = c.Name,
+                            dataType = c.DataType,
+                            nullable = c.Nullable,
+                            strategy = DataGenerator.Infer(c, detail),
+                        }),
+                    });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // Generated rows are ordinary inserts, so they are previewed and applied by the same
+        // handshake as a hand edit: the script is shown first, and `apply-changes` runs it.
+        app.MapPost("/api/data/{conn}/generate/preview", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, GenerateDto body, SessionFactory factory,
+            IMemoryCache cache, CancellationToken ct) =>
+        {
+            var rows = body.Rows ?? 50;
+            if (rows is < 1 or > 10_000)
+                return Results.BadRequest(new { message = "between 1 and 10000 rows, please" });
+
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var target = SchemaEndpoints.ParseObjectRef(objectRef);
+                    var detail = await driver.DescribeAsync(session, target, ct);
+                    var identity = RowIdentity.Resolve(detail);
+
+                    if (!identity.Editable)
+                        return Results.BadRequest(new { message = identity.Reason });
+
+                    // A foreign key can only point at rows that exist, so the parents are read
+                    // first and the generator picks from them.
+                    var parents = await ParentValuesAsync(driver, session, detail, ct);
+
+                    var changes = DataGenerator.Build(detail,
+                        new GenerateRequest(target.ToString(), rows, body.Strategies, body.Seed),
+                        parents);
+
+                    if (changes.Count == 0)
+                        return Results.BadRequest(new
+                        {
+                            message = "nothing to insert: every column of this table is generated " +
+                                      "by the database itself",
+                        });
+
+                    var changeSet = new ChangeSet(conn, target.ToString(), changes);
+                    var script = ChangeScriptBuilder.Build(changeSet, detail, driver.Dialect);
+                    var hash = changeSet.Hash();
+
+                    cache.Set($"changes:{hash}",
+                        new Prepared(target, script, changeSet, identity.KeyColumns),
+                        TimeSpan.FromMinutes(10));
+
+                    return Results.Ok(new
+                    {
+                        hash,
+                        script = script.Text,
+                        statementCount = script.Statements.Count,
+                        destructive = false,
+                        emptyForeignKeys = detail.ForeignKeys
+                            .SelectMany(fk => fk.Columns)
+                            .Where(column => !parents.ContainsKey(column) || parents[column].Count == 0)
+                            .Distinct(StringComparer.OrdinalIgnoreCase),
+                    });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
         app.MapGet("/api/data/{conn}/lookup", async (string conn, [FromQuery(Name = "ref")] string objectRef,
             string column, string? search, SessionFactory factory, CancellationToken ct) =>
         {
@@ -385,6 +480,45 @@ public static class DataEndpoints
         "oracle" => "VARCHAR2(4000)",
         _ => "TEXT",
     };
+
+    /// Up to 200 existing values per foreign-key column, to point generated rows at.
+    private static async Task<Dictionary<string, IReadOnlyList<object?>>> ParentValuesAsync(
+        IDbDriver driver, IDbSession session, ObjectDetail detail, CancellationToken ct)
+    {
+        var parents = new Dictionary<string, IReadOnlyList<object?>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var key in detail.ForeignKeys)
+        {
+            for (var i = 0; i < key.Columns.Count && i < key.ReferencedColumns.Count; i++)
+            {
+                var parent = new SchemaNodeRef(SchemaNodeKind.Table,
+                    key.ReferencedSchema is { Length: > 0 }
+                        ? [key.ReferencedSchema, key.ReferencedTable]
+                        : [key.ReferencedTable]);
+
+                var column = driver.Dialect.QuoteIdentifier(key.ReferencedColumns[i]);
+                var sql = $"SELECT DISTINCT {column} FROM {ChangeScriptBuilder.Qualify(parent, driver.Dialect)} " +
+                          $"WHERE {column} IS NOT NULL";
+
+                var values = new List<object?>();
+
+                try
+                {
+                    await foreach (var chunk in driver.ExecuteAsync(session, new ScriptRequest(sql, 200, 60), ct))
+                        if (chunk is ResultChunk.Rows rows)
+                            values.AddRange(rows.Items.Select(row => row.Length > 0 ? row[0] : null));
+                }
+                catch (Exception)
+                {
+                    // A parent that cannot be read is a foreign key the generator leaves alone.
+                }
+
+                parents[key.Columns[i]] = values;
+            }
+        }
+
+        return parents;
+    }
 
     private static ChangeSet ToChangeSet(string connectionId, string objectRef, ChangeRequest body) =>
         new(connectionId, objectRef, body.Changes.Select(c => new RowChange(

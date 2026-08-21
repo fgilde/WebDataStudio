@@ -99,12 +99,16 @@ try {
 } catch (e) { await fail("datatab", e); }
 
 // --- sorting and filtering happen on the server, not on the page ----------------------
-const firstUserName = () => page.locator("tbody tr").first().locator("td").nth(1).innerText();
+// Scoped to the data tab: the query result above it has the same columns, and a positional
+// locator would read the grid that was not sorted.
+const dataTab = page.locator(".dv-groupview")
+  .filter({ has: page.getByRole("button", { name: "Save", exact: true }) }).first();
+const firstUserName = () => dataTab.locator("tbody tr").first().locator("td").nth(1).innerText();
 
 try {
   const ascending = (await firstUserName()).trim();
 
-  await page.getByText("UserName", { exact: true }).first().click();
+  await dataTab.getByText("UserName", { exact: true }).first().click();
   await page.getByText("Sort descending").click();
   await page.keyboard.press("Escape");
   await page.getByText(/sorted by UserName/).waitFor({ timeout: 10000 });
@@ -113,7 +117,7 @@ try {
   if (ascending === descending)
     throw new Error(`sorting changed nothing: still ${descending}`);
 
-  await page.getByText("UserName", { exact: true }).first().click();
+  await dataTab.getByText("UserName", { exact: true }).first().click();
   await page.getByPlaceholder("Filter UserName").fill("user1");
   await page.getByText(/filtered on UserName/).waitFor({ timeout: 10000 });
   await page.keyboard.press("Escape");

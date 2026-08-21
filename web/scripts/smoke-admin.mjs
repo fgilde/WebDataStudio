@@ -42,7 +42,9 @@ if (nodeCount === 0) await fail("diagram-empty", new Error("the diagram drew no 
 // --- administration ----------------------------------------------------------
 await page.getByRole("button", { name: "Administration" }).click();
 try {
+  // Administration opens on the overview now, so the maintenance panel has to be asked for.
   await page.getByRole("tab", { name: "Maintenance" }).waitFor({ timeout: 15000 });
+  await page.getByRole("tab", { name: "Maintenance" }).click();
   // SQLite's integrity check needs no target, so it is safe to actually run here.
   await page.getByRole("button", { name: "PRAGMA integrity_check" }).click();
   await page.getByText("PRAGMA integrity_check").last().waitFor({ timeout: 15000 });

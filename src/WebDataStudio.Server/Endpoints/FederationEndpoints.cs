@@ -49,13 +49,11 @@ public static class FederationEndpoints
             {
                 // The stream has already started, so the failure travels in it rather than as a
                 // status code the client would never see.
-                await WriteAsync(ctx, new { type = "error", statement = 0, text = e.Message },
-                    CancellationToken.None);
+                await WriteAsync(ctx, Error(e.Message), CancellationToken.None);
             }
             catch (UnknownConnectionException e)
             {
-                await WriteAsync(ctx, new { type = "error", statement = 0, text = e.Message },
-                    CancellationToken.None);
+                await WriteAsync(ctx, Error(e.Message), CancellationToken.None);
             }
             catch (OperationCanceledException)
             {
@@ -65,6 +63,13 @@ public static class FederationEndpoints
             return Results.Empty;
         });
     }
+
+    /// The same shape a query error has, nulls included: the client renders one code path.
+    private static object Error(string message) => new
+    {
+        type = "error", statement = 0, text = message,
+        code = (string?)null, line = (int?)null, column = (int?)null,
+    };
 
     private static FederationRequest Model(FederateRequest body) => new(
         [.. (body.Sources ?? []).Select(s => new FederationSource(s.ConnectionId, s.Sql, s.Alias))],
@@ -79,7 +84,11 @@ public static class FederationEndpoints
             type = "end", statement = e.Statement, rowsAffected = e.RowsAffected,
             elapsedMs = e.ElapsedMs, truncated = e.Truncated,
         },
-        ResultChunk.Error x => new { type = "error", statement = x.Statement, text = x.Text },
+        ResultChunk.Error x => new
+        {
+            type = "error", statement = x.Statement, text = x.Text,
+            code = x.Code, line = x.Line, column = x.Column,
+        },
         _ => new { type = "unknown" },
     };
 

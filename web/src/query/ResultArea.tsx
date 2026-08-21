@@ -52,7 +52,7 @@ export function ResultArea({ result, onExport, changed }: {
           {s.error ? (
             <Text size="xs" c="red" p="xs" style={{ whiteSpace: "pre-wrap" }}>
               {s.error.text}
-              {s.error.line !== null && <> (line {s.error.line}{s.error.column !== null && `, column ${s.error.column}`})</>}
+              {s.error.line != null && <> (line {s.error.line}{s.error.column != null && `, column ${s.error.column}`})</>}
             </Text>
           ) : s.documents.length > 0 ? (
             <DocumentResultArea documents={s.documents} elapsedMs={s.elapsedMs} />

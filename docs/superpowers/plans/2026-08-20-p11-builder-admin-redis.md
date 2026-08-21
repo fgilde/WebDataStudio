@@ -574,16 +574,22 @@ reference for scope, not for code.
   `record FederationRequest(IReadOnlyList<FederationSource> Sources, string Sql, int? MaxRowsPerSource)`;
   the result streams as a normal `ResultChunk` sequence, so the existing grid renders it.
 
-- [ ] **Step 1: Write the failing test** — a SQLite table and a PostgreSQL table (Testcontainer)
+- [x] **Step 1: Write the failing test** — a SQLite table and a PostgreSQL table (Testcontainer)
       joined by a query over `a` and `b` returns the joined rows; a source that exceeds
       `MaxRowsPerSource` (default 100 000) fails with a message naming the source rather than
       filling memory; an unknown alias is a 400.
-- [ ] **Step 2: Run it** — expect failure.
-- [ ] **Step 3: Implement** — run each source query, stream its rows into an in-memory DuckDB table
+- [x] **Step 2: Run it** — expect failure.
+- [x] **Step 3: Implement** — run each source query, stream its rows into an in-memory DuckDB table
       named by the alias with types derived from the source metadata, then run the federated SQL
       there. One DuckDB connection per request, disposed with it.
-- [ ] **Step 4: Run it** — green.
-- [ ] **Step 5: Commit** — `feat(federation): join across connections by staging in DuckDB`
+
+      *As built:* rows are staged with batched multi-row `INSERT`s rather than DuckDB's appender —
+      fast enough for the row cap and free of type-by-type binding. Types are mapped narrowly
+      (numbers stay numbers, dates stay dates, everything else is text), the mask policy of each
+      source applies on the way through, and `POST /api/federate/preview` returns the `CREATE
+      TABLE` per source without copying a row.
+- [x] **Step 4: Run it** — green.
+- [x] **Step 5: Commit** — `feat(federation): join across connections by staging in DuckDB`
 
 ### Task 5.2: Watch mode
 

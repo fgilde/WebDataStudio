@@ -3,12 +3,14 @@ import { DockviewReact } from "dockview-react";
 import type { DockviewApi, DockviewReadyEvent, DockviewGroupPanel, IDockviewPanelProps } from "dockview-react";
 import { ActionIcon, Group, Modal, Text, Tooltip } from "@mantine/core";
 import {
+  IconArrowsJoin,
   IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconKey, IconLayoutBoard,
   IconSettingsCog, IconSitemap, IconSquarePlus, IconTable,
 } from "@tabler/icons-react";
 import "dockview-react/dist/styles/dockview.css";
 import "../editor/dockview-mantine.css";
 import { useAppTheme } from "../ThemeProvider";
+import { FederationPanel } from "../federate/FederationPanel";
 import { isAdmin, useRole } from "../auth/useRole";
 import { ExplorerTree, type ExplorerAction, type ExplorerSelection } from "../explorer/ExplorerTree";
 import { ObjectDetailPanel } from "../explorer/ObjectDetailPanel";
@@ -208,6 +210,11 @@ function RedisDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
   return <RedisPanel connectionId={props.params.connectionId} readOnly={connection?.readOnly ?? false} />;
 }
 
+function FederationDockPanel() {
+  const shell = useShell();
+  return <FederationPanel connections={shell.connections} />;
+}
+
 function DiagramDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
   const shell = useShell();
   return <DiagramPanel connectionId={props.params.connectionId} onOpenTable={shell.openData} />;
@@ -271,6 +278,13 @@ function ExplorerDockPanel() {
             </ActionIcon>
           </Tooltip>
         ) : null}
+        <Tooltip label="Join across connections">
+          <ActionIcon size="sm" variant="subtle" aria-label="Federated query"
+            disabled={!connection}
+            onClick={() => explorer.openTool("federate", "Federated", connection)}>
+            <IconArrowsJoin size={15} />
+          </ActionIcon>
+        </Tooltip>
         <Tooltip label="Query builder">
           <ActionIcon size="sm" variant="subtle" aria-label="Query builder" disabled={!connection}
             onClick={() => explorer.openTool("builder", "Builder", connection)}>
@@ -319,6 +333,7 @@ const components = {
   data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel, designer: DesignerPanel,
   diagram: DiagramDockPanel, admin: AdminDockPanel, compare: CompareDockPanel,
   saved: SavedQueriesDockPanel, builder: QueryDesignerDockPanel, redis: RedisDockPanel,
+  federate: FederationDockPanel,
 };
 
 /// The default arrangement, in one place: the initial layout and the reset command must produce

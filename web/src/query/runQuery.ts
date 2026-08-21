@@ -57,23 +57,7 @@ export function runQuery(request: QueryRequest, onChunk: (chunk: QueryChunk) => 
       return;
     }
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    for (;;) {
-      const { done: finished, value } = await reader.read();
-      if (finished) break;
-      buffer += decoder.decode(value, { stream: true });
-
-      let newline: number;
-      while ((newline = buffer.indexOf("\n")) >= 0) {
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        if (line) emit(line, onChunk);
-      }
-    }
-    if (buffer.trim()) emit(buffer.trim(), onChunk);
+    await readNdjson(response.body, onChunk);
   })();
 
   return {
@@ -84,6 +68,29 @@ export function runQuery(request: QueryRequest, onChunk: (chunk: QueryChunk) => 
       if (id) await fetch(`/api/query/${id}/cancel`, { method: "POST" });
     },
   };
+}
+
+/// Reads an NDJSON body, calling onChunk per line as it arrives. Shared with the federated run,
+/// which speaks the same stream.
+export async function readNdjson(
+  body: ReadableStream<Uint8Array>, onChunk: (chunk: QueryChunk) => void): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  for (;;) {
+    const { done: finished, value } = await reader.read();
+    if (finished) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let newline: number;
+    while ((newline = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (line) emit(line, onChunk);
+    }
+  }
+  if (buffer.trim()) emit(buffer.trim(), onChunk);
 }
 
 const errorChunk = (text: string): QueryChunk =>

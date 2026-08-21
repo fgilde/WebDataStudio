@@ -60,6 +60,7 @@ builder.Services.AddSingleton(sp => new ConnectionStore(
 builder.Services.AddSingleton<ConnectionRegistry>();
 builder.Services.AddSingleton<MaskPolicyStore>();
 builder.Services.AddSingleton<UndoStore>();
+builder.Services.AddSingleton<Federation>();
 builder.Services.AddSingleton<DriverRegistry>();
 builder.Services.AddSingleton<TunnelManager>();
 builder.Services.AddSingleton(sp => new SessionPool(sp.GetRequiredService<IConfiguration>()));
@@ -182,6 +183,7 @@ app.MapAdminEndpoints();
 app.MapRedisEndpoints();
 app.MapDiagramEndpoints();
 app.MapSavedQueryEndpoints();
+app.MapFederationEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();

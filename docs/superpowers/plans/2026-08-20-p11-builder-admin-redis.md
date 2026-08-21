@@ -660,13 +660,19 @@ reference for scope, not for code.
 - Produces: `type Cell = { id: string; kind: "sql" | "note"; text: string; connectionId?: string }`,
   `toMarkdown(cells: Cell[]): string`, `fromMarkdown(text: string): Cell[]`.
 
-- [ ] **Step 1: Write the failing test** — a round trip through Markdown keeps cell order, kind and
+- [x] **Step 1: Write the failing test** — a round trip through Markdown keeps cell order, kind and
       connection; a fenced ```sql block becomes a SQL cell; prose becomes a note.
-- [ ] **Step 2: Run it** — expect failure.
-- [ ] **Step 3: Implement** the model, the panel (run a cell with Ctrl+Enter, results under the
+- [x] **Step 2: Run it** — expect failure.
+- [x] **Step 3: Implement** the model, the panel (run a cell with Ctrl+Enter, results under the
       cell, reuse `ResultArea`), saving as a workspace item, and export as Markdown.
-- [ ] **Step 4: Run it** — green.
-- [ ] **Step 5: Commit** — `feat(notebook): SQL, prose and results in one saved document`
+
+      *As built:* no server change was needed — notebooks are stored through the existing workspace
+      item endpoints (`notebook:{id}`), which is what saved widths and layouts already use. A cell
+      is a plain textarea rather than a Monaco instance: one editor per cell would cost more than
+      it gives in a document that is mostly read. A fence that is not `sql` stays prose, so a
+      pasted Markdown file keeps its JSON and shell blocks.
+- [x] **Step 4: Run it** — green.
+- [x] **Step 5: Commit** — `feat(notebook): SQL, prose and results in one saved document`
 
 ### Task 5.5: Documentation
 

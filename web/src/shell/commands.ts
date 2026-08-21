@@ -27,6 +27,8 @@ export interface CommandContext {
   openSnippets: () => void;
   showExplorer: () => void;
   openInBuilder: () => void;
+  openNotebook: () => void;
+  openFederation: () => void;
   switchTheme: () => void;
   saveLayout: () => void;
   resetLayout: () => void;
@@ -58,6 +60,8 @@ export function buildCommands(context: CommandContext): Command[] {
     { id: "tool.health", label: "Open health report", group: "Tools", run: context.openHealth },
     { id: "tool.admin", label: "Open administration", group: "Tools", run: context.openAdmin },
     { id: "tool.compare", label: "Open compare", group: "Tools", run: context.openCompare },
+    { id: "tool.notebook", label: "Open notebook", group: "Tools", run: context.openNotebook },
+    { id: "tool.federate", label: "Join across connections", group: "Tools", run: context.openFederation },
     { id: "result.export", label: "Export result", group: "Tools", shortcut: "Ctrl+E", run: context.exportResult },
 
     { id: "view.explorer", label: "Show explorer", group: "View", shortcut: "Ctrl+B", run: context.showExplorer },

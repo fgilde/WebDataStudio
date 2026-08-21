@@ -3,7 +3,7 @@ import { DockviewReact } from "dockview-react";
 import type { DockviewApi, DockviewReadyEvent, DockviewGroupPanel, IDockviewPanelProps } from "dockview-react";
 import { ActionIcon, Group, Modal, Text, Tooltip } from "@mantine/core";
 import {
-  IconArrowsJoin,
+  IconArrowsJoin, IconNotebook,
   IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconKey, IconLayoutBoard,
   IconSettingsCog, IconSitemap, IconSquarePlus, IconTable,
 } from "@tabler/icons-react";
@@ -11,6 +11,7 @@ import "dockview-react/dist/styles/dockview.css";
 import "../editor/dockview-mantine.css";
 import { useAppTheme } from "../ThemeProvider";
 import { FederationPanel } from "../federate/FederationPanel";
+import { NotebookPanel } from "../notebook/NotebookPanel";
 import { isAdmin, useRole } from "../auth/useRole";
 import { ExplorerTree, type ExplorerAction, type ExplorerSelection } from "../explorer/ExplorerTree";
 import { ObjectDetailPanel } from "../explorer/ObjectDetailPanel";
@@ -215,6 +216,11 @@ function FederationDockPanel() {
   return <FederationPanel connections={shell.connections} />;
 }
 
+function NotebookDockPanel(props: IDockviewPanelProps<{ connectionId?: string }>) {
+  const shell = useShell();
+  return <NotebookPanel connections={shell.connections} connectionId={props.params.connectionId} />;
+}
+
 function DiagramDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
   const shell = useShell();
   return <DiagramPanel connectionId={props.params.connectionId} onOpenTable={shell.openData} />;
@@ -278,6 +284,12 @@ function ExplorerDockPanel() {
             </ActionIcon>
           </Tooltip>
         ) : null}
+        <Tooltip label="Notebook: SQL, prose and results in one document">
+          <ActionIcon size="sm" variant="subtle" aria-label="Notebook"
+            onClick={() => explorer.openTool("notebook", "Notebook", connection)}>
+            <IconNotebook size={15} />
+          </ActionIcon>
+        </Tooltip>
         <Tooltip label="Join across connections">
           <ActionIcon size="sm" variant="subtle" aria-label="Federated query"
             disabled={!connection}
@@ -333,7 +345,7 @@ const components = {
   data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel, designer: DesignerPanel,
   diagram: DiagramDockPanel, admin: AdminDockPanel, compare: CompareDockPanel,
   saved: SavedQueriesDockPanel, builder: QueryDesignerDockPanel, redis: RedisDockPanel,
-  federate: FederationDockPanel,
+  federate: FederationDockPanel, notebook: NotebookDockPanel,
 };
 
 /// The default arrangement, in one place: the initial layout and the reset command must produce
@@ -875,6 +887,8 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     openHealth: () => focusPanel("health"),
     openAdmin: () => openTool("admin", "Admin", activeConnection),
     openCompare: () => openTool("compare", "Compare", activeConnection),
+    openNotebook: () => openTool("notebook", "Notebook", activeConnection),
+    openFederation: () => openTool("federate", "Federated", activeConnection),
     openHistory: () => focusPanel("history"),
     openSavedQueries: () => focusPanel("saved"),
     saveCurrentQuery: () => focusPanel("saved"),

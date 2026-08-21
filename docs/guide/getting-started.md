@@ -92,3 +92,23 @@ It serves the studio on <http://localhost:8080>, opens your browser and stores i
 Set `WDS_USER` and `WDS_PASSWORD` and the app asks for them once and keeps a session cookie. Leave
 them unset and there is no login screen at all — the sensible default for a studio that already
 sits behind your own network or proxy.
+
+## Seeding a fresh stack
+
+`WDS_SEED_SQL` runs a script once per connection, so a database that has just been created is worth
+opening. Either one file for every connection, or a folder holding `{CONNECTION}.sql` per connection
+name:
+
+```bash
+WDS_SEED_SQL=/data/seed          # SHOP.sql, WAREHOUSE.sql, …
+WDS_SEED_SQL=/data/seed.sql      # or one for all of them
+```
+
+This is for development stacks, and it has three rules so it cannot become a foot-gun:
+
+- **Once per content.** The script's hash is remembered, so restarting does not insert everything
+  again — and editing the script does make it run again.
+- **Never on a read-only connection**, and never on one marked as production (colour red). A red
+  connection is somebody saying "not here".
+- **One transaction** where the engine has them: half a seed is worse than none. A script that fails
+  is not remembered as done, so fixing it and restarting runs it.

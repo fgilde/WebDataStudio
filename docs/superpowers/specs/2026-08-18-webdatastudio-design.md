@@ -454,6 +454,8 @@ it works for every engine whose capability set claims support for it.
 | F22.6 | A deployment decides which tools its agents get |
 | F24.1 | Somebody hears about a health finding without opening the studio |
 | F24.2 | A schema that moved without a migration is noticed |
+| F24.3 | The queries a team shares live in its repository, not in a chat |
+| F24.4 | A fresh stack comes up with data in it |
 
 ## 10. Safety behaviour
 

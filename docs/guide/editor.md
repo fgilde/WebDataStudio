@@ -41,6 +41,29 @@ server-side and travel with your workspace. A snippet of yours with a built-in's
 Every run is written to a searchable history that survives a restart. The **Saved** panel keeps
 named queries in folders; saving offers the current tab's SQL and remembers its connection.
 
+## Saved queries that ship with the stack
+
+`WDS_SAVED_QUERIES_DIR` points at a folder of `.sql` files, imported as saved queries when the studio
+starts — the five queries everybody on the team needs, in the repository rather than in a chat
+message.
+
+```bash
+WDS_SAVED_QUERIES_DIR=/data/queries
+```
+
+- Subfolders become the folders in the **Saved** panel.
+- A file may name its connection and folder in comments, and still be a file the database accepts:
+
+```sql
+-- wds:connection SHOP
+-- wds:folder Ops
+SELECT count(*) FROM orders WHERE created_at > current_date - 7;
+```
+
+- Importing is idempotent: the same file under the same name and folder is replaced, not duplicated,
+  so a restart does not grow the list. Editing a query in the studio and restarting brings the file's
+  version back — the folder is the source of truth for what it holds.
+
 ## Formatting
 
 `Ctrl+Shift+F` formats the buffer in the dialect of the connection.

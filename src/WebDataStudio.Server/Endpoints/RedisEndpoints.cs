@@ -156,6 +156,49 @@ public static class RedisEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
+        // --- what this server can do, and how it is put together ------------------------------
+        // Straight from the server rather than from a list baked into the studio: a server with
+        // modules has commands no such list knows about. Cached per connection because the answer
+        // only changes when the server does.
+        api.MapGet("/{conn}/commands", async (
+            string conn, SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
+        {
+            if (cache.Get($"redis-commands:{conn}") is IReadOnlyList<CommandDoc> cached)
+                return Results.Ok(new { commands = cached });
+
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+
+                    var commands = await RedisCommandDocs.ListAsync(redis);
+                    cache.Set($"redis-commands:{conn}", commands, TimeSpan.FromHours(1));
+
+                    return Results.Ok(new { commands });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        api.MapGet("/{conn}/cluster", async (string conn, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Unwrap() is not RedisSession redis) return NotRedis();
+
+                    return Results.Ok(await RedisCommandDocs.DescribeAsync(redis));
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
         // --- many keys at once ----------------------------------------------------------------
         api.MapPost("/{conn}/bulk/preview", async (
             string conn, BulkRequest body, SessionFactory factory, IMemoryCache cache,

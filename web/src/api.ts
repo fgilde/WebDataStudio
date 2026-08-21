@@ -542,6 +542,22 @@ export const revealConnectionString = (id: string): Promise<string> =>
     .then(body => body.connectionString);
 
 // --- redis -----------------------------------------------------------------------------------
+export interface RedisCommandDto {
+  name: string; arity: number; summary: string; group: string; since: string;
+}
+export interface RedisClusterDto {
+  enabled: boolean; state: string; knownNodes: number;
+  nodes: { id: string; endpoint: string; role: string; slots: string; connected: boolean }[];
+}
+
+/// What this server says it can do, from COMMAND DOCS (or COMMAND INFO on an older one).
+export const redisCommands = (conn: string): Promise<RedisCommandDto[]> =>
+  fetch(`${base}/redis/${conn}/commands`)
+    .then(r => ok<{ commands: RedisCommandDto[] }>(r)).then(b => b.commands);
+
+export const redisCluster = (conn: string): Promise<RedisClusterDto> =>
+  fetch(`${base}/redis/${conn}/cluster`).then(r => ok<RedisClusterDto>(r));
+
 // Redis is browsed rather than queried, so it has endpoints of its own next to the command console.
 
 export interface RedisKeyDto {

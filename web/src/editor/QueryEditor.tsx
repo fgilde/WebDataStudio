@@ -3,6 +3,7 @@ import * as monaco from "monaco-editor";
 import { useAppTheme } from "../ThemeProvider";
 import { configureMonaco } from "./monacoSetup";
 import { useActiveStatement } from "./useActiveStatement";
+import { useRedisLanguageFeatures } from "./useRedisLanguageFeatures";
 import { useSqlLanguageFeatures } from "./useSqlLanguageFeatures";
 import type { Snippet } from "./snippets";
 import { formatSql } from "./formatSql";
@@ -57,6 +58,7 @@ export function QueryEditor({ value, dialect, language = "sql", connectionId, er
 
   // Statement highlighting and schema completion only make sense for SQL.
   useActiveStatement(language === "sql" ? editor : null, dialect);
+  useRedisLanguageFeatures(connectionId, language === "plaintext");
   useSqlLanguageFeatures(language === "sql" ? connectionId : "", dialect, onOpenObject, snippets);
 
   useEffect(() => { markErrors(editor, error); }, [editor, error]);

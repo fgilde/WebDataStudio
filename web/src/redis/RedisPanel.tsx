@@ -5,10 +5,10 @@ import {
 } from "@mantine/core";
 import { IconRefresh, IconSearch, IconTrash } from "@tabler/icons-react";
 import {
-  redisAnalysis, redisApplyBulk, redisDatabases, redisKeys, redisPreviewBulk, redisPublish,
-  redisSlowLog, redisStream, redisSubscribeUrl, redisValue,
-  type RedisAnalysisDto, type RedisKeyDto, type RedisSlowEntryDto, type RedisStreamDto,
-  type RedisValueDto,
+  redisAnalysis, redisApplyBulk, redisCluster, redisDatabases, redisKeys, redisPreviewBulk,
+  redisPublish, redisSlowLog, redisStream, redisSubscribeUrl, redisValue,
+  type RedisAnalysisDto, type RedisClusterDto, type RedisKeyDto, type RedisSlowEntryDto,
+  type RedisStreamDto, type RedisValueDto,
 } from "../api";
 import { ValueEditor } from "./ValueEditor";
 import { formatBytes, formatTtl } from "./format";
@@ -33,6 +33,7 @@ export function RedisPanel({ connectionId, readOnly }: { connectionId: string; r
         <Tabs.Tab value="analysis">Analysis</Tabs.Tab>
         <Tabs.Tab value="pubsub">Pub/Sub</Tabs.Tab>
         <Tabs.Tab value="slowlog">Slow log</Tabs.Tab>
+        <Tabs.Tab value="cluster">Cluster</Tabs.Tab>
       </Tabs.List>
 
       <Tabs.Panel value="browser">
@@ -41,6 +42,9 @@ export function RedisPanel({ connectionId, readOnly }: { connectionId: string; r
       </Tabs.Panel>
       <Tabs.Panel value="analysis">
         <Analysis connectionId={connectionId} database={database} />
+      </Tabs.Panel>
+      <Tabs.Panel value="cluster">
+        <Cluster connectionId={connectionId} />
       </Tabs.Panel>
       <Tabs.Panel value="pubsub">
         <PubSub connectionId={connectionId} readOnly={readOnly} />
@@ -489,3 +493,75 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
     <Text size="sm" fw={700}>{value}</Text>
   </div>
 );
+
+/// The cluster, or the honest answer that there is none. A standalone server reports itself as one
+/// node, so this view says something useful everywhere rather than being empty on most servers.
+function Cluster({ connectionId }: { connectionId: string }) {
+  const [state, setState] = useState<RedisClusterDto | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(() => {
+    redisCluster(connectionId).then(setState)
+      .catch(e => setError(e instanceof Error ? e.message : String(e)));
+  }, [connectionId]);
+
+  useEffect(load, [load]);
+
+  if (error) return <Text c="red" size="xs" p="xs">{error}</Text>;
+  if (!state) return <Loader size="xs" m="xs" />;
+
+  return (
+    <Stack gap="xs" p="xs">
+      <Group gap="xs">
+        <Badge variant="light" color={state.enabled ? "blue" : "gray"}>
+          {state.enabled ? "cluster" : "standalone"}
+        </Badge>
+        <Badge variant="light"
+          color={state.state === "ok" || !state.enabled ? "green" : "orange"}>
+          {state.state || "unknown"}
+        </Badge>
+        <Badge variant="light">{state.knownNodes} node(s)</Badge>
+        <Tooltip label="Read it again">
+          <ActionIcon size="sm" variant="subtle" aria-label="Refresh cluster" onClick={load}>
+            <IconRefresh size={14} />
+          </ActionIcon>
+        </Tooltip>
+      </Group>
+
+      {!state.enabled && (
+        <Text size="xs" c="dimmed">
+          This server is not part of a cluster. Everything the studio shows comes from it alone.
+        </Text>
+      )}
+
+      <Table striped withTableBorder>
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Endpoint</Table.Th>
+            <Table.Th>Role</Table.Th>
+            <Table.Th>Slots</Table.Th>
+            <Table.Th>Link</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {state.nodes.map(node => (
+            <Table.Tr key={node.id + node.endpoint}>
+              <Table.Td><Text size="xs" ff="monospace">{node.endpoint}</Text></Table.Td>
+              <Table.Td>
+                <Badge size="sm" variant="light" color={node.role === "master" ? "blue" : "gray"}>
+                  {node.role}
+                </Badge>
+              </Table.Td>
+              <Table.Td><Text size="xs">{node.slots || "—"}</Text></Table.Td>
+              <Table.Td>
+                <Badge size="sm" variant="light" color={node.connected ? "green" : "red"}>
+                  {node.connected ? "connected" : "down"}
+                </Badge>
+              </Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Stack>
+  );
+}

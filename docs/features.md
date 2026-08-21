@@ -129,6 +129,7 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F19.5 | Keyspace analysis: memory by prefix, types, largest keys, what expires soonest | done | redis | Redis panel, analysis tab |
 | F19.6 | Live pub/sub with publishing, and stream consumer groups with their pending entries | done | redis | Redis panel, pub/sub tab |
 | F19.7 | Slow log and connected clients | done | redis | Redis panel, slow log tab |
+| F19.8 | Console completion and hover from the server's own COMMAND DOCS, and a cluster view that also answers for a standalone server | done | redis | Query tab, Redis panel, cluster tab |
 | F18.1 | Overview tab: connections, cache hit, waiting and running sessions, longest statement, with a short history per tile | done | postgresql, mysql, sqlserver, oracle | Administration, overview tab |
 | F18.2 | Progress of running work where the engine reports it, and every long statement with its age | done | postgresql, sqlserver, mysql, oracle | Administration, overview tab |
 | F18.3 | Blocking chains as a tree, with kill at the root | done | postgresql, sqlserver, mysql | Administration, overview tab |

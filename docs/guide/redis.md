@@ -79,3 +79,23 @@ what "stuck" looks like, and the panel says how long the oldest has been idle.
 `SLOWLOG GET`, with the duration and the command. The threshold is the server's own
 `slowlog-log-slower-than`, so an empty list means nothing was slower than that — not that the studio
 cannot see it.
+
+## Command help in the console
+
+A Redis connection's query tab is a command console, and it completes from what **this** server
+reports: `COMMAND DOCS` for the summary and the group, `COMMAND` for the arity, merged. A server with
+modules therefore completes its module commands too — `JSON.SET` is in the list if the server has it,
+and absent if it does not, which a list baked into the studio could never get right.
+
+Completion offers commands for the first word of a line only. The rest are keys and arguments, and
+guessing those is not the studio's business. Hovering a command shows its summary, group, arity and
+the version it appeared in.
+
+## Cluster
+
+The **Cluster** tab reads `CLUSTER INFO` and `CLUSTER NODES`: the state, the known nodes, each
+node's endpoint, role, slot range and link state.
+
+A standalone server — the common case — reports itself as one master node holding all of the
+keyspace, rather than failing. Everything else the studio shows for that connection comes from that
+one server, and the tab says so.

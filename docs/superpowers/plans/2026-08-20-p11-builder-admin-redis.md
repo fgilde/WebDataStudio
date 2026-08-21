@@ -67,7 +67,7 @@ ER diagram already proves the canvas stack works.
 - Produces: `suggestJoin(left: LoadedTable, right: LoadedTable): { on: string; kind: JoinKind } | null`
   where `LoadedTable = { alias: string; ref: string; columns: string[]; foreignKeys: ForeignKeyDto[] }`.
 
-- [ ] **Step 1: Write the failing test** — a table whose foreign key points at an already-loaded
+- [x] **Step 1: Write the failing test** — a table whose foreign key points at an already-loaded
       table yields `a.id = b.person_id`; two unrelated tables yield `null`; the direction is
       respected, so adding the parent after the child still finds it.
 
@@ -82,14 +82,14 @@ it("joins a child to the parent it references", () => {
 });
 ```
 
-- [ ] **Step 2: Run it** — `npx vitest run src/designer/suggestJoin.test.ts`, expect failure
+- [x] **Step 2: Run it** — `npx vitest run src/designer/suggestJoin.test.ts`, expect failure
       "suggestJoin is not exported".
-- [ ] **Step 3: Implement** `suggestJoin` in `buildSelect.ts`: match `referencedTable` (and schema
+- [x] **Step 3: Implement** `suggestJoin` in `buildSelect.ts`: match `referencedTable` (and schema
       when both have one) against the other table's name, pair the column lists positionally, and
       return `null` when nothing matches. Load `foreignKeys` in `QueryDesigner.addTable` from the
       `describeObject` response that is already fetched there.
-- [ ] **Step 4: Run it** — expect pass, then `npx tsc --noEmit`.
-- [ ] **Step 5: Commit** — `feat(builder): propose a join from the foreign key when a table joins the canvas`
+- [x] **Step 4: Run it** — expect pass, then `npx tsc --noEmit`.
+- [x] **Step 5: Commit** — `feat(builder): propose a join from the foreign key when a table joins the canvas`
 
 ### Task 1.2: The canvas
 
@@ -103,17 +103,17 @@ it("joins a child to the parent it references", () => {
 - Produces: `toGraph(model: QueryModel, loaded: LoadedTable[]): { nodes: Node[]; edges: Edge[] }`
   and `applyEdge(model: QueryModel, connection: { source: string; target: string }): QueryModel`.
 
-- [ ] **Step 1: Write the failing test** for `toGraph`: one node per table with its alias as id and
+- [x] **Step 1: Write the failing test** for `toGraph`: one node per table with its alias as id and
       its columns in `data.columns`; one edge per join with the join kind as its label. And for
       `applyEdge`: dragging from `a` to `b` adds a join whose `on` comes from `suggestJoin`, or an
       empty `on` the user fills in.
-- [ ] **Step 2: Run it** — expect failure.
-- [ ] **Step 3: Implement** `canvasModel.ts` with both functions, then `QueryCanvas.tsx` rendering
+- [x] **Step 2: Run it** — expect failure.
+- [x] **Step 3: Implement** `canvasModel.ts` with both functions, then `QueryCanvas.tsx` rendering
       `<ReactFlow>` with a node type that lists columns and a checkbox per column bound to
       `model.columns`. Layout with `dagre` on first render, exactly as `web/src/diagram/layout.ts`
       does — reuse that module rather than a second copy.
-- [ ] **Step 4: Run it** — Vitest green, `tsc` clean, and the panel renders in the app.
-- [ ] **Step 5: Commit** — `feat(builder): build the query on a canvas instead of in a form`
+- [x] **Step 4: Run it** — Vitest green, `tsc` clean, and the panel renders in the app.
+- [x] **Step 5: Commit** — `feat(builder): build the query on a canvas instead of in a form`
 
 ### Task 1.3: Live SQL and a sample of the result
 
@@ -121,15 +121,15 @@ it("joins a child to the parent it references", () => {
 - Modify: `web/src/designer/QueryDesigner.tsx`
 - Test: `web/scripts/smoke-builder.mjs` (new smoke), `package.json` script `smoke:builder`
 
-- [ ] **Step 1: Write the smoke** — open the builder, add `people`, add `orders`, assert the SQL box
+- [x] **Step 1: Write the smoke** — open the builder, add `people`, add `orders`, assert the SQL box
       contains `LEFT JOIN` or `JOIN orders`, assert the preview grid shows a value from the seeded
       data, assert no console errors.
-- [ ] **Step 2: Run it** — fails, because there is no preview grid.
-- [ ] **Step 3: Implement** — debounce 400 ms, run the generated SQL through the existing
+- [x] **Step 2: Run it** — fails, because there is no preview grid.
+- [x] **Step 3: Implement** — debounce 400 ms, run the generated SQL through the existing
       `runQuery` API with `LIMIT 50` applied by the dialect's `Paginate`, render with `ResultGrid`.
       A failing preview shows the server error inline and never blocks editing.
-- [ ] **Step 4: Run it** — smoke green.
-- [ ] **Step 5: Commit** — `feat(builder): show the SQL and the first rows while the query is built`
+- [x] **Step 4: Run it** — smoke green.
+- [x] **Step 5: Commit** — `feat(builder): show the SQL and the first rows while the query is built`
 
 ### Task 1.4: Aggregates, HAVING, DISTINCT and the round trip
 
@@ -141,23 +141,23 @@ it("joins a child to the parent it references", () => {
 - Produces: `QueryModel` gains `columns: { table: string; name: string; aggregate?: Aggregate; alias?: string }[]`,
   `having: Filter[]`, `distinct: boolean`, where `Aggregate = "count" | "sum" | "avg" | "min" | "max"`.
 
-- [ ] **Step 1: Write the failing tests** — an aggregate column puts every non-aggregate column
+- [x] **Step 1: Write the failing tests** — an aggregate column puts every non-aggregate column
       into `GROUP BY`; `having` renders after `GROUP BY`; `distinct` renders as `SELECT DISTINCT`;
       `buildSelect` ends with a `/* wds:model {…} */` comment carrying the JSON model, and
       `parseModel(sql)` returns that model again (and `null` for hand-written SQL).
-- [ ] **Step 2: Run them** — expect failure.
-- [ ] **Step 3: Implement** the model fields, the rendering, and `parseModel`. The builder offers
+- [x] **Step 2: Run them** — expect failure.
+- [x] **Step 3: Implement** the model fields, the rendering, and `parseModel`. The builder offers
       "open in builder" for any query tab whose SQL carries the comment.
-- [ ] **Step 4: Run them** — green, plus `smoke:builder`.
-- [ ] **Step 5: Commit** — `feat(builder): aggregates, HAVING, DISTINCT, and a query that can be reopened`
+- [x] **Step 4: Run them** — green, plus `smoke:builder`.
+- [x] **Step 5: Commit** — `feat(builder): aggregates, HAVING, DISTINCT, and a query that can be reopened`
 
 ### Task 1.5: Documentation
 
-- [ ] **Step 1:** Add `F17.1`–`F17.5` to the spec table and to `docs/features.md` (canvas,
+- [x] **Step 1:** Add `F17.1`–`F17.5` to the spec table and to `docs/features.md` (canvas,
       foreign-key joins, live preview, aggregates, round trip).
-- [ ] **Step 2:** Write `docs/guide/query-builder.md` and link it in `docs/guide/_sidebar.md`.
-- [ ] **Step 3:** Run `node scripts/check-links.mjs docs` and the feature coverage test.
-- [ ] **Step 4: Commit** — `docs(builder): the canvas, the joins it proposes and the round trip`
+- [x] **Step 2:** Write `docs/guide/query-builder.md` and link it in `docs/guide/_sidebar.md`.
+- [x] **Step 3:** Run `node scripts/check-links.mjs docs` and the feature coverage test.
+- [x] **Step 4: Commit** — `docs(builder): the canvas, the joins it proposes and the round trip`
 
 ---
 
@@ -182,17 +182,17 @@ recommendation to a change.
   `record RunningOperation(string Id, string Kind, string Target, double? PercentComplete, long ElapsedMs, string? Statement)`,
   `record LockWait(string Blocker, string Blocked, string Resource, long WaitMs, string? Statement)`.
 
-- [ ] **Step 1: Write the failing test** — against the PostgreSQL Testcontainer, two connections
+- [x] **Step 1: Write the failing test** — against the PostgreSQL Testcontainer, two connections
       where one holds a row lock: the endpoint reports a wait whose blocker is the first session's
       pid, and the shape is stable when nothing is blocked (empty arrays, 200).
-- [ ] **Step 2: Run it** — fails, endpoint missing.
-- [ ] **Step 3: Implement** the per-engine queries: PostgreSQL `pg_stat_progress_*` plus
+- [x] **Step 2: Run it** — fails, endpoint missing.
+- [x] **Step 3: Implement** the per-engine queries: PostgreSQL `pg_stat_progress_*` plus
       `pg_locks`/`pg_blocking_pids`, SQL Server `sys.dm_exec_requests` (`percent_complete`,
       `blocking_session_id`), MySQL `performance_schema.data_locks` +
       `information_schema.processlist`, Oracle `v$session_longops` + `v$lock`. Anything else
       reports the capability as false and the tab does not appear.
-- [ ] **Step 4: Run it** — green; `CapabilityHonestyTests` still green.
-- [ ] **Step 5: Commit** — `feat(admin): report running operations and who is blocking whom`
+- [x] **Step 4: Run it** — green; `CapabilityHonestyTests` still green.
+- [x] **Step 5: Commit** — `feat(admin): report running operations and who is blocking whom`
 
 ### Task 2.2: The overview tab
 
@@ -205,15 +205,15 @@ recommendation to a change.
 - Produces: `useMetricHistory(sample: () => Promise<Sample>, intervalMs: number, keep: number)`
   returning `{ samples: Sample[]; latest: Sample | null; error: string | null }`.
 
-- [ ] **Step 1: Write the failing test** for the ring buffer: it keeps at most `keep` samples,
+- [x] **Step 1: Write the failing test** for the ring buffer: it keeps at most `keep` samples,
       drops the oldest, survives a failing sample without losing history, and stops polling when
       unmounted.
-- [ ] **Step 2: Run it** — expect failure.
-- [ ] **Step 3: Implement** the hook and the tiles: connections, cache hit ratio, locks waiting,
+- [x] **Step 2: Run it** — expect failure.
+- [x] **Step 3: Implement** the hook and the tiles: connections, cache hit ratio, locks waiting,
       longest running statement, database size, plus the sparkline per tile. Follow the `dataviz`
       guidance for the chart colours; reuse `ResultChart`'s palette rather than inventing one.
-- [ ] **Step 4: Run it** — green, `tsc` clean.
-- [ ] **Step 5: Commit** — `feat(admin): an overview tab that answers what is happening right now`
+- [x] **Step 4: Run it** — green, `tsc` clean.
+- [x] **Step 5: Commit** — `feat(admin): an overview tab that answers what is happening right now`
 
 ### Task 2.3: Blocking chains as a tree, with a kill button
 
@@ -226,13 +226,13 @@ recommendation to a change.
 - Produces: `toChains(waits: LockWait[]): ChainNode[]` with
   `ChainNode = { session: string; statement?: string; waitMs: number; blocked: ChainNode[] }`.
 
-- [ ] **Step 1: Write the failing test** — a chain a→b→c becomes one root with a nested child; two
+- [x] **Step 1: Write the failing test** — a chain a→b→c becomes one root with a nested child; two
       independent pairs become two roots; a cycle (which SQL Server can report) does not recurse
       forever.
-- [ ] **Step 2: Run it** — expect failure.
-- [ ] **Step 3: Implement** `toChains` and the tree, with the existing kill action on each node.
-- [ ] **Step 4: Run it** — green.
-- [ ] **Step 5: Commit** — `feat(admin): show the blocking chain as a tree and kill at the root`
+- [x] **Step 2: Run it** — expect failure.
+- [x] **Step 3: Implement** `toChains` and the tree, with the existing kill action on each node.
+- [x] **Step 4: Run it** — green.
+- [x] **Step 5: Commit** — `feat(admin): show the blocking chain as a tree and kill at the root`
 
 ### Task 2.4: Recommendations that can be applied
 
@@ -243,16 +243,16 @@ recommendation to a change.
   that opens the existing migration preview
 - Test: `tests/WebDataStudio.Server.Tests/Analysis/RecommendationScriptTests.cs`
 
-- [ ] **Step 1: Write the failing test** — the deep-analyze response for a table with an unindexed
+- [x] **Step 1: Write the failing test** — the deep-analyze response for a table with an unindexed
       foreign key contains a finding whose `script` is a `CREATE INDEX` statement that parses for
       the engine's dialect, and a duplicate index yields a `DROP INDEX`.
-- [ ] **Step 2: Run it** — fails, findings have no script today.
-- [ ] **Step 3: Implement** — generate the script next to each finding using the driver's dialect
+- [x] **Step 2: Run it** — fails, findings have no script today.
+- [x] **Step 3: Implement** — generate the script next to each finding using the driver's dialect
       helpers (`objectScripts.ts` has the shapes for the front end; the server side belongs in
       `Services/IndexAdvisor.cs`). Apply goes through `POST /api/ddl/{conn}/preview` and `apply`,
       which already exist — no new mutation path.
-- [ ] **Step 4: Run it** — green.
-- [ ] **Step 5: Commit** — `feat(admin): every recommendation carries the script that fixes it`
+- [x] **Step 4: Run it** — green.
+- [x] **Step 5: Commit** — `feat(admin): every recommendation carries the script that fixes it`
 
 ### Task 2.5: Replication, sizes and a configuration diff
 
@@ -270,23 +270,23 @@ recommendation to a change.
   `record SettingDto(string Name, string Value, string? Default, string? Unit, bool RequiresRestart)`,
   and `squarify(items: {label: string; bytes: number}[], width: number, height: number): Rect[]`.
 
-- [ ] **Step 1: Write the failing tests** — replication against the PostgreSQL container reports the
+- [x] **Step 1: Write the failing tests** — replication against the PostgreSQL container reports the
       primary with no replicas rather than failing; `squarify` fills the box, keeps the largest item
       first and never returns a negative rectangle.
-- [ ] **Step 2: Run them** — expect failure.
-- [ ] **Step 3: Implement** the queries (`pg_stat_replication`, `SHOW REPLICA STATUS`,
+- [x] **Step 2: Run them** — expect failure.
+- [x] **Step 3: Implement** the queries (`pg_stat_replication`, `SHOW REPLICA STATUS`,
       `sys.dm_hadr_database_replica_states`), the settings snapshot (`pg_settings`,
       `SHOW VARIABLES`, `sys.configurations`), the treemap from the table-size data the health
       report already fetches, and the config diff which reuses `web/src/compare/diffResults.ts`
       to compare two connections' settings.
-- [ ] **Step 4: Run them** — green.
-- [ ] **Step 5: Commit** — `feat(admin): replication state, a size treemap and a settings diff`
+- [x] **Step 4: Run them** — green.
+- [x] **Step 5: Commit** — `feat(admin): replication state, a size treemap and a settings diff`
 
 ### Task 2.6: Documentation
 
-- [ ] Add `F18.1`–`F18.6` to the spec and `docs/features.md`; extend
+- [x] Add `F18.1`–`F18.6` to the spec and `docs/features.md`; extend
       `docs/guide/administration.md`; run the link check and the coverage test.
-- [ ] **Commit** — `docs(admin): the overview, blocking chains, replication and the settings diff`
+- [x] **Commit** — `docs(admin): the overview, blocking chains, replication and the settings diff`
 
 ---
 
@@ -309,15 +309,15 @@ reference for scope, not for code.
 - Produces: `record KeyPageDto(IReadOnlyList<KeyDto> Keys, long NextCursor, bool Complete)`,
   `record KeyDto(string Key, string Type, long? TtlSeconds, long? SizeBytes, long? Length)`.
 
-- [ ] **Step 1: Write the failing test** — against the Redis Testcontainer with 5 000 keys: the
+- [x] **Step 1: Write the failing test** — against the Redis Testcontainer with 5 000 keys: the
       first page returns at most `count` keys and a non-zero cursor, following the cursor to the end
       returns every key exactly once, `match` and `type` filter server-side, and `SizeBytes` comes
       from `MEMORY USAGE`.
-- [ ] **Step 2: Run it** — fails, no endpoint.
-- [ ] **Step 3: Implement** cursor-based scanning (drop the 5 000-key ceiling in the tree: the tree
+- [x] **Step 2: Run it** — fails, no endpoint.
+- [x] **Step 3: Implement** cursor-based scanning (drop the 5 000-key ceiling in the tree: the tree
       shows prefixes and asks for a page per prefix), TTL and size per key in one pipeline.
-- [ ] **Step 4: Run it** — green.
-- [ ] **Step 5: Commit** — `feat(redis): scan the keyspace with a cursor, a pattern and a type filter`
+- [x] **Step 4: Run it** — green.
+- [x] **Step 5: Commit** — `feat(redis): scan the keyspace with a cursor, a pattern and a type filter`
 
 ### Task 3.2: Type-aware value editors
 
@@ -337,17 +337,17 @@ reference for scope, not for code.
   `xadd`, `json.set`, `expire`, `persist`, `rename`, `del`.
 - Produces (front end): `detectFormat(value: string): "json" | "hex" | "text"`.
 
-- [ ] **Step 1: Write the failing tests** — server: reading a hash returns its fields as an object
+- [x] **Step 1: Write the failing tests** — server: reading a hash returns its fields as an object
       and a list returns an array with indices; writing goes through preview (a hash whose apply
       hash is wrong is rejected); `expire` sets a TTL that `TTL` then reports. Front end:
       `detectFormat` recognises JSON, hex-looking blobs and plain text.
-- [ ] **Step 2: Run them** — expect failure.
-- [ ] **Step 3: Implement** the endpoints, then one editor per type: string with a format switch
+- [x] **Step 2: Run them** — expect failure.
+- [x] **Step 3: Implement** the endpoints, then one editor per type: string with a format switch
       (raw / JSON tree / hex), hash and zset as virtualised tables with inline edit, list with
       index and push/pop, set with add/remove, stream with entries and a "add entry" form, JSON via
       `JSON.GET`/`JSON.SET` when the module answers.
-- [ ] **Step 4: Run them** — green, `tsc` clean.
-- [ ] **Step 5: Commit** — `feat(redis): edit every value type from a browser built for it`
+- [x] **Step 4: Run them** — green, `tsc` clean.
+- [x] **Step 5: Commit** — `feat(redis): edit every value type from a browser built for it`
 
 ### Task 3.3: Bulk actions with a dry run
 
@@ -362,14 +362,14 @@ reference for scope, not for code.
   with actions `delete`, `expire`, `persist`; preview answers
   `record BulkPreviewDto(string Hash, long MatchedKeys, IReadOnlyList<string> Sample)`.
 
-- [ ] **Step 1: Write the failing test** — a preview over `user:*` counts the matching keys and
+- [x] **Step 1: Write the failing test** — a preview over `user:*` counts the matching keys and
       returns at most 20 samples without deleting anything; applying the hash deletes exactly those
       keys and leaves `order:*` untouched; a read-only connection is refused.
-- [ ] **Step 2: Run it** — expect failure.
-- [ ] **Step 3: Implement** — scan for matches, apply in batches through a pipeline, count what was
+- [x] **Step 2: Run it** — expect failure.
+- [x] **Step 3: Implement** — scan for matches, apply in batches through a pipeline, count what was
       done, and refuse when `Spec.ReadOnly`.
-- [ ] **Step 4: Run it** — green.
-- [ ] **Step 5: Commit** — `feat(redis): delete or expire by pattern, after showing what matches`
+- [x] **Step 4: Run it** — green.
+- [x] **Step 5: Commit** — `feat(redis): delete or expire by pattern, after showing what matches`
 
 ### Task 3.4: Keyspace analysis
 
@@ -382,15 +382,15 @@ reference for scope, not for code.
 **Interfaces:**
 - Produces: `record KeyspaceAnalysisDto(long SampledKeys, IReadOnlyList<PrefixStat> Prefixes, IReadOnlyList<TypeStat> Types, IReadOnlyList<KeyDto> Largest, IReadOnlyList<KeyDto> ExpiringSoon, long? TotalMemoryBytes)`.
 
-- [ ] **Step 1: Write the failing test** — with 1 000 keys under two prefixes and one deliberately
+- [x] **Step 1: Write the failing test** — with 1 000 keys under two prefixes and one deliberately
       large value: the prefix table sums memory per prefix, the type table counts per type, and
       `Largest` is sorted descending with the big key first.
-- [ ] **Step 2: Run it** — expect failure.
-- [ ] **Step 3: Implement** — sample with `SCAN` (never `KEYS`), `MEMORY USAGE` per key in a
+- [x] **Step 2: Run it** — expect failure.
+- [x] **Step 3: Implement** — sample with `SCAN` (never `KEYS`), `MEMORY USAGE` per key in a
       pipeline, group by the prefix before the first `:`, and render prefixes as the treemap from
       Task 2.5 plus tables for the rest.
-- [ ] **Step 4: Run it** — green.
-- [ ] **Step 5: Commit** — `feat(redis): analyse the keyspace by prefix, type and memory`
+- [x] **Step 4: Run it** — green.
+- [x] **Step 5: Commit** — `feat(redis): analyse the keyspace by prefix, type and memory`
 
 ### Task 3.5: Pub/Sub, streams with consumer groups, slowlog and clients
 
@@ -408,16 +408,16 @@ reference for scope, not for code.
   `record ConsumerGroupDto(string Name, long Consumers, long Pending, string LastDelivered)`,
   `record SlowEntryDto(long Id, DateTimeOffset At, long MicroSeconds, string Command, string? Client)`.
 
-- [ ] **Step 1: Write the failing tests** — publishing on a channel while subscribed delivers the
+- [x] **Step 1: Write the failing tests** — publishing on a channel while subscribed delivers the
       message through the SSE endpoint within a second; a stream with a consumer group reports the
       group, its pending count and the last delivered id; `slowlog` returns entries after a
       deliberately slow command with the threshold lowered.
-- [ ] **Step 2: Run them** — expect failure.
-- [ ] **Step 3: Implement** — one subscription per request, cancelled with the request; SSE keeps
+- [x] **Step 2: Run them** — expect failure.
+- [x] **Step 3: Implement** — one subscription per request, cancelled with the request; SSE keeps
       the browser side to `EventSource` with no new dependency. Streams read `XINFO STREAM/GROUPS`
       and `XPENDING`; the panel offers claim and ack on a pending entry.
-- [ ] **Step 4: Run them** — green.
-- [ ] **Step 5: Commit** — `feat(redis): live pub/sub, stream consumer groups, slow log and clients`
+- [x] **Step 4: Run them** — green.
+- [x] **Step 5: Commit** — `feat(redis): live pub/sub, stream consumer groups, slow log and clients`
 
 ### Task 3.6: Command help in the console, and cluster awareness
 
@@ -427,25 +427,25 @@ reference for scope, not for code.
 - Modify: `Endpoints/RedisEndpoints.cs` — `GET /api/redis/{conn}/commands`, `GET …/cluster`
 - Test: `web/src/redis/commandHelp.test.ts`, `tests/WebDataStudio.Server.Tests/Redis/CommandDocsTests.cs`
 
-- [ ] **Step 1: Write the failing tests** — the help index maps `HSET` to its arity and summary and
+- [x] **Step 1: Write the failing tests** — the help index maps `HSET` to its arity and summary and
       suggests it for the prefix `hs`; the cluster endpoint reports a single node for a standalone
       server rather than failing.
-- [ ] **Step 2: Run them** — expect failure.
-- [ ] **Step 3: Implement** — `COMMAND DOCS` where available with a fallback to `COMMAND INFO`,
+- [x] **Step 2: Run them** — expect failure.
+- [x] **Step 3: Implement** — `COMMAND DOCS` where available with a fallback to `COMMAND INFO`,
       completion and a hover with the summary in the console, and `CLUSTER INFO`/`CLUSTER NODES`
       for the slot map.
-- [ ] **Step 4: Run them** — green.
-- [ ] **Step 5: Commit** — `feat(redis): command help in the console and a cluster view`
+- [x] **Step 4: Run them** — green.
+- [x] **Step 5: Commit** — `feat(redis): command help in the console and a cluster view`
 
 ### Task 3.7: Documentation and capabilities
 
-- [ ] Set the new capability flags (`KeyBrowser`, `PubSub`, `Streams`, `KeyspaceAnalysis`) on the
+- [x] Set the new capability flags (`KeyBrowser`, `PubSub`, `Streams`, `KeyspaceAnalysis`) on the
       Redis driver only, extend `docs/guide/engines.md`, write `docs/guide/redis.md`, add
       `F19.1`–`F19.7` to the spec and `docs/features.md`, and mark `F14.2` as `done`.
-- [ ] Add `web/scripts/smoke-redis.mjs` driving the browser: create a key, edit it, set a TTL,
+- [x] Add `web/scripts/smoke-redis.mjs` driving the browser: create a key, edit it, set a TTL,
       delete by pattern, see the analysis. Requires a Redis connection in the environment; the
       script skips with a clear message when there is none.
-- [ ] **Commit** — `docs(redis): the key browser, the editors and everything around them`
+- [x] **Commit** — `docs(redis): the key browser, the editors and everything around them`
 
 ---
 
@@ -767,16 +767,16 @@ abstractions for two callers. What is shared is the ten lines that caused the bu
   hidden columns)
 - Create: `web/scripts/smoke-data-menu.mjs`
 
-- [ ] **Step 1:** Write `smoke-data-menu.mjs`: open a table by double-click, open a column menu,
+- [x] **Step 1:** Write `smoke-data-menu.mjs`: open a table by double-click, open a column menu,
       type into the filter, assert the input holds the keystrokes and the rows narrow; hide a
       column, assert the indicator counts it and restores it.
-- [ ] **Step 2:** Run it — fails on the focus.
-- [ ] **Step 3:** Extract `MenuFilterInput` (the `div` with `stopPropagation` on click and keydown,
+- [x] **Step 2:** Run it — fails on the focus.
+- [x] **Step 3:** Extract `MenuFilterInput` (the `div` with `stopPropagation` on click and keydown,
       `data-autofocus`, an eager `currentTarget` read, and a `debounceMs` prop that defaults to 0 so
       `ResultGrid` keeps its current behaviour); use it in both grids with 350 ms in the data tab.
       Add hidden columns to the data tab keyed by column name, with the same eye indicator.
-- [ ] **Step 4:** Run the smoke and `smoke-grid`.
-- [ ] **Step 5: Commit** — `fix(data): a column menu whose filter can be typed into`
+- [x] **Step 4:** Run the smoke and `smoke-grid`.
+- [x] **Step 5: Commit** — `fix(data): a column menu whose filter can be typed into`
 
 ### Task 7.2: An explorer filter that finds tables
 
@@ -795,17 +795,17 @@ called by anything.
 - Modify: `web/src/explorer/ExplorerTree.tsx`, `web/src/shell/GoToObject.tsx`,
   `web/src/editor/schemaCache.ts` usage on refresh
 
-- [ ] **Step 1:** Write `fuzzy.test.ts`: `matches("ordit", "order_items")` is true,
+- [x] **Step 1:** Write `fuzzy.test.ts`: `matches("ordit", "order_items")` is true,
       `matches("xyz", "order_items")` is false, ranking prefers a prefix hit over a scattered one,
       matching is case-insensitive.
-- [ ] **Step 2:** Run it — the module does not exist yet.
-- [ ] **Step 3:** Move the matcher into `fuzzy.ts`, use it from `GoToObject`. In the explorer, a
+- [x] **Step 2:** Run it — the module does not exist yet.
+- [x] **Step 3:** Move the matcher into `fuzzy.ts`, use it from `GoToObject`. In the explorer, a
       filter of two characters or more replaces the tree body with the matching tables and views
       from `schemaCache`, each row showing its schema dimmed and keeping select, double-click and
       context menu; an empty box renders today's tree. The refresh button calls
       `schemaCache.invalidate` so the flat list cannot go stale after a DDL change.
-- [ ] **Step 4:** Run the tests and `smoke-tree`.
-- [ ] **Step 5: Commit** — `fix(explorer): filter for the objects people look for`
+- [x] **Step 4:** Run the tests and `smoke-tree`.
+- [x] **Step 5: Commit** — `fix(explorer): filter for the objects people look for`
 
 ### Task 7.3: Panel management — context menu, popout, pinned tabs
 
@@ -825,20 +825,20 @@ new document, but Mantine's `data-mantine-color-scheme` attribute is not.
 - Modify: `web/src/dock/DockShell.tsx`
 - Modify: `web/scripts/smoke-layout.mjs`
 
-- [ ] **Step 1:** Extend `smoke-layout.mjs`: right-click a tab, assert the menu offers Close, Close
+- [x] **Step 1:** Extend `smoke-layout.mjs`: right-click a tab, assert the menu offers Close, Close
       others and Close all; use Close others and assert one tab is left in that group; assert
       `/popout.html` answers 200 and is not the SPA shell.
-- [ ] **Step 2:** Run it — no context menu exists.
-- [ ] **Step 3:** Add `getTabContextMenuItems`, with `'close'` left out for the explorer and the
+- [x] **Step 2:** Run it — no context menu exists.
+- [x] **Step 3:** Add `getTabContextMenuItems`, with `'close'` left out for the explorer and the
       welcome panel so the way back is not lost; `pinnedTabs: { enabled: true }`; an empty
       `popout.html`; and an `onDidOpen` hook that copies `data-mantine-color-scheme` onto the popout
       document so a popped-out panel is not a white rectangle in a dark studio.
-- [ ] **Step 4:** Run `smoke-layout` and `smoke`.
-- [ ] **Step 5: Commit** — `feat(shell): a tab context menu, pinned tabs and panels that pop out`
+- [x] **Step 4:** Run `smoke-layout` and `smoke`.
+- [x] **Step 5: Commit** — `feat(shell): a tab context menu, pinned tabs and panels that pop out`
 
 ### Task 7.4: Documentation
 
-- [ ] `F23.1`–`F23.3` into the spec and `docs/features.md`; a section in `docs/guide/results.md`
+- [x] `F23.1`–`F23.3` into the spec and `docs/features.md`; a section in `docs/guide/results.md`
       (the data tab's menu), in a new `docs/guide/explorer.md` (searching), and in
       `docs/guide/shortcuts.md` (the tab menu and popout).
-- [ ] **Commit** — `docs: the data tab menu, explorer search and panel management`
+- [x] **Commit** — `docs: the data tab menu, explorer search and panel management`

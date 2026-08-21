@@ -69,6 +69,32 @@ copy takes the page on screen, export streams the whole table. Its column header
 sorting and filtering, and both run on the server — a page holds 200 of possibly millions of rows,
 so sorting in the browser would order the wrong set.
 
+## Sharing a result
+
+With sharing on, a result grows a **Share** button: the rows are kept as they are and you get a link
+to them. It is the answer to "here is what I am seeing" that is not a screenshot.
+
+| Variable | Meaning |
+|---|---|
+| `WDS_SHARE_ENABLED` | `true` allows sharing. Off by default |
+| `WDS_SHARE_PUBLIC` | `true` lets anybody with the link open it, without signing in |
+| `WDS_SHARE_TTL_HOURS` | how long a link lives, default `168` (a week) |
+| `WDS_SHARE_MAX_ROWS` | rows a link keeps, default `1000` |
+
+A link is a **snapshot**, and that is the whole design:
+
+- It shows the rows as they were. Changing the table afterwards does not change the link, and the
+  link cannot run anything.
+- It cannot show more than the person who made it could see: masking is applied **before** the rows
+  are stored, so a masked column is masked in that link for good.
+- Only a reading statement can be shared.
+- It expires. An expired link and one that never existed answer the same way, because a link that
+  used to work should not say what it used to show.
+- Ids are 128 random bits: a link anybody with it can open must not be a link anybody can guess.
+
+`WDS_SHARE_PUBLIC=true` is the part worth thinking about — it puts those rows behind nothing but the
+URL. Off, a link still needs an account on the studio.
+
 ## Scheduled queries
 
 `WDS_SCHEDULE_FILE` points at a JSON file of queries the studio runs on its own and writes as files —

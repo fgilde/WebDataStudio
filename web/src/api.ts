@@ -56,6 +56,8 @@ export interface HealthDto {
   connections: number;
   /// True when an assistance endpoint is configured. Absent on older servers.
   assist?: boolean;
+  /// Whether a result can be shared as a link, and whether that link needs a login.
+  share?: { isPublic: boolean } | null;
   /// Where the MCP endpoint is, when the studio has one. Null when nobody asked for one.
   /// `enabled` is false when it was asked for but refused — `reason` says why.
   mcp?: {
@@ -227,6 +229,33 @@ export const assistChat = (conn: string,
   messages: { role: string; content: string }[], includeSchema: boolean): Promise<AssistReplyDto> =>
   fetch(`${base}/assist/chat`, json("POST", { connectionId: conn, messages, includeSchema }))
     .then(r => ok<AssistReplyDto>(r));
+
+export interface SharedResultDto {
+  id: string;
+  connectionName: string;
+  sql: string;
+  by: string | null;
+  at: string;
+  expiresAt: string;
+  columns: string[];
+  rows: (string | null)[][];
+  truncated: boolean;
+}
+
+/// A snapshot of a result, by its link id. Open without a login when the studio says so.
+export const sharedResult = (id: string): Promise<SharedResultDto> =>
+  fetch(`${base}/share/${id}`).then(r => ok<SharedResultDto>(r));
+
+export interface ShareCreatedDto {
+  id: string; url: string; expiresAt: string; rows: number; truncated: boolean; isPublic: boolean;
+}
+
+/// Keeps this result's rows and hands back a link to them.
+export const shareResult = (conn: string, sql: string): Promise<ShareCreatedDto> =>
+  fetch(`${base}/share`, json("POST", { connectionId: conn, sql })).then(r => ok<ShareCreatedDto>(r));
+
+export const shareSettings = (): Promise<{ enabled: boolean; isPublic: boolean }> =>
+  fetch(`${base}/share`).then(r => ok<{ enabled: boolean; isPublic: boolean }>(r));
 
 export interface McpInfoDto {
   name: string;

@@ -3,16 +3,26 @@ import { AuthGate } from "./auth/AuthGate";
 import { AppShellFrame } from "./components/AppShellFrame";
 import { ConnectionsPage } from "./connections/ConnectionsPage";
 import { DockShell } from "./dock/DockShell";
+import { SharePage } from "./share/SharePage";
 
 export default function App() {
   return (
-    <AuthGate>
-      <AppShellFrame>
-        <Routes>
-          <Route path="/" element={<DockShell />} />
-          <Route path="/connections" element={<ConnectionsPage />} />
-        </Routes>
-      </AppShellFrame>
-    </AuthGate>
+    <Routes>
+      {/* Outside the login gate and outside the shell: a shared result is for somebody who may not
+          have an account here, and there is nothing on the page for them to navigate. The server
+          decides whether the link opens without a login. */}
+      <Route path="/share/:id" element={<SharePage />} />
+
+      <Route path="*" element={
+        <AuthGate>
+          <AppShellFrame>
+            <Routes>
+              <Route path="/" element={<DockShell />} />
+              <Route path="/connections" element={<ConnectionsPage />} />
+            </Routes>
+          </AppShellFrame>
+        </AuthGate>
+      } />
+    </Routes>
   );
 }

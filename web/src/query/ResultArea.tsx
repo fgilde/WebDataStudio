@@ -9,14 +9,18 @@ import { TransposedView } from "../grid/TransposedView";
 import { ResultChart } from "../chart/ResultChart";
 import { ResultCompare, type NamedResult } from "../compare/ResultCompare";
 import type { ResultState } from "./resultStore";
+import { ShareButton } from "../share/ShareButton";
 
 type View = "grid" | "form" | "transposed" | "chart" | "compare";
 
-export function ResultArea({ result, onExport, changed }: {
+export function ResultArea({ result, onExport, changed, connectionId, sql }: {
   result: ResultState;
   onExport?: () => void;
   /// Cells that changed since the previous run of the same query, for watch mode.
   changed?: ReadonlySet<string>;
+  /// What a shared link would be made of. Without both, the share action is not offered.
+  connectionId?: string;
+  sql?: string;
 }) {
   const [view, setView] = useState<View>("grid");
   const [formRow, setFormRow] = useState(0);
@@ -92,6 +96,7 @@ export function ResultArea({ result, onExport, changed }: {
                       </Menu.Item>
                     </Menu.Dropdown>
                   </Menu>
+                  {connectionId && sql && <ShareButton connectionId={connectionId} sql={sql} />}
                   {onExport && (
                     <Button size="compact-xs" variant="default" leftSection={<IconDownload size={13} />}
                       onClick={onExport}>

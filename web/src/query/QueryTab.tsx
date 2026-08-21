@@ -204,7 +204,7 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
         flex: 1, minHeight: 100,
         borderTop: "1px solid var(--mantine-color-default-border)",
       }}>
-        <ResultArea result={result} changed={changed}
+        <ResultArea result={result} changed={changed} connectionId={connectionId} sql={sql}
           onExport={onExport ? () => onExport(sql) : undefined} />
       </div>
 

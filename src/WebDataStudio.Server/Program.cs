@@ -82,6 +82,8 @@ builder.Services.AddHostedService<SeedScriptStartup>();
 builder.Services.AddSingleton(sp => ScheduleOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<ScheduledQueries>();
 builder.Services.AddHostedService<ScheduledQueryRunner>();
+builder.Services.AddSingleton(sp => ShareOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<ResultShares>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<HealthAlerts>());
 builder.Services.AddHttpClient("alerts", client => client.Timeout = TimeSpan.FromSeconds(20));
 builder.Services.AddHttpClient("assist", client => client.Timeout = TimeSpan.FromSeconds(60));
@@ -124,7 +126,8 @@ foreach (var (label, path, error) in new[]
 }
 
 app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assistantOptions,
-    McpAvailability mcpAvailability, AlertOptions alertOptions) => Results.Ok(new
+    McpAvailability mcpAvailability, AlertOptions alertOptions,
+    ShareOptions shareOptions) => Results.Ok(new
 {
     status = connectionStore.Available && workspaceStore.Available ? "ok" : "degraded",
     version,
@@ -142,6 +145,8 @@ app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assista
     // Off unless configured, and said out loud: a studio that quietly talks to an endpoint would
     // be the wrong kind of surprise.
     assist = assistantOptions.Configured,
+    // Whether a result can be shared as a link, and whether that link needs a login.
+    share = shareOptions.Enabled ? new { isPublic = shareOptions.Public } : null,
     // Whether anything is watching the health report, and how often.
     alerts = alertOptions.Configured
         ? new { intervalMinutes = (int)alertOptions.Interval.TotalMinutes, minSeverity = alertOptions.MinSeverity }
@@ -179,9 +184,14 @@ app.Use(async (ctx, next) =>
 {
     var users = ctx.RequestServices.GetRequiredService<UserStore>();
     var path = ctx.Request.Path;
+    var shares = ctx.RequestServices.GetRequiredService<ShareOptions>();
+
     var open = !path.StartsWithSegments("/api")
                || path.StartsWithSegments("/api/auth")
-               || path.StartsWithSegments("/api/health");
+               || path.StartsWithSegments("/api/health")
+               // A shared result is meant to be openable by whoever has the link — but only when
+               // the deployment said so.
+               || (shares.Enabled && shares.Public && path.StartsWithSegments("/api/share"));
 
     if (!users.Anonymous && !open && !(ctx.User.Identity?.IsAuthenticated ?? false))
     {
@@ -220,6 +230,7 @@ app.MapDiagramEndpoints();
 app.MapSavedQueryEndpoints();
 app.MapFederationEndpoints();
 app.MapAssistantEndpoints();
+app.MapShareEndpoints();
 app.MapMcpEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());

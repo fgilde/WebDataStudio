@@ -155,3 +155,4 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F24.3 | A folder of .sql files imported as saved queries at start, idempotently, with the connection and folder in comments | done | all | Saved panel |
 | F24.4 | A seed script run once per connection, never on a read-only or production one | done | all | Environment |
 | F24.5 | Scheduled read-only queries exported to files, on an interval or daily, with the last run per job on an endpoint | done | all | Environment |
+| F24.6 | A result kept as a snapshot behind a random link, masked before storage, expiring, public only on purpose | done | all | Result area, share page |

@@ -12,6 +12,7 @@
 | `WDS_SECRET_KEY` | AES key (base64, 32 bytes) for stored secrets; generated into `/data/.key` if absent |
 | `WDS_READONLY` | when `true`, every connection is read-only regardless of its own flag |
 | `WDS_ASSIST_ENDPOINT`, `WDS_ASSIST_KEY`, `WDS_ASSIST_MODEL` | optional assistance; without the endpoint the feature does not exist — see [Optional assistance](assistant.md) |
+| `WDS_SHARE_ENABLED`, `WDS_SHARE_PUBLIC`, `WDS_SHARE_TTL_HOURS`, `WDS_SHARE_MAX_ROWS` | share a result as a link — see [Results and export](results.md) |
 | `WDS_SCHEDULE_FILE`, `WDS_SCHEDULE_OUTPUT_DIR` | queries the studio runs on a schedule and writes as files — see [Results and export](results.md) |
 | `WDS_SAVED_QUERIES_DIR` | folder of `.sql` files imported as saved queries at start — see [Query editor](editor.md) |
 | `WDS_SEED_SQL` | a script, or a folder of `{CONNECTION}.sql`, run once per connection — see [Getting started](getting-started.md) |

@@ -20,9 +20,13 @@ const ROW_HEIGHT = 24;
 /// its columns before the rows are measured; the header's resize handle overrides it.
 const DEFAULT_WIDTH = 160;
 
-export function ResultGrid({ result, onSelectionChange }: {
+export function ResultGrid({ result, onSelectionChange, changed }: {
   result: StatementResult;
   onSelectionChange?: (values: unknown[]) => void;
+  /// Cells that changed since the previous run, as `row:column` indexes into the result's own rows.
+  /// Watch mode fills this; it is ignored while the grid sorts or filters, because then a row's
+  /// position is no longer the row the diff was about.
+  changed?: ReadonlySet<string>;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [sort, setSort] = useState<{ index: number; desc: boolean } | null>(null);
@@ -90,6 +94,10 @@ export function ResultGrid({ result, onSelectionChange }: {
 
   // Sorting and filtering happen client-side over the rows already fetched. Anything beyond the
   // fetch cap needs a server round trip, which the result footer's "load more" will trigger.
+  // A sort or a filter moves rows around, and the diff was about where they were.
+  const highlightable = sort === null && search.trim() === ""
+    && Object.values(filters).every(value => value.trim() === "");
+
   const rows = useMemo(() => {
     let out = result.rows;
 
@@ -265,6 +273,7 @@ export function ResultGrid({ result, onSelectionChange }: {
               <tr key={item.key} style={{ height: ROW_HEIGHT }}>
                 {visibleColumns.map(c => {
                   const isSelected = selected.some(s => s.row === item.index && s.col === c.index);
+                  const isChanged = highlightable && changed?.has(`${item.index}:${c.index}`);
                   return (
                     <td key={c.index}
                       onMouseDown={e => setSelected(prev => e.ctrlKey || e.metaKey
@@ -277,7 +286,9 @@ export function ResultGrid({ result, onSelectionChange }: {
                         padding: "2px 8px", whiteSpace: "nowrap", cursor: "cell", overflow: "hidden",
                         textOverflow: "ellipsis", maxWidth: 0,
                         borderBottom: "1px solid var(--mantine-color-default-border)",
-                        background: isSelected ? "var(--mantine-primary-color-light)" : undefined,
+                        background: isSelected
+                          ? "var(--mantine-primary-color-light)"
+                          : isChanged ? "var(--mantine-color-orange-light)" : undefined,
                       }}>
                       <CellValue value={rows[item.index]?.[c.index]} />
                     </td>

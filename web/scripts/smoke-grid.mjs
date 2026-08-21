@@ -70,6 +70,34 @@ await page.waitForTimeout(400);
 check("the column is back", await header("name").count() === 1
   && await page.getByLabel(/hidden columns/).count() === 0);
 
+// --- watch mode -------------------------------------------------------------------------------
+// A query whose value moves on its own: watching it must notice, without touching the demo data.
+// A fresh tab rather than the one above: the column menu that is still open there swallows
+// keystrokes, and this check is about watch mode.
+await page.keyboard.press("Escape");
+await page.getByRole("button", { name: "New query" }).click();
+await page.waitForTimeout(600);
+await page.locator(".monaco-editor").last().click();
+// No quotes: Monaco's auto-closing pairs mangle a typed string literal, and this smoke is about
+// watch mode, not about the editor.
+await page.keyboard.type("SELECT 1 AS id, random() AS r");
+await page.keyboard.press("F5");
+await page.waitForTimeout(800);
+
+await page.getByRole("combobox", { name: "Watch interval" }).click();
+await page.getByRole("option", { name: "every 2 s" }).click();
+// Two intervals: the first run only records what to compare against.
+await page.waitForTimeout(6000);
+
+const note = await page.locator("text=/changed|no change/").first().innerText();
+check(`watch reports what moved (${note})`, /changed|no change/.test(note));
+check("watch highlights the changed cell",
+  await page.locator("td[style*='orange']").count() > 0);
+
+await page.getByRole("combobox", { name: "Watch interval" }).click();
+await page.getByRole("option", { name: "every 2 s" }).click();
+await page.keyboard.press("Escape");
+
 check("no console errors", errors.length === 0);
 if (errors.length > 0) console.error(errors.slice(0, 5).join(" | "));
 await browser.close();

@@ -12,9 +12,11 @@ import type { ResultState } from "./resultStore";
 
 type View = "grid" | "form" | "transposed" | "chart" | "compare";
 
-export function ResultArea({ result, onExport }: {
+export function ResultArea({ result, onExport, changed }: {
   result: ResultState;
   onExport?: () => void;
+  /// Cells that changed since the previous run of the same query, for watch mode.
+  changed?: ReadonlySet<string>;
 }) {
   const [view, setView] = useState<View>("grid");
   const [formRow, setFormRow] = useState(0);
@@ -99,7 +101,8 @@ export function ResultArea({ result, onExport }: {
                 </Group>
               </Group>
               <div style={{ flex: 1, minHeight: 0 }}>
-                {view === "grid" ? <ResultGrid result={s} onSelectionChange={onSelectionChange} />
+                {view === "grid" ? <ResultGrid result={s} onSelectionChange={onSelectionChange}
+                    changed={s.index === 0 ? changed : undefined} />
                   : view === "form" ? <RowFormView result={s} index={formRow} onIndexChange={setFormRow} />
                   : view === "transposed" ? <TransposedView columns={s.columns} rows={s.rows} />
                   : view === "chart" ? <ResultChart columns={s.columns} rows={s.rows} />

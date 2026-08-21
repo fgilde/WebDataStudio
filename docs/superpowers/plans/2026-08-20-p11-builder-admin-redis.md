@@ -602,15 +602,21 @@ reference for scope, not for code.
 - Produces: `diffRows(previous: unknown[][], next: unknown[][], keyColumns: number[]): RowFlags[]`
   where `RowFlags = "added" | "removed" | "changed" | "same"`.
 
-- [ ] **Step 1: Write the failing test** — a changed cell marks the row `changed`, a new key
+- [x] **Step 1: Write the failing test** — a changed cell marks the row `changed`, a new key
       `added`, a vanished key `removed`, identical data `same`; without key columns the comparison
       falls back to position.
-- [ ] **Step 2: Run it** — expect failure.
-- [ ] **Step 3: Implement** the diff and the toggle: re-run every N seconds (2, 5, 10, 30), flash
+
+      *As built:* `diffRows` returns `{flags, cells, removed}` — flags per row of the new result,
+      the changed cells as `row:column` for the highlight, and the rows whose key vanished (a
+      removed row has no position in the new result, so it cannot be a flag in that list).
+      `describeDiff` is what the toolbar says. The highlight is skipped while the grid sorts or
+      filters, because then a row's position is no longer the row the diff was about.
+- [x] **Step 2: Run it** — expect failure.
+- [x] **Step 3: Implement** the diff and the toggle: re-run every N seconds (2, 5, 10, 30), flash
       changed cells in the grid, stop on error and say why, never queue two runs.
-- [ ] **Step 4: Run it** — green, plus a line in `smoke-grid.mjs` that watches a table while a row
+- [x] **Step 4: Run it** — green, plus a line in `smoke-grid.mjs` that watches a table while a row
       is inserted.
-- [ ] **Step 5: Commit** — `feat(query): watch a query and highlight what changed`
+- [x] **Step 5: Commit** — `feat(query): watch a query and highlight what changed`
 
 ### Task 5.3: Test data generator
 

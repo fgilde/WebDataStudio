@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActionIcon, Group, Switch, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Select, Switch, Text, Tooltip } from "@mantine/core";
 import { IconPlayerPlay, IconPlayerStop, IconPlayerTrackNext } from "@tabler/icons-react";
 import { QueryEditor } from "../editor/QueryEditor";
+import { describeDiff, diffRows } from "../grid/diffRows";
 import { ResultArea } from "./ResultArea";
 import { runQuery, type QueryRun } from "./runQuery";
 import { applyChunk, createResultState, type ResultState } from "./resultStore";
@@ -36,6 +37,13 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   const [snippets] = useUserSnippets();
   // Off means the engine's own auto-commit; on wraps the whole script in one transaction.
   const [transactional, setTransactional] = useState(false);
+  // Watch mode: re-run every N seconds and say what moved. Null is off.
+  const [watchSeconds, setWatchSeconds] = useState<number | null>(null);
+  const [changed, setChanged] = useState<ReadonlySet<string> | undefined>(undefined);
+  const [watchNote, setWatchNote] = useState<string | null>(null);
+  // The rows the last run produced, to diff the next one against. A ref rather than state: the
+  // comparison happens inside a run, not during a render.
+  const lastRows = useRef<unknown[][] | null>(null);
 
   useEffect(() => { onSqlChange?.(tabId, sql); }, [tabId, sql, onSqlChange]);
 
@@ -59,6 +67,19 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
       setRunning(false);
       activeRun.current = null;
 
+      // What moved since the previous run. Only the first result: a script that returns several is
+      // not something to watch.
+      const first = state.statements[0];
+      if (first && !first.error) {
+        const previous = lastRows.current;
+        if (previous) {
+          const diff = diffRows(previous, first.rows);
+          setChanged(diff.cells);
+          setWatchNote(describeDiff(diff));
+        }
+        lastRows.current = first.rows;
+      }
+
       const last = state.statements[state.statements.length - 1];
       // History is best-effort: a failed write must never swallow the result the user is reading.
       addHistory({
@@ -69,6 +90,34 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
       }).catch(() => {});
     }
   }, [connectionId, transactional]);
+
+  // One run at a time: the next is scheduled when the previous finished, so a slow query cannot
+  // pile up behind its own interval. An error stops the watch and says so.
+  useEffect(() => {
+    if (watchSeconds === null || !sql.trim()) return;
+
+    let cancelled = false;
+    let timer: number | undefined;
+
+    const tick = async () => {
+      await run(sql);
+      if (cancelled) return;
+      timer = window.setTimeout(tick, watchSeconds * 1000);
+    };
+
+    timer = window.setTimeout(tick, watchSeconds * 1000);
+    return () => { cancelled = true; if (timer !== undefined) window.clearTimeout(timer); };
+    // `sql` on purpose: watching a query the user has since edited would watch the wrong thing.
+  }, [watchSeconds, sql, run]);
+
+  const firstWatchError = result.statements.find(s => s.error)?.error ?? null;
+
+  useEffect(() => {
+    if (watchSeconds !== null && firstWatchError) {
+      setWatchSeconds(null);
+      setWatchNote(`watch stopped: ${firstWatchError.text}`);
+    }
+  }, [watchSeconds, firstWatchError]);
 
   // A statement with bind variables asks for them once, then runs with the values as parameters.
   const execute = useCallback((text: string) => {
@@ -104,6 +153,26 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
           <Switch size="xs" ml={6} label="single transaction" checked={transactional}
             onChange={e => setTransactional(e.currentTarget.checked)} />
         </Tooltip>
+        <Tooltip label="Re-run this query and highlight what changed">
+          <Select size="xs" w={110} ml={6} placeholder="watch off" clearable
+            aria-label="Watch interval"
+            data={[
+              { value: "2", label: "every 2 s" },
+              { value: "5", label: "every 5 s" },
+              { value: "10", label: "every 10 s" },
+              { value: "30", label: "every 30 s" },
+            ]}
+            value={watchSeconds === null ? null : String(watchSeconds)}
+            onChange={value => {
+              setWatchSeconds(value === null ? null : Number(value));
+              setWatchNote(null);
+              setChanged(undefined);
+              lastRows.current = null;
+            }} />
+        </Tooltip>
+        {watchNote && (
+          <Text size="xs" c={watchNote.startsWith("watch stopped") ? "red" : "dimmed"}>{watchNote}</Text>
+        )}
         {result.cancelled && <Text size="xs" c="orange">cancelled</Text>}
       </Group>
 
@@ -117,7 +186,8 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
         flex: 1, minHeight: 100,
         borderTop: "1px solid var(--mantine-color-default-border)",
       }}>
-        <ResultArea result={result} onExport={onExport ? () => onExport(sql) : undefined} />
+        <ResultArea result={result} changed={changed}
+          onExport={onExport ? () => onExport(sql) : undefined} />
       </div>
 
       <ParameterDialog names={pending?.names ?? null} initial={lastValues}

@@ -161,7 +161,31 @@ public sealed class McpToolbox(
                 "this studio's MCP endpoint is read-only; set WDS_MCP_ALLOW_WRITE=true to change that",
                 IsError: true);
 
+        using var span = Telemetry.Span($"mcp.{name}");
+
         try
+        {
+            var result = await Dispatch(name, arguments, ct);
+
+            Telemetry.ToolCall(name, result.IsError);
+            span?.SetTag("failed", result.IsError);
+
+            return result;
+        }
+        catch (UnknownConnectionException e) { return Failed(name, e.Message); }
+        catch (FormatException e) { return Failed(name, e.Message); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception e) { return Failed(name, e.Message); }
+    }
+
+    private static McpToolResult Failed(string name, string message)
+    {
+        Telemetry.ToolCall(name, failed: true);
+        return new McpToolResult(message, IsError: true);
+    }
+
+    private async Task<McpToolResult> Dispatch(string name, JsonElement arguments, CancellationToken ct)
+    {
         {
             return name switch
             {
@@ -180,10 +204,6 @@ public sealed class McpToolbox(
                 _ => new McpToolResult($"there is no tool called '{name}'", IsError: true),
             };
         }
-        catch (UnknownConnectionException e) { return new McpToolResult(e.Message, IsError: true); }
-        catch (FormatException e) { return new McpToolResult(e.Message, IsError: true); }
-        catch (OperationCanceledException) { throw; }
-        catch (Exception e) { return new McpToolResult(e.Message, IsError: true); }
     }
 
     // --- the tools themselves ---------------------------------------------------------------

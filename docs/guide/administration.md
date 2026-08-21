@@ -110,3 +110,29 @@ findings themselves, each with the statement that would fix it:
 Only new findings are sent: the same warning every hour is a message people learn to ignore. A post
 that fails is retried on the next sweep rather than swallowed, and a connection that cannot be
 reached is a log line rather than an alert — whatever watches uptime already knows.
+
+## Traces and metrics
+
+With `OTEL_EXPORTER_OTLP_ENDPOINT` set — the standard variable, so a stack that already exports
+telemetry needs nothing studio-specific — the studio reports its own work to that collector:
+
+| What | Name |
+|---|---|
+| span per run | `query.execute`, tagged with the engine, the rows and whether it failed |
+| span per tool call | `mcp.{tool}` |
+| statements run | `wds.queries` (counter, tagged by engine and outcome) |
+| how long they took | `wds.query.duration` (histogram, ms) |
+| rows handed to a client | `wds.rows` (counter) |
+| MCP tool calls | `wds.tool.calls` (counter, tagged by tool and outcome) |
+
+ASP.NET Core, HttpClient and .NET runtime instrumentation ride along. Health checks are filtered out
+of the traces — they would be most of the traffic and none of the information.
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4317
+OTEL_SERVICE_NAME=analytics-studio      # defaults to "webdatastudio"
+```
+
+Nothing is exported without that endpoint. The instrumentation is always compiled in, which costs
+nothing while nobody listens — and means a `dotnet-counters` or a test can watch it locally without
+a collector at all.

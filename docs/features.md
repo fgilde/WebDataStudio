@@ -156,3 +156,4 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F24.4 | A seed script run once per connection, never on a read-only or production one | done | all | Environment |
 | F24.5 | Scheduled read-only queries exported to files, on an interval or daily, with the last run per job on an endpoint | done | all | Environment |
 | F24.6 | A result kept as a snapshot behind a random link, masked before storage, expiring, public only on purpose | done | all | Result area, share page |
+| F24.7 | The studio's own traces and metrics over OTLP: a span per run and per tool call, counters for statements, rows and tool calls | done | all | Environment |

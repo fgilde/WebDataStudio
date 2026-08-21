@@ -458,6 +458,7 @@ it works for every engine whose capability set claims support for it.
 | F24.4 | A fresh stack comes up with data in it |
 | F24.5 | A report runs itself, and reads only |
 | F24.6 | "Here is what I am seeing" is a link, not a screenshot |
+| F24.7 | The studio is visible in the same collector as everything else |
 
 ## 10. Safety behaviour
 

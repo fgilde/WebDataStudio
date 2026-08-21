@@ -36,6 +36,13 @@ public static class QueryEndpoints
                 return Results.Json(new { message = e.Message }, statusCode: 502);
             }
 
+            using var span = Telemetry.Span("query.execute");
+            span?.SetTag("engine", driver.Info.Id);
+
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            var returned = 0L;
+            var failed = false;
+
             var (runId, source) = runner.Start(ctx.RequestAborted);
             ctx.Response.Headers["X-Run-Id"] = runId;
             ctx.Response.ContentType = "application/x-ndjson";
@@ -56,10 +63,15 @@ public static class QueryEndpoints
                 {
                     await foreach (var chunk in driver.ExecuteAsync(session, request, source.Token))
                     {
-                        if (chunk is ResultChunk.Columns columns)
+                        switch (chunk)
                         {
-                            masked.Clear();
-                            masked.UnionWith(Masking.IndexesOf(columns.Items, policy));
+                            case ResultChunk.Columns columns:
+                                masked.Clear();
+                                masked.UnionWith(Masking.IndexesOf(columns.Items, policy));
+                                break;
+
+                            case ResultChunk.Rows rows: returned += rows.Items.Count; break;
+                            case ResultChunk.Error: failed = true; break;
                         }
 
                         await WriteAsync(ctx, Wire(chunk, masked), source.Token);
@@ -73,6 +85,10 @@ public static class QueryEndpoints
                 finally
                 {
                     runner.Finish(runId);
+
+                    Telemetry.Query(driver.Info.Id, failed, started.Elapsed.TotalMilliseconds, returned);
+                    span?.SetTag("rows", returned);
+                    span?.SetTag("failed", failed);
                 }
             }
 

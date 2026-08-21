@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using WebDataStudio.Server.Drivers;
 using WebDataStudio.Server.Endpoints;
 using WebDataStudio.Server.Export;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using WebDataStudio.Server.Mcp;
 using WebDataStudio.Server.Services;
 
@@ -84,6 +87,35 @@ builder.Services.AddSingleton<ScheduledQueries>();
 builder.Services.AddHostedService<ScheduledQueryRunner>();
 builder.Services.AddSingleton(sp => ShareOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<ResultShares>();
+
+// Traces and metrics, when a collector is configured the standard way. Nothing is exported without
+// OTEL_EXPORTER_OTLP_ENDPOINT — a studio that talks to a collector nobody asked for would be the
+// wrong kind of surprise, and the instrumentation costs nothing while nobody listens.
+// Read twice on purpose: the exporter has to be wired while services are being registered, and the
+// options a request reads have to come from the final configuration — which is only complete once
+// the host is built (a test that injects settings would otherwise be told the feature is off).
+var telemetryOptions = TelemetryOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(sp =>
+    TelemetryOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+
+if (telemetryOptions.Configured)
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(resource => resource.AddService(telemetryOptions.ServiceName))
+        .WithTracing(tracing => tracing
+            .AddSource(Telemetry.SourceName)
+            .AddAspNetCoreInstrumentation(instrumentation =>
+                // Health checks and static files would be most of the traffic and none of the
+                // information.
+                instrumentation.Filter = context =>
+                    !context.Request.Path.StartsWithSegments("/api/health"))
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter())
+        .WithMetrics(metrics => metrics
+            .AddMeter(Telemetry.SourceName)
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddOtlpExporter());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<HealthAlerts>());
 builder.Services.AddHttpClient("alerts", client => client.Timeout = TimeSpan.FromSeconds(20));
 builder.Services.AddHttpClient("assist", client => client.Timeout = TimeSpan.FromSeconds(60));
@@ -127,7 +159,7 @@ foreach (var (label, path, error) in new[]
 
 app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assistantOptions,
     McpAvailability mcpAvailability, AlertOptions alertOptions,
-    ShareOptions shareOptions) => Results.Ok(new
+    ShareOptions shareOptions, TelemetryOptions telemetry) => Results.Ok(new
 {
     status = connectionStore.Available && workspaceStore.Available ? "ok" : "degraded",
     version,
@@ -147,6 +179,10 @@ app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assista
     assist = assistantOptions.Configured,
     // Whether a result can be shared as a link, and whether that link needs a login.
     share = shareOptions.Enabled ? new { isPublic = shareOptions.Public } : null,
+    // Where the studio's own traces and metrics go, when they go anywhere.
+    telemetry = telemetry.Configured
+        ? new { endpoint = telemetry.Endpoint, service = telemetry.ServiceName }
+        : null,
     // Whether anything is watching the health report, and how often.
     alerts = alertOptions.Configured
         ? new { intervalMinutes = (int)alertOptions.Interval.TotalMinutes, minSeverity = alertOptions.MinSeverity }

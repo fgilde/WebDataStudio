@@ -329,6 +329,90 @@ public class McpTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task It_explains_a_plan_and_reports_health()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var plan = await CallAsync(client, "explain_plan",
+            new { connectionId = id, sql = "SELECT * FROM customers WHERE city = 'london'" });
+
+        Assert.False(plan.IsError);
+        Assert.Contains("operation", plan.Text);
+
+        var health = await CallAsync(client, "health_report", new { connectionId = id });
+
+        Assert.False(health.IsError);
+        // A report with no findings is still a report; the shape is what matters.
+        Assert.Contains("findings", health.Text);
+    }
+
+    /// An actual plan runs the statement, so it obeys the rule run_query obeys.
+    [Fact]
+    public async Task An_actual_plan_of_a_write_is_refused()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var plan = await CallAsync(client, "explain_plan",
+            new { connectionId = id, sql = "DELETE FROM customers", actual = "true" });
+
+        Assert.True(plan.IsError);
+    }
+
+    [Fact]
+    public async Task Activity_is_empty_rather_than_an_error_on_an_engine_that_cannot_answer()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var activity = await CallAsync(client, "server_activity", new { connectionId = id });
+
+        Assert.False(activity.IsError);
+        Assert.Contains("running", activity.Text);
+    }
+
+    [Fact]
+    public async Task Redis_value_says_when_the_connection_is_not_redis()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var value = await CallAsync(client, "redis_value", new { connectionId = id, key = "x" });
+
+        Assert.True(value.IsError);
+        Assert.Contains("not Redis", value.Text);
+    }
+
+    /// A deployment can narrow the endpoint to the tools it wants an agent to have.
+    [Fact]
+    public async Task The_tools_can_be_named_by_the_deployment()
+    {
+        using var factory = Factory(
+            ("WDS_MCP_ENABLED", "true"), ("WDS_MCP_TOOLS", "list_connections, list_tables"));
+        var client = factory.CreateClient();
+
+        var tools = (await RpcAsync(client, "tools/list"))
+            .GetProperty("result").GetProperty("tools").EnumerateArray()
+            .Select(tool => tool.GetProperty("name").GetString())
+            .ToList();
+
+        Assert.Equal(["list_connections", "list_tables"], tools.Order());
+
+        // A tool left out is refused by name, not silently missing.
+        var id = await IdAsync(client);
+        var refused = await CallAsync(client, "run_query",
+            new { connectionId = id, sql = "SELECT 1" });
+
+        Assert.True(refused.IsError);
+        Assert.Contains("WDS_MCP_TOOLS", refused.Text);
+    }
+
+    [Fact]
     public async Task The_path_can_be_moved()
     {
         using var factory = Factory(("WDS_MCP_PATH", "agents/db"));

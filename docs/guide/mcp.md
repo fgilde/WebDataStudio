@@ -65,10 +65,29 @@ deployment from a terminal.
 | `browse_rows` | a page of rows from one table, masked and capped |
 | `run_query` | one **reading** statement, masked and capped |
 | `preview_script` | splits a script, marks the destructive statements, returns a hash. Nothing runs |
+| `explain_plan` | the query plan for a statement — why it is slow, without guessing |
+| `health_report` | the studio's own analysis, each finding with the statement that fixes it |
+| `server_activity` | what is running, and who is waiting on whom |
+| `redis_value` | one Redis key, in the shape its type has |
 | `apply_script` | runs the script that hash belongs to |
 
 `preview_script` and `apply_script` exist only when `WDS_MCP_ALLOW_WRITE=true`; otherwise they are
 not in `tools/list` at all, and calling them by name says why.
+
+## Narrowing the endpoint
+
+`WDS_MCP_TOOLS` names the tools the endpoint offers, comma-separated:
+
+```bash
+WDS_MCP_TOOLS=list_connections,list_tables,describe_object,explain_plan
+```
+
+It is a whitelist, so a tool added in a later version does not appear on an endpoint somebody
+deliberately narrowed — and a tool left out is refused by name when it is called, rather than being
+silently absent.
+
+`explain_plan` with `actual: "true"` runs the statement to measure it, so it obeys the same rule
+`run_query` does: a write is refused.
 
 ## What an agent cannot do
 

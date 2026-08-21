@@ -450,6 +450,8 @@ it works for every engine whose capability set claims support for it.
 | F22.2 | The studio answers as an MCP server, with the same rules a person gets |
 | F22.3 | The assistant can answer from the database through those same tools |
 | F22.4 | A chat with sessions, in the corner, using those tools where they exist |
+| F22.5 | An agent can ask why something is slow, and what the studio thinks is wrong |
+| F22.6 | A deployment decides which tools its agents get |
 
 ## 10. Safety behaviour
 

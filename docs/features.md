@@ -148,3 +148,5 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F22.2 | MCP server over JSON-RPC/HTTP: list, describe, browse, read-only query, and a previewed write behind a flag; masking and read-only enforced for agents too | done | all | MCP endpoint, header dialog |
 | F22.3 | The assistant answers from the database through the MCP tools, naming the ones it used | done | all | Query tab, assistant dialog |
 | F22.4 | A chat in the corner with sessions that survive a reload, the MCP tools where they exist, and one click from a suggested statement to the editor | done | all | Chat panel |
+| F22.5 | MCP tools for the plan, the health report, server activity and a Redis value | done | all | MCP endpoint |
+| F22.6 | The MCP endpoint can be narrowed to named tools, enforced on the call as well as the listing | done | all | MCP endpoint |

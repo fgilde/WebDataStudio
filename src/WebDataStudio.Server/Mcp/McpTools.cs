@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
 using WebDataStudio.Server.Drivers.Abstractions;
+using WebDataStudio.Server.Drivers.Redis;
 using WebDataStudio.Server.Endpoints;
 using WebDataStudio.Server.Services;
 
@@ -32,7 +33,9 @@ public sealed class McpToolbox(
     };
 
     public IReadOnlyList<McpTool> Tools =>
-        [.. All().Where(tool => options.AllowWrite || !tool.Writes)];
+        [.. All()
+            .Where(tool => options.AllowWrite || !tool.Writes)
+            .Where(tool => options.Only is null || options.Only.Contains(tool.Name))];
 
     private static IEnumerable<McpTool> All()
     {
@@ -87,6 +90,40 @@ public sealed class McpToolbox(
                 ("limit", "integer", $"Rows to return, at most {MaxRows}.", false)),
             Writes: false);
 
+        yield return new McpTool("explain_plan",
+            "The query plan for a statement, as the engine reports it: operations, estimated cost "
+            + "and rows, and the actual rows where the engine can measure them. The way to answer "
+            + "\"why is this slow\" without guessing.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("sql", "string", "The statement to explain.", true),
+                ("actual", "string", "\"true\" runs the statement to measure it, where the engine can.", false)),
+            Writes: false);
+
+        yield return new McpTool("health_report",
+            "The studio's own analysis of a connection: missing indexes, duplicate indexes, tables "
+            + "without a primary key, bloat, and whatever else the engine can be asked. Each finding "
+            + "carries the statement that would fix it, which preview_script then takes.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("ref", "string", "One table, e.g. \"Table:public/orders\". Omit for the connection.", false)),
+            Writes: false);
+
+        yield return new McpTool("server_activity",
+            "What the server is doing right now: running statements with their age, and who is "
+            + "waiting on whom. Empty on an engine that cannot be asked, rather than an error.",
+            Object(("connectionId", "string", "Connection id.", true)),
+            Writes: false);
+
+        yield return new McpTool("redis_value",
+            "One Redis key: its type, TTL and value, in the shape that type has. A key/value store "
+            + "has no rows, so browse_rows and run_query do not apply to it.",
+            Object(
+                ("connectionId", "string", "A Redis connection id.", true),
+                ("key", "string", "The key to read.", true),
+                ("database", "integer", "Database number, default 0.", false)),
+            Writes: false);
+
         yield return new McpTool("preview_script",
             "Splits a script into statements, says which of them are destructive, and returns a "
             + "hash. Nothing runs. The hash is what apply_script takes, so what runs is what was "
@@ -112,6 +149,13 @@ public sealed class McpToolbox(
         if (tool is null)
             return new McpToolResult($"there is no tool called '{name}'", IsError: true);
 
+        // A narrowed endpoint refuses by name: a tool that is not listed must not be callable
+        // either, or the whitelist is decoration.
+        if (options.Only is not null && !options.Only.Contains(name))
+            return new McpToolResult(
+                $"'{name}' is not one of the tools this endpoint offers (WDS_MCP_TOOLS names them)",
+                IsError: true);
+
         if (tool.Writes && !options.AllowWrite)
             return new McpToolResult(
                 "this studio's MCP endpoint is read-only; set WDS_MCP_ALLOW_WRITE=true to change that",
@@ -127,6 +171,10 @@ public sealed class McpToolbox(
                 "describe_object" => await DescribeAsync(arguments, ct),
                 "browse_rows" => await BrowseAsync(arguments, ct),
                 "run_query" => await QueryAsync(arguments, ct),
+                "explain_plan" => await ExplainAsync(arguments, ct),
+                "health_report" => await HealthAsync(arguments, ct),
+                "server_activity" => await ActivityAsync(arguments, ct),
+                "redis_value" => await RedisValueAsync(arguments, ct),
                 "preview_script" => await PreviewAsync(arguments, ct),
                 "apply_script" => await ApplyAsync(arguments, ct),
                 _ => new McpToolResult($"there is no tool called '{name}'", IsError: true),
@@ -329,6 +377,135 @@ public sealed class McpToolbox(
             rowCount = rows.Count,
             rows = rows.Take(limit).Select(row => row.Select(Text).ToArray()),
         });
+    }
+
+    private async Task<McpToolResult> ExplainAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var sql = Required(arguments, "sql");
+        var actual = string.Equals(Optional(arguments, "actual"), "true", StringComparison.OrdinalIgnoreCase);
+
+        // An actual plan runs the statement, so it has to obey the same rule run_query does.
+        if (actual && !ReadOnlyStatement.Looks(sql))
+            return new McpToolResult(
+                "an actual plan runs the statement, and this one is not a read; ask for the "
+                + "estimated plan instead", IsError: true);
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            if (!driver.Caps.EstimatedPlan && !driver.Caps.ActualPlan)
+                return new McpToolResult($"{driver.Info.Label} has no query plans", IsError: true);
+
+            var mode = actual && driver.Caps.ActualPlan ? PlanMode.Actual : PlanMode.Estimated;
+            var plan = await driver.ExplainAsync(session, sql, mode, ct);
+
+            return Ok(new { mode = mode.ToString(), plan = Flatten(plan, 0) });
+        }
+    }
+
+    /// The plan as a flat list with a depth per node: a tree in JSON is harder for a model to read
+    /// than an indented list, and the depth is the only part of the shape that matters.
+    private static List<object> Flatten(PlanNode node, int depth)
+    {
+        var flat = new List<object>
+        {
+            new
+            {
+                depth,
+                operation = node.Operation,
+                detail = node.Detail,
+                estimatedCost = node.EstimatedCost,
+                estimatedRows = node.EstimatedRows,
+                actualRows = node.ActualRows,
+            },
+        };
+
+        foreach (var child in node.Children) flat.AddRange(Flatten(child, depth + 1));
+        return flat;
+    }
+
+    private async Task<McpToolResult> HealthAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var reference = Optional(arguments, "ref");
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            var target = reference is null ? null : SchemaNodeRef.Parse(reference);
+            var scope = target is null ? AnalyzeScope.Connection : AnalyzeScope.Table;
+            var report = await driver.AnalyzeAsync(session, scope, target, ct);
+
+            return Ok(new
+            {
+                count = report.Findings.Count,
+                findings = report.Findings.Select(finding => new
+                {
+                    finding.Category,
+                    finding.Severity,
+                    finding.Title,
+                    finding.Detail,
+                    // The statement that fixes it, for preview_script. Never run from here.
+                    fix = finding.Statement,
+                }),
+            });
+        }
+    }
+
+    private async Task<McpToolResult> ActivityAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            var activity = await ServerActivity.ReadAsync(driver, session, ct);
+
+            return Ok(new
+            {
+                running = activity.Operations.Select(operation => new
+                {
+                    session = operation.Id,
+                    operation.Kind,
+                    operation.Target,
+                    operation.PercentComplete,
+                    operation.ElapsedMs,
+                    statement = operation.Statement,
+                }),
+                waiting = activity.Waits.Select(wait => new
+                {
+                    wait.Blocker,
+                    wait.Blocked,
+                    wait.Resource,
+                    wait.WaitMs,
+                    statement = wait.Statement,
+                }),
+            });
+        }
+    }
+
+    private async Task<McpToolResult> RedisValueAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var key = Required(arguments, "key");
+        var database = Number(arguments, "database") ?? 0;
+
+        var (_, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            if (session.Unwrap() is not RedisSession redis)
+                return new McpToolResult("that connection is not Redis", IsError: true);
+
+            // The first page of a collection value: enough to see what is in there, capped like
+            // every other tool.
+            var value = await RedisValues.ReadAsync(
+                redis.Multiplexer.GetDatabase(database), key, 0, MaxRows, ct);
+
+            return value is null
+                ? new McpToolResult($"there is no key '{key}'", IsError: true)
+                : Ok(value);
+        }
     }
 
     private async Task<McpToolResult> PreviewAsync(JsonElement arguments, CancellationToken ct)

@@ -4,6 +4,7 @@ import { ActionIcon, AppShell, Divider, Group, Text, Tooltip } from "@mantine/co
 import { IconDatabaseCog, IconLayoutBoard, IconPalette, IconTable } from "@tabler/icons-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeDrawer } from "../ThemeDrawer";
+import { UserMenu } from "../auth/UserMenu";
 import { BrandLinks } from "./BrandLinks";
 import { useStudioTitle } from "./useStudioTitle";
 
@@ -60,6 +61,8 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
                 <IconPalette size={18} />
               </ActionIcon>
             </Tooltip>
+            {/* Only on a studio with accounts; it renders nothing otherwise. */}
+            <UserMenu />
             {/* What this studio does, and where it comes from, are two different kinds of link. */}
             <Divider orientation="vertical" my={12} mx={4} />
             <BrandLinks />

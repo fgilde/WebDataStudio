@@ -60,7 +60,7 @@ public sealed class RedisDriver : IDbDriver
 
     public DriverCapabilities Caps { get; } = new()
     {
-        Sql = false, MultiDatabase = true, Backup = true,
+        Sql = false, TabularBrowse = false, MultiDatabase = true, Backup = true,
         SessionList = true, KillSession = true, ServerStats = true, SystemCommands = true,
     };
 

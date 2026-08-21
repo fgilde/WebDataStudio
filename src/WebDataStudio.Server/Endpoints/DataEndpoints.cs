@@ -41,6 +41,15 @@ public static class DataEndpoints
                 var (driver, session) = await factory.OpenAsync(conn, ct);
                 await using (session)
                 {
+                    // A Redis key is one value, not a page of rows. Building `SELECT * FROM key`
+                    // for it produced a command the server rejected, which told the user nothing.
+                    if (!driver.Caps.TabularBrowse)
+                        return Results.BadRequest(new
+                        {
+                            message = $"{driver.Info.Label} has no rows to browse; open the key in " +
+                                      "the key browser instead",
+                        });
+
                     var target = SchemaEndpoints.ParseObjectRef(objectRef);
                     var detail = await driver.DescribeAsync(session, target, ct);
                     var identity = RowIdentity.Resolve(detail);

@@ -5,6 +5,10 @@ namespace WebDataStudio.Server.Drivers.Abstractions;
 public sealed record DriverCapabilities
 {
     public bool Sql { get; init; } = true;
+
+    /// Whether an object can be browsed as a page of rows. False for a key/value store, where an
+    /// object is one value with a shape of its own and `SELECT * FROM key` means nothing.
+    public bool TabularBrowse { get; init; } = true;
     public bool MultiSchema { get; init; }
     public bool MultiDatabase { get; init; }
     public bool EstimatedPlan { get; init; }

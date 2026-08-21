@@ -204,11 +204,16 @@ function QueryDesignerDockPanel(
   );
 }
 
-function RedisDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+function RedisDockPanel(
+  props: IDockviewPanelProps<{ connectionId: string; key?: string; database?: number }>) {
   const shell = useShell();
   const connection = shell.connections.find(c => c.id === props.params.connectionId);
 
-  return <RedisPanel connectionId={props.params.connectionId} readOnly={connection?.readOnly ?? false} />;
+  return (
+    <RedisPanel connectionId={props.params.connectionId}
+      readOnly={connection?.readOnly ?? false}
+      initialKey={props.params.key} initialDatabase={props.params.database} />
+  );
 }
 
 function FederationDockPanel() {
@@ -602,6 +607,29 @@ export function DockShell() {
   const engineOf = useCallback((connectionId: string) =>
     connections.find(c => c.id === connectionId)?.engine ?? "postgresql", [connections]);
 
+  /// Opens the Redis panel on one key. The ref is `Table:{db}/{part}/{part}`, and the key is those
+  /// parts joined by ':' again — the separator the tree split them on.
+  const openRedisKey = useCallback((connectionId: string, objectRef: string) => {
+    const path = objectRef.split(":").slice(1).join(":").split("/");
+    const database = Number(path[0]) || 0;
+    const key = path.slice(1).join(":");
+    const id = `redis:${connectionId}`;
+
+    const existing = api.current?.getPanel(id);
+    if (existing) {
+      existing.api.updateParameters({ connectionId, key, database });
+      focusPanel(id);
+      flashPanel(existing.group.element);
+      return;
+    }
+
+    api.current?.addPanel({
+      id, component: "redis", title: "Keys", params: { connectionId, key, database },
+      position: centerGroup.current ? { referenceGroup: centerGroup.current } : undefined,
+    });
+    flashPanel(api.current?.getPanel(id)?.group.element);
+  }, [focusPanel]);
+
   const handleAction = useCallback(async (action: ExplorerAction, s: ExplorerSelection) => {
     const name = qualify(s.connectionId, s.node.ref);
     const engine = engineOf(s.connectionId);
@@ -621,7 +649,11 @@ export function DockShell() {
         break;
 
       case "open-data":
-        await openData(s.connectionId, s.node.ref, s.node.label);
+        // A Redis key is one value, not a page of rows: it belongs in the key browser. Asking the
+        // data tab for it produced "ERR wrong number of arguments for 'select' command", because
+        // `SELECT * FROM key` is not a thing Redis can be asked.
+        if (engine === "redis") openRedisKey(s.connectionId, s.node.ref);
+        else await openData(s.connectionId, s.node.ref, s.node.label);
         break;
 
       case "new-query":
@@ -784,7 +816,8 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       default:
         setSelection(s);
     }
-  }, [focusPanel, newTab, openData, openDesigner, qualify, engineOf, parentTableRef, connections]);
+  }, [focusPanel, newTab, openData, openDesigner, openRedisKey, qualify, engineOf, parentTableRef,
+    connections]);
 
   const runStatement = useCallback((connectionId: string, sql: string) => newTab(connectionId, sql), [newTab]);
 

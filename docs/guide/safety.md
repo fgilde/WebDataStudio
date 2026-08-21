@@ -75,6 +75,9 @@ WDS_USERS='ada:admin:pbkdf2$210000$c2FsdA==$aGFzaA==;grace:viewer:pbkdf2$...:PRO
   administration panel says which of the two each account uses.
 - `WDS_USER`/`WDS_PASSWORD` keep working and mean one admin.
 
+The header shows a person icon once accounts exist: who is signed in, their role and what it may
+do, and **Sign out**. On a studio without accounts there is nothing to be and no menu.
+
 Accounts are deployment configuration, not stored state. They come from the environment, so a
 container rollout is the only way to change them and nobody can grant themselves a role through the
 UI. The *Studio users* tab lists who exists; it does not edit.

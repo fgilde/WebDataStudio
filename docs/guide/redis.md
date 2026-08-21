@@ -80,6 +80,15 @@ what "stuck" looks like, and the panel says how long the oldest has been idle.
 `slowlog-log-slower-than`, so an empty list means nothing was slower than that — not that the studio
 cannot see it.
 
+## Opening a key
+
+A double-click on a key in the explorer opens it in the **Keys** tab with its value loaded — not in
+the data tab. A Redis key is one value with a shape of its own, not a page of rows, and asking the
+data tab for it used to produce `ERR wrong number of arguments for 'select' command`, because
+`SELECT * FROM key` is not something Redis can be asked. The API says the same thing now: browsing
+rows on a Redis connection answers "Redis has no rows to browse; open the key in the key browser
+instead".
+
 ## Command help in the console
 
 A Redis connection's query tab is a command console, and it completes from what **this** server

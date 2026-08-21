@@ -18,13 +18,24 @@ const TYPES = ["", "string", "hash", "list", "set", "zset", "stream"];
 /// Redis, as a Redis user expects it: a keyspace to walk, a value to edit in the shape it has, and
 /// the handful of administrative views that answer why it is slow or large. The command console in
 /// a query tab stays where it is — this is the other half.
-export function RedisPanel({ connectionId, readOnly }: { connectionId: string; readOnly: boolean }) {
+export function RedisPanel({ connectionId, readOnly, initialKey, initialDatabase }: {
+  connectionId: string;
+  readOnly: boolean;
+  /// A key to open straight away — what a double-click in the explorer means for Redis. A key is
+  /// one value, not a page of rows, so it opens here rather than in the data tab.
+  initialKey?: string;
+  initialDatabase?: number;
+}) {
   const [databases, setDatabases] = useState<{ database: number; keys: number }[]>([]);
-  const [database, setDatabase] = useState(0);
+  const [database, setDatabase] = useState(initialDatabase ?? 0);
 
   useEffect(() => {
     redisDatabases(connectionId).then(setDatabases).catch(() => setDatabases([]));
   }, [connectionId]);
+
+  useEffect(() => {
+    if (initialDatabase !== undefined) setDatabase(initialDatabase);
+  }, [initialDatabase]);
 
   return (
     <Tabs defaultValue="browser" h="100%" styles={{ panel: { height: "calc(100% - 34px)", minHeight: 0 } }}>
@@ -38,7 +49,7 @@ export function RedisPanel({ connectionId, readOnly }: { connectionId: string; r
 
       <Tabs.Panel value="browser">
         <KeyBrowser connectionId={connectionId} database={database} readOnly={readOnly}
-          databases={databases} onDatabaseChange={setDatabase} />
+          databases={databases} onDatabaseChange={setDatabase} initialKey={initialKey} />
       </Tabs.Panel>
       <Tabs.Panel value="analysis">
         <Analysis connectionId={connectionId} database={database} />
@@ -56,14 +67,15 @@ export function RedisPanel({ connectionId, readOnly }: { connectionId: string; r
   );
 }
 
-function KeyBrowser({ connectionId, database, readOnly, databases, onDatabaseChange }: {
+function KeyBrowser({ connectionId, database, readOnly, databases, onDatabaseChange, initialKey }: {
   connectionId: string;
   database: number;
   readOnly: boolean;
   databases: { database: number; keys: number }[];
   onDatabaseChange: (database: number) => void;
+  initialKey?: string;
 }) {
-  const [match, setMatch] = useState("*");
+  const [match, setMatch] = useState(initialKey ?? "*");
   const [type, setType] = useState("");
   const [keys, setKeys] = useState<RedisKeyDto[]>([]);
   const [cursor, setCursor] = useState(0);
@@ -103,6 +115,12 @@ function KeyBrowser({ connectionId, database, readOnly, databases, onDatabaseCha
       })
       .catch(e => setError(e.message));
   }, [connectionId, database]);
+
+  // A key the explorer asked for opens by itself, so a double-click lands on the value rather
+  // than on a list the user then has to search.
+  useEffect(() => {
+    if (initialKey) open(initialKey);
+  }, [initialKey, open]);
 
   const previewBulk = (action: string) => {
     redisPreviewBulk(connectionId, {

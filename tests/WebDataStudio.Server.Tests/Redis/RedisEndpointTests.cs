@@ -117,6 +117,25 @@ public class RedisEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    /// A key is one value, not a page of rows. Asking the data tab for it used to reach the driver
+    /// as `SELECT * FROM key` and come back as "ERR wrong number of arguments for 'select' command",
+    /// which told the user nothing about what to do instead.
+    [Fact]
+    public async Task Browsing_rows_on_redis_says_where_to_look_instead()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var id = await IdAsync(client, "CACHE");
+
+        var response = await client.GetAsync($"/api/data/{id}?ref=Table:0/user/1", ct);
+        var message = await response.Content.ReadAsStringAsync(ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("key browser", message);
+        Assert.DoesNotContain("select", message, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task An_unknown_connection_is_a_404()
     {

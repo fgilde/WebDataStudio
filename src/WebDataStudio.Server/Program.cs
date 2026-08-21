@@ -66,6 +66,7 @@ builder.Services.AddSingleton(sp => AssistantOptions.FromConfiguration(sp.GetReq
 builder.Services.AddSingleton<Assistant>();
 builder.Services.AddSingleton(sp => McpOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<McpToolbox>();
+builder.Services.AddSingleton<McpAvailability>();
 builder.Services.AddHttpClient("assist", client => client.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddSingleton<DriverRegistry>();
 builder.Services.AddSingleton<TunnelManager>();
@@ -106,7 +107,7 @@ foreach (var (label, path, error) in new[]
 }
 
 app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assistantOptions,
-    McpOptions mcpOptions) => Results.Ok(new
+    McpAvailability mcpAvailability) => Results.Ok(new
 {
     status = connectionStore.Available && workspaceStore.Available ? "ok" : "degraded",
     version,
@@ -124,10 +125,9 @@ app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assista
     // Off unless configured, and said out loud: a studio that quietly talks to an endpoint would
     // be the wrong kind of surprise.
     assist = assistantOptions.Configured,
-    // The MCP endpoint, so a client can find it without being told where to look.
-    mcp = mcpOptions.Enabled
-        ? new { path = mcpOptions.Path, writes = mcpOptions.AllowWrite, needsKey = mcpOptions.Key is not null }
-        : null,
+    // The MCP endpoint, so a client can find it without being told where to look — and so a
+    // studio that refuses to serve it says why instead of advertising a path that answers HTML.
+    mcp = mcpAvailability.Describe(),
 })).AllowAnonymous();
 
 // A stuck data directory is a dependency failure, not a bug in the request: say so, with the path

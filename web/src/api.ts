@@ -56,8 +56,11 @@ export interface HealthDto {
   connections: number;
   /// True when an assistance endpoint is configured. Absent on older servers.
   assist?: boolean;
-  /// Where the MCP endpoint is, when the studio has one. Null when it has none.
-  mcp?: { path: string; writes: boolean; needsKey: boolean } | null;
+  /// Where the MCP endpoint is, when the studio has one. Null when nobody asked for one.
+  /// `enabled` is false when it was asked for but refused — `reason` says why.
+  mcp?: {
+    path: string; writes: boolean; needsKey: boolean; enabled: boolean; reason: string | null;
+  } | null;
 }
 
 export const health = (): Promise<HealthDto> => fetch(`${base}/health`).then(r => ok<HealthDto>(r));
@@ -218,6 +221,13 @@ export const assistAsk = (conn: string, question: string, includeSchema: boolean
   fetch(`${base}/assist/ask`, json("POST", { connectionId: conn, question, includeSchema }))
     .then(r => ok<AssistReplyDto>(r));
 
+/// A conversation: the history belongs to the client, the system prompt and the tools to the
+/// server. Nothing is kept server-side, so a restart loses no session and two tabs cannot collide.
+export const assistChat = (conn: string,
+  messages: { role: string; content: string }[], includeSchema: boolean): Promise<AssistReplyDto> =>
+  fetch(`${base}/assist/chat`, json("POST", { connectionId: conn, messages, includeSchema }))
+    .then(r => ok<AssistReplyDto>(r));
+
 export interface McpInfoDto {
   name: string;
   protocolVersion: string;
@@ -226,9 +236,21 @@ export interface McpInfoDto {
   tools: { name: string; description: string; writes: boolean }[];
 }
 
-/// The MCP endpoint describes itself on a GET. It lives outside /api, so it takes its own path.
-export const mcpInfo = (path: string): Promise<McpInfoDto> =>
-  fetch(path, { headers: { accept: "application/json" } }).then(r => ok<McpInfoDto>(r));
+/// The MCP endpoint describes itself on a GET. It lives outside /api, so it takes its own path —
+/// and when the studio refuses to serve it, that path falls through to the SPA and answers HTML.
+/// Saying so beats "Unexpected token '<'".
+export const mcpInfo = async (path: string): Promise<McpInfoDto> => {
+  const response = await fetch(path, { headers: { accept: "application/json" } });
+  const text = await response.text();
+
+  try {
+    return JSON.parse(text) as McpInfoDto;
+  } catch {
+    throw new Error(
+      `${path} did not answer as JSON (HTTP ${response.status}). The endpoint is not being served — `
+      + "check the studio's log for the reason.");
+  }
+};
 
 /// Both calls answer 501 when no assistance endpoint is configured, which is how the UI knows not
 /// to offer them at all.

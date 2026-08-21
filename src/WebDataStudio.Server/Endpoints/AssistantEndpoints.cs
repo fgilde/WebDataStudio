@@ -6,6 +6,8 @@ namespace WebDataStudio.Server.Endpoints;
 public static class AssistantEndpoints
 {
     public record AssistDto(string ConnectionId, string? Sql, string? Question, bool? IncludeSchema);
+    public record ChatTurnDto(string Role, string Content);
+    public record ChatDto(string ConnectionId, List<ChatTurnDto> Messages, bool? IncludeSchema);
 
     public static void MapAssistantEndpoints(this WebApplication app)
     {
@@ -21,6 +23,42 @@ public static class AssistantEndpoints
         // endpoint exposes, with the same rules — and looks things up instead of guessing.
         app.MapPost("/api/assist/ask", (AssistDto body, Assistant assistant, CancellationToken ct) =>
             RunAsync(assistant, body, ct, Kind.Ask));
+
+        // A conversation, which is what the chat panel in the corner speaks. The history comes
+        // from the client because it is the client's to keep — the server holds no session, so a
+        // restart loses nothing and two tabs cannot tread on each other.
+        app.MapPost("/api/assist/chat", async (ChatDto body, Assistant assistant,
+            CancellationToken ct) =>
+        {
+            if (!assistant.Configured)
+                return Results.Json(
+                    new { message = "no assistance is configured; set WDS_ASSIST_ENDPOINT to enable it" },
+                    statusCode: StatusCodes.Status501NotImplemented);
+
+            var history = (body.Messages ?? [])
+                .Where(turn => !string.IsNullOrWhiteSpace(turn.Content))
+                .Select(turn => new ChatTurn(turn.Role, turn.Content))
+                .ToList();
+
+            // A long conversation is the model's problem to summarise, not ours to send whole: the
+            // last turns are what the answer depends on.
+            if (history.Count > 30) history = [.. history.Skip(history.Count - 30)];
+
+            try
+            {
+                var reply = await assistant.ChatAsync(
+                    new AssistRequest(body.ConnectionId, null, null, body.IncludeSchema ?? false),
+                    history, ct);
+
+                return Results.Ok(new
+                {
+                    text = reply.Text, statements = reply.Statements, usedTools = reply.UsedTools,
+                });
+            }
+            catch (AssistantException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
 
         // What the UI needs to decide which buttons exist.
         app.MapGet("/api/assist/capabilities", (Assistant assistant, McpToolbox toolbox) =>

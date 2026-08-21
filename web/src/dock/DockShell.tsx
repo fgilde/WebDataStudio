@@ -1016,6 +1016,17 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     return () => document.removeEventListener("wds:layouts", open);
   }, []);
 
+  // The chat lives outside the dock, so "put this in the editor" arrives as an event.
+  useEffect(() => {
+    const use = (event: Event) => {
+      const sql = (event as CustomEvent<string>).detail;
+      if (typeof sql === "string" && sql.trim().length > 0) newTab(activeConnection, sql);
+    };
+
+    document.addEventListener("wds:use-sql", use);
+    return () => document.removeEventListener("wds:use-sql", use);
+  }, [activeConnection, newTab]);
+
   // A deep link opens its target once the connections are known.
   const followedLink = useRef(false);
   useEffect(() => {

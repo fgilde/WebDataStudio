@@ -11,6 +11,10 @@ namespace WebDataStudio.Server.Services;
 public sealed record AssistRequest(
     string ConnectionId, string? Sql, string? Question, bool IncludeSchema);
 
+/// One turn of a conversation. `user` and `assistant` are the only roles a client may send; the
+/// system prompt is the studio's, and tool turns never leave the server.
+public sealed record ChatTurn(string Role, string Content);
+
 /// The reply as text, plus any SQL it contained. The statements are handed over as text and never
 /// executed — a suggestion is a suggestion.
 public sealed record AssistReply(
@@ -47,7 +51,7 @@ public sealed class AssistantException(string message) : Exception(message);
 /// — a summary of table and column names. Never a row of data.
 public sealed partial class Assistant(
     IHttpClientFactory clients, AssistantOptions options, SessionFactory factory,
-    McpToolbox toolbox, McpOptions mcp, ConnectionRegistry registry)
+    McpToolbox toolbox, McpAvailability mcp, ConnectionRegistry registry)
 {
     /// How many times the model may come back asking for another tool call. Enough to look
     /// something up, read it and answer; not enough to sit in a loop on somebody's bill.
@@ -101,6 +105,31 @@ public sealed partial class Assistant(
             request.Question!, ct);
     }
 
+    /// A conversation rather than a single question: the history comes from the client, the system
+    /// prompt and the tools come from here. With tools it reads the database to answer; without them
+    /// it is a well-informed rubber duck that knows SQL.
+    public Task<AssistReply> ChatAsync(
+        AssistRequest request, IReadOnlyList<ChatTurn> history, CancellationToken ct)
+    {
+        if (history.Count == 0) throw new AssistantException("there is nothing to answer");
+
+        var system =
+            "You are the assistant inside WebDataStudio, a database studio. You are talking to an " +
+            "engineer who knows SQL. Answer briefly and concretely, and say when you are unsure. " +
+            "Put any SQL in a ```sql block so it can be put into the editor with one click. " +
+            (HasTools
+                ? "You can inspect the database with the tools you have — use them rather than " +
+                  "guessing at table or column names, and say what you looked at. "
+                : "You cannot read the database: answer from what you are told, and say so when " +
+                  "that is not enough. ") +
+            (HasTools && mcp.AllowWrite
+                ? "You may change data, but only through preview_script and apply_script, in that " +
+                  "order, and you say what the script does before you apply it."
+                : "You cannot change anything.");
+
+        return AskAsync(request, system, history, ct);
+    }
+
     public Task<AssistReply> DraftAsync(AssistRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.Question))
@@ -112,13 +141,19 @@ public sealed partial class Assistant(
             request.Question!, ct);
     }
 
+    private Task<AssistReply> AskAsync(
+        AssistRequest request, string system, string user, CancellationToken ct) =>
+        AskAsync(request, system, [new ChatTurn("user", user)], ct);
+
     private async Task<AssistReply> AskAsync(
-        AssistRequest request, string system, string user, CancellationToken ct)
+        AssistRequest request, string system, IReadOnlyList<ChatTurn> history, CancellationToken ct)
     {
         if (!options.Configured)
             throw new AssistantException("no assistance endpoint is configured");
 
-        var prompt = new StringBuilder(user);
+        // The context — which connection, and optionally its schema — rides on the last user turn,
+        // so a long conversation does not repeat it in every message.
+        var prompt = new StringBuilder(history[^1].Content);
 
         // With tools, the model has to be told which connection it is looking at — otherwise its
         // first tool call guesses an id, fails, and burns a round finding out.
@@ -135,11 +170,16 @@ public sealed partial class Assistant(
                 prompt.Append("\n\nThe schema, names only:\n").Append(schema);
         }
 
-        var messages = new List<object>
-        {
-            new { role = "system", content = system },
-            new { role = "user", content = prompt.ToString() },
-        };
+        var messages = new List<object> { new { role = "system", content = system } };
+
+        foreach (var turn in history.Take(history.Count - 1))
+            messages.Add(new
+            {
+                role = turn.Role == "assistant" ? "assistant" : "user",
+                content = turn.Content,
+            });
+
+        messages.Add(new { role = "user", content = prompt.ToString() });
 
         var tools = HasTools
             ? toolbox.Tools.Select(tool => new

@@ -41,6 +41,15 @@ public sealed class McpToolbox(
             + "the group and colour it carries. Every other tool takes one of these ids.",
             Object(), Writes: false);
 
+        yield return new McpTool("list_tables",
+            "Every table and view of a connection, with its ref — the answer to \"what is in this "
+            + "database\" in one call. Use this before list_objects: that one walks the tree a level "
+            + "at a time, which is only worth doing for a database too large to list.",
+            Object(
+                ("connectionId", "string", "Connection id from list_connections.", true),
+                ("schema", "string", "Only this schema, if the engine has schemas.", false)),
+            Writes: false);
+
         yield return new McpTool("list_objects",
             "Walks the object tree of a connection. Without a parent it lists the top level "
             + "(schemas or folders); with one it lists that node's children. A node's `ref` is what "
@@ -113,6 +122,7 @@ public sealed class McpToolbox(
             return name switch
             {
                 "list_connections" => ListConnections(),
+                "list_tables" => await ListTablesAsync(arguments, ct),
                 "list_objects" => await ListObjectsAsync(arguments, ct),
                 "describe_object" => await DescribeAsync(arguments, ct),
                 "browse_rows" => await BrowseAsync(arguments, ct),
@@ -139,6 +149,54 @@ public sealed class McpToolbox(
         group = spec.Group,
         colour = spec.Color,
     }));
+
+    /// Walks the tree for the caller, breadth-first, and returns the leaves. Bounded, because a
+    /// database with thousands of tables is exactly where an unbounded walk hurts.
+    private async Task<McpToolResult> ListTablesAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var schema = Optional(arguments, "schema");
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            var found = new List<object>();
+            var queue = new Queue<SchemaNodeRef?>();
+            queue.Enqueue(null);
+            var visited = 0;
+
+            while (queue.Count > 0 && visited++ < 200 && found.Count < 500)
+            {
+                var parent = queue.Dequeue();
+
+                foreach (var node in await driver.IntrospectAsync(session, parent, ct))
+                {
+                    if (node.Ref.Kind is SchemaNodeKind.Table or SchemaNodeKind.View
+                        or SchemaNodeKind.MaterializedView)
+                    {
+                        if (schema is { Length: > 0 } && node.Ref.Path.Count > 1
+                            && !node.Ref.Path[0].Equals(schema, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
+                        found.Add(new
+                        {
+                            @ref = node.Ref.ToString(),
+                            name = node.Ref.Name,
+                            schema = node.Ref.Path.Count > 1 ? node.Ref.Path[0] : null,
+                            kind = node.Ref.Kind.ToString(),
+                            detail = node.Detail,
+                        });
+                        continue;
+                    }
+
+                    // A folder or a schema: worth opening, and nothing to report by itself.
+                    if (node.HasChildren) queue.Enqueue(node.Ref);
+                }
+            }
+
+            return Ok(new { count = found.Count, tables = found });
+        }
+    }
 
     private async Task<McpToolResult> ListObjectsAsync(JsonElement arguments, CancellationToken ct)
     {

@@ -59,7 +59,8 @@ deployment from a terminal.
 | Tool | What it does |
 |---|---|
 | `list_connections` | the databases this studio can reach, with their ids |
-| `list_objects` | walks the object tree — schemas, folders, tables, views |
+| `list_tables` | every table and view of a connection in one call — the usual first question |
+| `list_objects` | walks the object tree a level at a time, for a database too large to list |
 | `describe_object` | columns, indexes, foreign keys, triggers, row count, and which columns are masked |
 | `browse_rows` | a page of rows from one table, masked and capped |
 | `run_query` | one **reading** statement, masked and capped |

@@ -146,3 +146,4 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F22.1 | Optional explain and draft-SQL against an OpenAI-compatible endpoint; absent unless configured, sends no row of data, executes nothing | done | all | Query tab |
 | F22.2 | MCP server over JSON-RPC/HTTP: list, describe, browse, read-only query, and a previewed write behind a flag; masking and read-only enforced for agents too | done | all | MCP endpoint, header dialog |
 | F22.3 | The assistant answers from the database through the MCP tools, naming the ones it used | done | all | Query tab, assistant dialog |
+| F22.4 | A chat in the corner with sessions that survive a reload, the MCP tools where they exist, and one click from a suggested statement to the editor | done | all | Chat panel |

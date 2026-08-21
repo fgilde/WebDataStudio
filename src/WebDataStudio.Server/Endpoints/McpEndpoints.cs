@@ -18,18 +18,15 @@ public static class McpEndpoints
     public static void MapMcpEndpoints(this WebApplication app)
     {
         var options = app.Services.GetRequiredService<McpOptions>();
-        if (!options.Enabled) return;
+        var availability = app.Services.GetRequiredService<McpAvailability>();
 
-        // A studio with a login must not have an unguarded back door: the MCP endpoint sits outside
-        // the login (an agent has no cookie), so it needs a key of its own or it does not open.
-        var users = app.Services.GetRequiredService<UserStore>();
-        if (!users.Anonymous && options.Key is null)
+        if (!availability.Enabled)
         {
-            app.Services.GetRequiredService<ILoggerFactory>()
-                .CreateLogger("WebDataStudio.Mcp")
-                .LogError("This studio has accounts, so the MCP endpoint needs WDS_MCP_KEY. " +
-                          "Without it an agent would reach every database without signing in, so " +
-                          "the endpoint stays off.");
+            // Configured but refused is worth saying out loud; not configured at all is silence.
+            if (availability.Reason is { } reason)
+                app.Services.GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("WebDataStudio.Mcp").LogError("{Reason}", reason);
+
             return;
         }
 
@@ -106,8 +103,10 @@ public static class McpEndpoints
                     },
                     instructions =
                         "The databases of a WebDataStudio instance. Start with list_connections, "
-                        + "then list_objects and describe_object to find your way around, then "
-                        + "run_query to read. Masked columns come back as dots on purpose. "
+                        + "then list_tables for what is in one, describe_object for its columns and "
+                        + "keys, and run_query to read. list_objects walks the tree a level at a "
+                        + "time, for a database too large to list. Masked columns come back as dots "
+                        + "on purpose — describe_object says which ones. "
                         + (options.AllowWrite
                             ? "Writing goes through preview_script and apply_script, in that order."
                             : "This endpoint is read-only."),

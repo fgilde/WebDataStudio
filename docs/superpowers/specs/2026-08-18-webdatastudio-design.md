@@ -448,6 +448,7 @@ it works for every engine whose capability set claims support for it.
 | F22.1 | Optional assistance that explains a statement or drafts one, off unless configured |
 | F22.2 | The studio answers as an MCP server, with the same rules a person gets |
 | F22.3 | The assistant can answer from the database through those same tools |
+| F22.4 | A chat with sessions, in the corner, using those tools where they exist |
 
 ## 10. Safety behaviour
 

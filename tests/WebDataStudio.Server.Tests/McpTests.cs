@@ -276,7 +276,9 @@ public class McpTests : IAsyncLifetime
         Assert.True(authorised.IsSuccessStatusCode);
     }
 
-    /// An agent endpoint that skips the login screen would be a back door, so it does not open.
+    /// An agent endpoint that skips the login screen would be a back door, so it does not open —
+    /// and health says why, because otherwise the header dialog advertises a path that answers the
+    /// SPA's HTML and the user gets "Unexpected token '<'".
     [Fact]
     public async Task A_studio_with_accounts_needs_an_mcp_key()
     {
@@ -289,6 +291,41 @@ public class McpTests : IAsyncLifetime
             new { jsonrpc = "2.0", id = 1, method = "ping" }, ct);
 
         Assert.False(response.IsSuccessStatusCode);
+
+        var mcp = (await client.GetFromJsonAsync<JsonElement>("/api/health", ct))
+            .GetProperty("mcp");
+
+        Assert.False(mcp.GetProperty("enabled").GetBoolean());
+        Assert.Contains("WDS_MCP_KEY", mcp.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task A_served_endpoint_reports_itself_as_enabled()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+
+        var mcp = (await factory.CreateClient().GetFromJsonAsync<JsonElement>("/api/health", ct))
+            .GetProperty("mcp");
+
+        Assert.True(mcp.GetProperty("enabled").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, mcp.GetProperty("reason").ValueKind);
+    }
+
+    /// With accounts and a key it works, and the key is what guards it.
+    [Fact]
+    public async Task Accounts_and_a_key_together_are_fine()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory(
+            ("WDS_MCP_ENABLED", "true"), ("WDS_USERS", "ada:admin:one"), ("WDS_MCP_KEY", "k"));
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-API-Key", "k");
+
+        var response = await client.PostAsJsonAsync("/mcp",
+            new { jsonrpc = "2.0", id = 1, method = "ping" }, ct);
+
+        Assert.True(response.IsSuccessStatusCode);
     }
 
     [Fact]

@@ -4,6 +4,7 @@ import { ActionIcon, AppShell, Divider, Group, Text, Tooltip } from "@mantine/co
 import { IconDatabaseCog, IconLayoutBoard, IconPalette, IconTable } from "@tabler/icons-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeDrawer } from "../ThemeDrawer";
+import { ChatDock } from "../assist/ChatDock";
 import { UserMenu } from "../auth/UserMenu";
 import { McpButton } from "../mcp/McpButton";
 import { BrandLinks } from "./BrandLinks";
@@ -73,6 +74,9 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
         </Group>
       </AppShell.Header>
       <AppShell.Main h="calc(100vh - 44px)">{children}</AppShell.Main>
+      {/* In the corner, over everything, and absent unless assistance is configured. */}
+      <ChatDock onUseStatement={sql =>
+        document.dispatchEvent(new CustomEvent("wds:use-sql", { detail: sql }))} />
       <ThemeDrawer opened={themeOpen} onClose={() => setThemeOpen(false)} />
     </AppShell>
   );

@@ -7,19 +7,26 @@ import { mcpInfo, type McpInfoDto } from "../api";
 
 /// The MCP endpoint, as something somebody can paste into their agent. The point is not to explain
 /// the protocol: it is to hand over the two lines of configuration their client wants.
-export function McpModal({ opened, onClose, path, needsKey }: {
+export function McpModal({ opened, onClose, path, needsKey, enabled = true, reason = null }: {
   opened: boolean;
   onClose: () => void;
   path: string;
   needsKey: boolean;
+  /// False when the studio was asked for an endpoint it refuses to serve.
+  enabled?: boolean;
+  reason?: string | null;
 }) {
   const [info, setInfo] = useState<McpInfoDto | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!opened) return;
-    mcpInfo(path).then(setInfo).catch(e => setError(e instanceof Error ? e.message : String(e)));
-  }, [opened, path]);
+    // Nothing to read when the endpoint is not being served: the path would answer the SPA's HTML.
+    if (!opened || !enabled) return;
+
+    mcpInfo(path)
+      .then(found => { setInfo(found); setError(null); })
+      .catch(e => setError(e instanceof Error ? e.message : String(e)));
+  }, [opened, path, enabled]);
 
   const url = useMemo(() => new URL(path, window.location.origin).toString(), [path]);
 
@@ -62,6 +69,14 @@ export function McpModal({ opened, onClose, path, needsKey }: {
     <Modal opened={opened} onClose={onClose} size="xl"
       title="This studio as an MCP server">
       <Stack gap="sm">
+        {!enabled && (
+          <Alert color="red" p="xs" title="Not being served">
+            <Text size="sm">
+              {reason ?? "The studio is not serving this endpoint; check its log for the reason."}
+            </Text>
+          </Alert>
+        )}
+
         <Group gap="xs">
           <Code>{url}</Code>
           <CopyButton value={url}>
@@ -97,7 +112,7 @@ export function McpModal({ opened, onClose, path, needsKey }: {
 
         {error && <Alert color="red" p="xs"><Text size="sm">{error}</Text></Alert>}
 
-        <Tabs defaultValue="Claude Code">
+        {enabled && <Tabs defaultValue="Claude Code">
           <Tabs.List>
             {Object.keys(snippets).map(name => (
               <Tabs.Tab key={name} value={name}>{name}</Tabs.Tab>
@@ -119,7 +134,7 @@ export function McpModal({ opened, onClose, path, needsKey }: {
               <Code block style={{ whiteSpace: "pre-wrap" }}>{snippet}</Code>
             </Tabs.Panel>
           ))}
-        </Tabs>
+        </Tabs>}
 
         {info && (
           <>

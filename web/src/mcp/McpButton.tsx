@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { ActionIcon, Indicator, Tooltip } from "@mantine/core";
-import { IconPlugConnected } from "@tabler/icons-react";
-import { health } from "../api";
+import { IconPlugConnected, IconPlugConnectedX } from "@tabler/icons-react";
+import { health, type HealthDto } from "../api";
 import { McpModal } from "./McpModal";
 
-/// The way to hand this studio to an agent. Absent unless the studio really is an MCP server: a
-/// button that opens instructions for a feature nobody switched on is just noise.
+type Mcp = NonNullable<HealthDto["mcp"]>;
+
+/// The way to hand this studio to an agent. Absent unless somebody asked for an MCP endpoint — and
+/// when they asked for one the studio refuses to serve, the icon says that rather than pretending
+/// everything is fine.
 export function McpButton() {
-  const [mcp, setMcp] = useState<{ path: string; writes: boolean; needsKey: boolean } | null>(null);
+  const [mcp, setMcp] = useState<Mcp | null>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -16,19 +19,25 @@ export function McpButton() {
 
   if (!mcp) return null;
 
+  const broken = mcp.enabled === false;
+
   return (
     <>
-      <Tooltip label="Use this studio from an AI agent (MCP)">
+      <Tooltip label={broken
+        ? "MCP is configured but not being served — click for the reason"
+        : "Use this studio from an AI agent (MCP)"}>
         {/* The dot says "this endpoint can write", which is the one thing worth noticing. */}
-        <Indicator disabled={!mcp.writes} color="orange" size={6} offset={4}>
-          <ActionIcon variant="subtle" aria-label="MCP" onClick={() => setOpen(true)}>
-            <IconPlugConnected size={18} />
+        <Indicator disabled={!mcp.writes && !broken} color={broken ? "red" : "orange"}
+          size={6} offset={4}>
+          <ActionIcon variant="subtle" aria-label="MCP" color={broken ? "red" : undefined}
+            onClick={() => setOpen(true)}>
+            {broken ? <IconPlugConnectedX size={18} /> : <IconPlugConnected size={18} />}
           </ActionIcon>
         </Indicator>
       </Tooltip>
 
-      <McpModal opened={open} onClose={() => setOpen(false)}
-        path={mcp.path} needsKey={mcp.needsKey} />
+      <McpModal opened={open} onClose={() => setOpen(false)} path={mcp.path}
+        needsKey={mcp.needsKey} enabled={mcp.enabled !== false} reason={mcp.reason} />
     </>
   );
 }

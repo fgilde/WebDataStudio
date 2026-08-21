@@ -55,6 +55,22 @@ Exactly this:
 Never a row of data. Not a sample, not a value, not a masked one. A column called `secret_token`
 travels as a name when the schema is sent, because that is what a schema is — its contents do not.
 
+## The chat in the corner
+
+A bubble in the bottom-right corner opens a chat panel: a conversation about the connection you pick
+in it, with **sessions** that survive a reload — the last twenty are kept, and the session list is in
+the chat's own menu. Enter sends, Shift+Enter is a newline.
+
+- With an [MCP endpoint](mcp.md) it carries a **tools** badge and reads the database to answer;
+  without one it says so and answers from what you tell it.
+- SQL in an answer gets an **editor** button that opens it in a query tab.
+- The tools an answer used are named above it.
+- The history lives in the browser and the workspace, not on the server: a restart loses no session,
+  and two tabs cannot tread on each other. Only the last 30 turns are sent.
+
+A small local model can drive the tool loop but often reads its own tool results badly — for the
+chat, a capable model is worth the money it costs.
+
 ## Answering from the database
 
 With an [MCP endpoint](mcp.md) configured, the dialog grows a third button: **Answer it from the

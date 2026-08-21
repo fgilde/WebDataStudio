@@ -125,11 +125,19 @@ public static class DataEndpoints
         app.MapGet("/api/data/{conn}/mask-policy", (string conn, MaskPolicyStore policies) =>
         {
             var policy = policies.For(conn);
+            var baseline = policies.Baseline;
+
             return Results.Ok(new
             {
                 maskByDefault = policy.MaskByDefault,
                 extra = policy.Extra.OrderBy(c => c, StringComparer.OrdinalIgnoreCase),
                 never = policy.Never.OrderBy(c => c, StringComparer.OrdinalIgnoreCase),
+                // What the deployment set, so the UI can say "this one is not yours to change here".
+                fromEnvironment = new
+                {
+                    extra = baseline.Extra.OrderBy(c => c, StringComparer.OrdinalIgnoreCase),
+                    never = baseline.Never.OrderBy(c => c, StringComparer.OrdinalIgnoreCase),
+                },
             });
         });
 

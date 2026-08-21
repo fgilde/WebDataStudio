@@ -217,6 +217,101 @@ public class MaskingTests : IAsyncLifetime
         Assert.DoesNotContain("hash-abc", await masked.Content.ReadAsStringAsync(ct));
     }
 
+    /// The deployment's own answer: two lists in the environment, so a schema whose names the word
+    /// list gets wrong is corrected once, in the place the rest of the configuration lives.
+    [Fact]
+    public async Task The_environment_can_name_columns_to_mask_and_to_leave_alone()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DB_PATH"] = Path.Combine(_dir, "wds-env.db"),
+                ["WDS_CONN_SHOP"] = "sqlite:///" + _db.Replace(Path.DirectorySeparatorChar, '/'),
+                ["WDS_MASK_EXTRA"] = "comment, name",
+                ["WDS_MASK_NEVER"] = "api_key",
+            })));
+
+        var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var body = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/data/{id}?ref=Table:main/accounts", ct);
+        var columns = body.GetProperty("columns").EnumerateArray().ToList();
+
+        bool MaskedOf(string name) => columns
+            .First(c => c.GetProperty("name").GetString() == name)
+            .GetProperty("masked").GetBoolean();
+
+        Assert.True(MaskedOf("comment"));
+        Assert.True(MaskedOf("name"));
+        Assert.False(MaskedOf("api_key"));
+        // The heuristic still applies to everything the lists say nothing about.
+        Assert.True(MaskedOf("password_hash"));
+
+        var policy = await client.GetFromJsonAsync<JsonElement>($"/api/data/{id}/mask-policy", ct);
+        Assert.Contains("api_key", policy.GetProperty("fromEnvironment").GetProperty("never")
+            .EnumerateArray().Select(v => v.GetString()));
+    }
+
+    /// With the heuristic off, only the named columns are masked — for a schema whose names the
+    /// word list reads wrong more often than right.
+    [Fact]
+    public async Task The_heuristic_can_be_turned_off_entirely()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DB_PATH"] = Path.Combine(_dir, "wds-off.db"),
+                ["WDS_CONN_SHOP"] = "sqlite:///" + _db.Replace(Path.DirectorySeparatorChar, '/'),
+                ["WDS_MASK_DEFAULT"] = "false",
+                ["WDS_MASK_EXTRA"] = "comment",
+            })));
+
+        var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var body = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/data/{id}?ref=Table:main/accounts", ct);
+        var columns = body.GetProperty("columns").EnumerateArray().ToList();
+
+        bool MaskedOf(string name) => columns
+            .First(c => c.GetProperty("name").GetString() == name)
+            .GetProperty("masked").GetBoolean();
+
+        Assert.False(MaskedOf("password_hash"));
+        Assert.True(MaskedOf("comment"));
+    }
+
+    /// A click in the column menu is somebody looking at the data; it wins over the environment.
+    [Fact]
+    public async Task What_was_set_in_the_ui_wins_over_the_environment()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DB_PATH"] = Path.Combine(_dir, "wds-both.db"),
+                ["WDS_CONN_SHOP"] = "sqlite:///" + _db.Replace(Path.DirectorySeparatorChar, '/'),
+                ["WDS_MASK_EXTRA"] = "name",
+            })));
+
+        var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var saved = await client.PutAsJsonAsync($"/api/data/{id}/mask-policy",
+            new { maskByDefault = true, extra = Array.Empty<string>(), never = new[] { "name" } }, ct);
+        saved.EnsureSuccessStatusCode();
+
+        var body = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/data/{id}?ref=Table:main/accounts", ct);
+        var columns = body.GetProperty("columns").EnumerateArray().ToList();
+
+        Assert.False(columns.First(c => c.GetProperty("name").GetString() == "name")
+            .GetProperty("masked").GetBoolean());
+    }
+
     // A null is not a secret, and masking it would make a masked column impossible to reason about.
     [Fact]
     public void A_null_stays_null()

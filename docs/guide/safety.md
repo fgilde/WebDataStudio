@@ -21,6 +21,24 @@ click; a false negative leaks.
 column*. Both lists are stored per connection in the workspace database and apply to everybody who
 opens that connection — somebody who knows the schema knows it better than a word list does.
 
+**Setting it from the deployment** is the other way, for a schema whose names the word list reads
+wrong:
+
+| Variable | Meaning |
+|---|---|
+| `WDS_MASK_EXTRA` | columns to mask as well, comma-separated |
+| `WDS_MASK_NEVER` | columns to leave alone |
+| `WDS_MASK_DEFAULT` | `false` turns the name heuristic off, leaving only `WDS_MASK_EXTRA` |
+
+```bash
+WDS_MASK_EXTRA=ssn,iban,customer_note
+WDS_MASK_NEVER=token_type
+```
+
+These are the baseline for every connection. A column somebody set from the column menu wins over
+them, because they were looking at the data at the time. The mask-policy call reports which rules
+came from the environment, so the UI can say that.
+
 Where it applies:
 
 | Path | Behaviour |

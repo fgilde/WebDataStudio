@@ -441,6 +441,7 @@ it works for every engine whose capability set claims support for it.
 | F20.1 | A column that holds a secret is masked before it leaves the server |
 | F20.2 | An applied data change can be taken back, script first |
 | F20.3 | Several accounts, each with a role and the connections it may see |
+| F20.4 | The deployment can say which columns are secret, and which are not |
 | F21.1 | A query can join two connections, by staging their rows |
 | F21.2 | A query can be watched, and what changed is visible |
 | F21.3 | An empty table can be filled with plausible rows |

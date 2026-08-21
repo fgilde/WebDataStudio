@@ -437,6 +437,9 @@ it works for every engine whose capability set claims support for it.
 | F18.4 | A recommendation can be applied, not only read |
 | F18.5 | Replicas and their lag |
 | F18.6 | Where the disk went, as areas rather than a list |
+| F20.1 | A column that holds a secret is masked before it leaves the server |
+| F20.2 | An applied data change can be taken back, script first |
+| F20.3 | Several accounts, each with a role and the connections it may see |
 
 ## 10. Safety behaviour
 

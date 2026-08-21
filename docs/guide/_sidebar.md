@@ -14,6 +14,7 @@
 - [Analysis](analysis.md)
 - [Comparison](comparison.md)
 - [Administration](administration.md)
+- [Safety](safety.md)
 - [Diagrams](diagrams.md)
 - [Redis](redis.md)
 - [Engine capabilities](engines.md)

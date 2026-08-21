@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Alert, Badge, Code, Group, Loader, Stack, Table, Text } from "@mantine/core";
-import { listStudioUsers, type StudioUsersDto } from "../api";
+import {
+  Alert, Badge, Button, Code, Group, Loader, Stack, Table, Text, TextInput,
+} from "@mantine/core";
+import { hashStudioPassword, listStudioUsers, type StudioUsersDto } from "../api";
 
 const roleColour = (role: string) =>
   role === "admin" ? "red" : role === "editor" ? "blue" : "gray";
@@ -10,6 +12,10 @@ const roleColour = (role: string) =>
 export function StudioUsers() {
   const [state, setState] = useState<StudioUsersDto | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Hashing here rather than in the browser: the iteration count and the format then come from the
+  // same code that verifies them.
+  const [password, setPassword] = useState("");
+  const [hash, setHash] = useState<string | null>(null);
 
   useEffect(() => {
     listStudioUsers().then(setState)
@@ -35,6 +41,20 @@ export function StudioUsers() {
         From <Code>{state.source}</Code>. Accounts are deployment configuration: change them there
         and roll the container out.
       </Text>
+
+      <Group gap="xs" align="flex-end">
+        <TextInput size="xs" label="Hash a password for WDS_USERS" flex={1} value={password}
+          onChange={e => setPassword(e.currentTarget.value)} />
+        <Button size="compact-sm" variant="default" disabled={password.length === 0}
+          onClick={() => hashStudioPassword(password)
+            .then(r => setHash(r.hash))
+            .catch(e => setError(e instanceof Error ? e.message : String(e)))}>
+          Hash
+        </Button>
+      </Group>
+      {hash ? (
+        <Code block style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{hash}</Code>
+      ) : null}
 
       <Table striped withTableBorder>
         <Table.Thead>

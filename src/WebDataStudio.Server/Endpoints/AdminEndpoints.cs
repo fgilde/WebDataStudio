@@ -10,6 +10,7 @@ public static class AdminEndpoints
     public record SystemCommandRequest(string CommandId, string? Target);
     public record UserRequest(string User, string? Password, string? Privilege, string? Target);
     public record UserApplyRequest(string Hash);
+    public record HashRequest(string Password);
     public record DatabaseRequest(string Name);
     public record BackupRequest(bool? SchemaOnly, bool? DataOnly, List<string>? Tables, string? ServerPath);
 
@@ -21,10 +22,10 @@ public static class AdminEndpoints
         // The studio's own accounts, not the database's. Secrets never leave the server, and the
         // list is read-only: accounts are deployment configuration, so a rollout is the only way to
         // change them and nobody can grant themselves a role through the UI.
-        app.MapGet("/api/admin/studio-users", (UserStore users) => Results.Ok(new
+        app.MapGet("/api/admin/studio-users", (UserStore users, IConfiguration config) => Results.Ok(new
         {
             anonymous = users.Anonymous,
-            source = "WDS_USERS",
+            source = string.IsNullOrWhiteSpace(config["WDS_USERS"]) ? "WDS_USER/WDS_PASSWORD" : "WDS_USERS",
             users = users.All.Select(u => new
             {
                 name = u.Name,
@@ -33,6 +34,14 @@ public static class AdminEndpoints
                 hashed = u.Secret.StartsWith("pbkdf2$", StringComparison.Ordinal),
             }),
         }));
+
+        // Turning a password into what WDS_USERS wants. Hashing is not a secret operation - the
+        // hash it returns is what goes into a deployment - but it stays behind the admin role so it
+        // cannot be used as an oracle by anybody who happens to reach the studio.
+        app.MapPost("/api/admin/studio-users/hash", (HashRequest body) =>
+            string.IsNullOrEmpty(body.Password)
+                ? Results.BadRequest(new { message = "a password is needed" })
+                : Results.Ok(new { hash = UserStore.Hash(body.Password) }));
 
         app.MapGet("/api/admin/activity/{conn}", async (
             string conn, SessionFactory factory, CancellationToken ct) =>

@@ -6,7 +6,8 @@
 | `WDS_CONN_<NAME>` | one connection as a URL or a provider connection string; the name after the prefix becomes its label |
 | `WDS_CONN_<NAME>_ENGINE` | which engine that connection string belongs to |
 | `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | flags for the connection of the same name |
-| `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app |
+| `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app; the account is an admin |
+| `WDS_USERS` | several accounts: `name:role:secret[:conn,conn]` entries separated by `;` — see [Safety](safety.md) |
 | `WDS_TITLE` | a name for this studio, shown in the header, on the login screen and in the browser tab |
 | `WDS_SECRET_KEY` | AES key (base64, 32 bytes) for stored secrets; generated into `/data/.key` if absent |
 | `WDS_READONLY` | when `true`, every connection is read-only regardless of its own flag |
@@ -17,6 +18,23 @@
 | `WDS_OPEN_BROWSER` | `true` opens a browser on start (the default for desktop builds) |
 | `DB_PATH` | application SQLite database, default `/data/webdatastudio.db` |
 | `ASPNETCORE_URLS` | listen address, default `http://0.0.0.0:8080` |
+
+## Accounts
+
+```bash
+# one admin, as before
+WDS_USER=admin
+WDS_PASSWORD=s3cret
+
+# or several accounts, with roles and the connections each may see
+WDS_USERS='ada:admin:pbkdf2$210000$c2FsdA==$aGFzaA==;grace:viewer:pbkdf2$...:PROD'
+```
+
+Roles are `admin` (everything, including the administration surface), `editor` (read and write) and
+`viewer` (every connection read-only). The optional fourth field is a whitelist of connection names
+or ids; empty means all of them. The secret is either a PBKDF2 hash or a literal password. Masking
+of columns that look like secrets is on by default and has no variable — it is corrected per column
+from the data tab, which is described in [Safety](safety.md).
 
 ## Connections as URLs
 

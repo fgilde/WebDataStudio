@@ -552,9 +552,9 @@ reference for scope, not for code.
 
 ### Task 4.4: Documentation
 
-- [ ] `F20.1`–`F20.3` into the spec and `docs/features.md`; write `docs/guide/safety.md`; extend
+- [x] `F20.1`–`F20.3` into the spec and `docs/features.md`; write `docs/guide/safety.md`; extend
       `docs/guide/environment.md` with `WDS_USERS` and the masking variables; link check.
-- [ ] **Commit** — `docs(safety): masking, undo and studio users`
+- [x] **Commit** — `docs(safety): masking, undo and studio users`
 
 ---
 

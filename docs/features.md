@@ -135,3 +135,6 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F18.4 | Every health finding carries the statement that fixes it, applied through the migration preview | done | postgresql, mysql, sqlserver, sqlite | Health panel |
 | F18.5 | Replication state with lag | done | postgresql, mysql, sqlserver | Administration, replication tab |
 | F18.6 | Database sizes as a treemap | done | all | Administration, databases tab |
+| F20.1 | Columns that look like secrets masked on the server, revealed on purpose, per-connection overrides, exports refused unmasked on production | done | all | Data tab, query results, export |
+| F20.2 | Undo for an applied data change, the inverse shown as a script before it runs | done | all | Data tab |
+| F20.3 | Several studio accounts with roles (admin, editor, viewer) and their own connections | done | all | Login, administration, studio users tab |

@@ -189,6 +189,11 @@ export interface StudioUsersDto { anonymous: boolean; source: string; users: Stu
 export const listStudioUsers = (): Promise<StudioUsersDto> =>
   fetch(`${base}/admin/studio-users`).then(r => ok<StudioUsersDto>(r));
 
+/// Turns a password into what WDS_USERS wants. Admin-only on the server.
+export const hashStudioPassword = (password: string): Promise<{ hash: string }> =>
+  fetch(`${base}/admin/studio-users/hash`, json("POST", { password }))
+    .then(r => ok<{ hash: string }>(r));
+
 export interface UndoStateDto { available: boolean; label: string | null; at: string | null }
 
 export const getUndoState = (conn: string, ref: string): Promise<UndoStateDto> =>

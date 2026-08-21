@@ -16,6 +16,7 @@
 - [Administration](administration.md)
 - [Safety](safety.md)
 - [Joining across connections](federation.md)
+- [Optional assistance](assistant.md)
 - [Diagrams](diagrams.md)
 - [Redis](redis.md)
 - [Engine capabilities](engines.md)

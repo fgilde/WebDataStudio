@@ -721,9 +721,9 @@ Off unless configured: no key, no calls, no mention in the UI.
 
 ### Task 6.2: Documentation
 
-- [ ] `F22.1` into the spec and `docs/features.md`; `docs/guide/assistant.md` stating plainly what
+- [x] `F22.1` into the spec and `docs/features.md`; `docs/guide/assistant.md` stating plainly what
       leaves the machine and what does not; link check.
-- [ ] **Commit** — `docs(assist): what it sends, and how to leave it off`
+- [x] **Commit** — `docs(assist): what it sends, and how to leave it off`
 
 ---
 

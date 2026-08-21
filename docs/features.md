@@ -142,3 +142,4 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F21.2 | Watch a query on an interval, changed cells highlighted, one run at a time | done | all | Query tab |
 | F21.3 | Generated test rows with a strategy per column, foreign keys pointing at existing rows, seeded | done | all | Data tab, generate dialog |
 | F21.4 | Notebooks: SQL and prose cells with their results, saved in the workspace, Markdown in and out | done | all | Notebook panel |
+| F22.1 | Optional explain and draft-SQL against an OpenAI-compatible endpoint; absent unless configured, sends no row of data, executes nothing | done | all | Query tab |

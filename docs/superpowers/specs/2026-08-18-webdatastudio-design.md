@@ -444,6 +444,7 @@ it works for every engine whose capability set claims support for it.
 | F21.2 | A query can be watched, and what changed is visible |
 | F21.3 | An empty table can be filled with plausible rows |
 | F21.4 | SQL, prose and results in one document that can be saved and pasted |
+| F22.1 | Optional assistance that explains a statement or drafts one, off unless configured |
 
 ## 10. Safety behaviour
 

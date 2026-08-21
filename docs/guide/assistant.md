@@ -20,6 +20,23 @@ WDS_ASSIST_MODEL=gpt-4o-mini
 A local endpoint works the same way — Ollama, llama.cpp, vLLM and LM Studio all speak this shape —
 which is the way to have the feature without anything leaving the building.
 
+### From an Aspire app host
+
+The [Nextended.Aspire.Hosting.WebDataStudio](https://www.nuget.org/packages/Nextended.Aspire.Hosting.WebDataStudio)
+package wires it to a model server in the same stack, so the conversation never leaves the machine:
+
+```csharp
+var ollama = builder.AddOllama("ollama").WithDataVolume();
+ollama.AddModel("llama3.2");
+
+builder.AddWebDataStudio()
+    .WithReference(shop)
+    .WithOllamaAssistant(ollama, "llama3.2");
+```
+
+`WithLocalAiAssistant(localai, "qwen3-8b")` does the same for LocalAI, and
+`WithAssistant(url, model, key)` for a hosted model.
+
 ## What it does
 
 The sparkle in the query toolbar opens one dialog with two actions:

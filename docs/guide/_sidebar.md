@@ -15,6 +15,7 @@
 - [Comparison](comparison.md)
 - [Administration](administration.md)
 - [Safety](safety.md)
+- [Joining across connections](federation.md)
 - [Diagrams](diagrams.md)
 - [Redis](redis.md)
 - [Engine capabilities](engines.md)

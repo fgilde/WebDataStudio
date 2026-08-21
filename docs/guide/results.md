@@ -48,6 +48,20 @@ rather than aborting the whole file.
 
 **Copy to another connection…** moves a table between two connections, including across engines.
 
+## Watching a query
+
+The interval box in the query toolbar re-runs the statement every 2, 5, 10 or 30 seconds and
+highlights the cells that changed since the previous run, with a note saying what moved — "2
+changed, 1 added, 1 gone".
+
+- One run at a time: the next is scheduled when the previous finished, so a slow query cannot pile
+  up behind its own interval.
+- An error stops the watch and says why, rather than retrying into the same wall.
+- Editing the SQL restarts the comparison: watching a query you have since changed would compare
+  the wrong things.
+- The highlight is skipped while the grid sorts or filters, because then a row's position is no
+  longer the row the comparison was about.
+
 ## Browsing a table
 
 A table opened with a double-click gets the same **Copy** and **Export** actions as a query result:

@@ -676,10 +676,10 @@ reference for scope, not for code.
 
 ### Task 5.5: Documentation
 
-- [ ] `F21.1`–`F21.4` into the spec and `docs/features.md`; `docs/guide/federation.md`,
+- [x] `F21.1`–`F21.4` into the spec and `docs/features.md`; `docs/guide/federation.md`,
       sections in `docs/guide/results.md` (watch) and `docs/guide/editing.md` (generator);
       link check.
-- [ ] **Commit** — `docs(power): federation, watch mode, the generator and notebooks`
+- [x] **Commit** — `docs(power): federation, watch mode, the generator and notebooks`
 
 ---
 

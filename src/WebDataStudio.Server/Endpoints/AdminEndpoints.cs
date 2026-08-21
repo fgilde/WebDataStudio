@@ -18,6 +18,22 @@ public static class AdminEndpoints
         // --- sessions --------------------------------------------------------
         // What the server is doing right now, and who is waiting for whom. One call, because the
         // overview tab asks for both every few seconds.
+        // The studio's own accounts, not the database's. Secrets never leave the server, and the
+        // list is read-only: accounts are deployment configuration, so a rollout is the only way to
+        // change them and nobody can grant themselves a role through the UI.
+        app.MapGet("/api/admin/studio-users", (UserStore users) => Results.Ok(new
+        {
+            anonymous = users.Anonymous,
+            source = "WDS_USERS",
+            users = users.All.Select(u => new
+            {
+                name = u.Name,
+                role = u.Role,
+                connections = u.Connections.OrderBy(c => c, StringComparer.OrdinalIgnoreCase),
+                hashed = u.Secret.StartsWith("pbkdf2$", StringComparison.Ordinal),
+            }),
+        }));
+
         app.MapGet("/api/admin/activity/{conn}", async (
             string conn, SessionFactory factory, CancellationToken ct) =>
         {

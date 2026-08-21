@@ -11,6 +11,7 @@ import {
   type DatabaseDto, type SessionDto, type SystemCommandDto,
 } from "../api";
 import { Overview } from "./Overview";
+import { StudioUsers } from "./StudioUsers";
 import { SizeTreemap } from "./SizeTreemap";
 import { Replication } from "./Replication";
 
@@ -450,6 +451,7 @@ export function AdminPanel({ connectionId, database = "" }: { connectionId: stri
         <Tabs.Tab value="sessions">Sessions</Tabs.Tab>
         <Tabs.Tab value="databases">Databases</Tabs.Tab>
         <Tabs.Tab value="users">Users</Tabs.Tab>
+        <Tabs.Tab value="studio-users">Studio users</Tabs.Tab>
         <Tabs.Tab value="backup">Backup</Tabs.Tab>
         <Tabs.Tab value="metrics">Metrics</Tabs.Tab>
         <Tabs.Tab value="slow">Slow queries</Tabs.Tab>
@@ -469,6 +471,7 @@ export function AdminPanel({ connectionId, database = "" }: { connectionId: stri
         </ScrollArea>
       </Tabs.Panel>
       <Tabs.Panel value="users"><Users connectionId={connectionId} /></Tabs.Panel>
+      <Tabs.Panel value="studio-users"><StudioUsers /></Tabs.Panel>
       <Tabs.Panel value="backup"><Backup connectionId={connectionId} database={database} /></Tabs.Panel>
       <Tabs.Panel value="overview"><Overview connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="metrics"><ServerMetrics connectionId={connectionId} /></Tabs.Panel>

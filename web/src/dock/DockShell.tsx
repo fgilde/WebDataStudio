@@ -9,6 +9,7 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import "../editor/dockview-mantine.css";
 import { useAppTheme } from "../ThemeProvider";
+import { isAdmin, useRole } from "../auth/useRole";
 import { ExplorerTree, type ExplorerAction, type ExplorerSelection } from "../explorer/ExplorerTree";
 import { ObjectDetailPanel } from "../explorer/ObjectDetailPanel";
 import { QueryTab } from "../query/QueryTab";
@@ -231,6 +232,9 @@ function WelcomePanel() {
 function ExplorerDockPanel() {
   const { explorer } = useShell();
   const connection = explorer.activeConnection;
+  // The administration surface belongs to admins; the server refuses it for anybody else, so
+  // offering the button would only be a promise it cannot keep.
+  const role = useRole();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -259,12 +263,14 @@ function ExplorerDockPanel() {
             <IconGitCompare size={15} />
           </ActionIcon>
         </Tooltip>
-        <Tooltip label="Administration">
-          <ActionIcon size="sm" variant="subtle" aria-label="Administration" disabled={!connection}
-            onClick={() => explorer.openTool("admin", "Admin", connection)}>
-            <IconSettingsCog size={15} />
-          </ActionIcon>
-        </Tooltip>
+        {isAdmin(role) ? (
+          <Tooltip label="Administration">
+            <ActionIcon size="sm" variant="subtle" aria-label="Administration" disabled={!connection}
+              onClick={() => explorer.openTool("admin", "Admin", connection)}>
+              <IconSettingsCog size={15} />
+            </ActionIcon>
+          </Tooltip>
+        ) : null}
         <Tooltip label="Query builder">
           <ActionIcon size="sm" variant="subtle" aria-label="Query builder" disabled={!connection}
             onClick={() => explorer.openTool("builder", "Builder", connection)}>

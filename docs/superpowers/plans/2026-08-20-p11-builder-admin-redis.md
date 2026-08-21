@@ -530,17 +530,25 @@ reference for scope, not for code.
   with roles `admin`, `editor`, `viewer`; `WDS_USERS` accepts
   `name:role:bcrypt-hash[:conn,conn]` entries separated by `;`, and `WDS_USER`/`WDS_PASSWORD`
   keep working as a single admin.
-- [ ] **Step 1: Write the failing tests** — a viewer sees only the connections assigned to them and
+- [x] **Step 1: Write the failing tests** — a viewer sees only the connections assigned to them and
       every one of them read-only; an editor may write but not reach the administration endpoints;
       the legacy single-user variables still sign in as admin; an unknown user is rejected in
       constant time.
-- [ ] **Step 2: Run them** — expect failure.
-- [ ] **Step 3: Implement** — password hashes verified with `Rfc2898DeriveBytes` (no new
+- [x] **Step 2: Run them** — expect failure.
+- [x] **Step 3: Implement** — password hashes verified with `Rfc2898DeriveBytes` (no new
       dependency), role checks as an endpoint filter, connection filtering in the registry, and the
       studio-users tab listing who exists (management stays in the environment: this is deployment
       configuration, not stored state).
-- [ ] **Step 4: Run them** — green.
-- [ ] **Step 5: Commit** — `feat(safety): several studio users, with roles and their own connections`
+
+      *As built:* `WDS_USERS` takes `name:role:secret[:conn,conn]`, where the secret is either a
+      `pbkdf2$iterations$salt$hash` string (`UserStore.Hash`) or a literal password, which is what
+      the single-account variables have always been. The connection filter lives in
+      `ConnectionRegistry.All()`, so a connection an account may not see does not exist for it on
+      any route, and a viewer's connections come back read-only wherever they are opened. The role
+      travels in the sign-in cookie (`CurrentUser`), `/api/admin/*` needs admin, `/api/auth/me`
+      reports the role and the UI stops offering the administration button without it.
+- [x] **Step 4: Run them** — green.
+- [x] **Step 5: Commit** — `feat(safety): several studio users, with roles and their own connections`
 
 ### Task 4.4: Documentation
 

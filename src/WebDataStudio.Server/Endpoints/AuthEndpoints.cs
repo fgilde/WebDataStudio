@@ -1,6 +1,4 @@
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using WebDataStudio.Server.Services;
@@ -13,7 +11,7 @@ public static class AuthEndpoints
 
     public static void MapAuthEndpoints(this WebApplication app)
     {
-        var options = app.Services.GetRequiredService<AuthOptions>();
+        var users = app.Services.GetRequiredService<UserStore>();
         var api = app.MapGroup("/api");
 
         // A name for this studio, shown in the header and the browser tab. Empty by default, so
@@ -21,30 +19,35 @@ public static class AuthEndpoints
         var title = app.Services.GetRequiredService<IConfiguration>()["WDS_TITLE"]?.Trim();
         if (string.IsNullOrEmpty(title)) title = null;
 
-        api.MapGet("/auth/me", (HttpContext ctx) => Results.Ok(new
+        api.MapGet("/auth/me", (HttpContext ctx, CurrentUser current) => Results.Ok(new
         {
-            anonymous = options.Anonymous,
-            authenticated = options.Anonymous || (ctx.User.Identity?.IsAuthenticated ?? false),
-            username = options.Anonymous ? null : ctx.User.Identity?.Name,
+            anonymous = users.Anonymous,
+            authenticated = users.Anonymous || (ctx.User.Identity?.IsAuthenticated ?? false),
+            username = users.Anonymous ? null : ctx.User.Identity?.Name,
+            // The UI hides what a role cannot reach; the server refuses it anyway.
+            role = current.User?.Role,
             // The login screen needs it too, so it rides along with the one call that always runs.
             title,
         })).AllowAnonymous();
 
         api.MapPost("/auth/login", async (HttpContext ctx, LoginRequest body) =>
         {
-            if (options.Anonymous) return Results.Ok(new { anonymous = true });
+            if (users.Anonymous) return Results.Ok(new { anonymous = true });
 
-            // Constant-time comparison so a wrong password cannot be found by timing.
-            var userOk = FixedTimeEquals(body.Username, options.Username!);
-            var passOk = FixedTimeEquals(body.Password, options.Password!);
-            if (!userOk || !passOk)
+            // Verification is constant-time and costs the same for an unknown name as for a wrong
+            // password, so neither can be found by timing.
+            var user = users.Verify(body.Username, body.Password);
+            if (user is null)
                 return Results.Json(new { message = "invalid credentials" }, statusCode: StatusCodes.Status401Unauthorized);
 
-            var identity = new ClaimsIdentity(
-                new[] { new Claim(ClaimTypes.Name, options.Username!) },
+            var identity = new ClaimsIdentity(CurrentUser.ClaimsOf(user),
                 CookieAuthenticationDefaults.AuthenticationScheme);
             await ctx.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
-            return Results.Ok(new { anonymous = false, authenticated = true, username = options.Username });
+
+            return Results.Ok(new
+            {
+                anonymous = false, authenticated = true, username = user.Name, role = user.Role,
+            });
         }).AllowAnonymous();
 
         api.MapPost("/auth/logout", async (HttpContext ctx) =>
@@ -54,6 +57,4 @@ public static class AuthEndpoints
         }).AllowAnonymous();
     }
 
-    private static bool FixedTimeEquals(string a, string b) =>
-        CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a), Encoding.UTF8.GetBytes(b));
 }

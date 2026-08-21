@@ -2,6 +2,8 @@ const base = "/api";
 
 export interface Me {
   anonymous: boolean; authenticated: boolean; username: string | null;
+  /// admin, editor or viewer. Null when the studio runs without accounts.
+  role?: string | null;
   /// Name of this studio, from WDS_TITLE. Null when nothing named it.
   title?: string | null;
 }
@@ -178,6 +180,14 @@ export const browseData = (conn: string, ref: string,
     if (value !== undefined && value !== "") query.set(key, String(value));
   return fetch(`${base}/data/${conn}?${refQuery(ref, query)}`).then(r => ok<DataPageDto>(r));
 };
+
+export interface StudioUserDto {
+  name: string; role: string; connections: string[]; hashed: boolean;
+}
+export interface StudioUsersDto { anonymous: boolean; source: string; users: StudioUserDto[] }
+
+export const listStudioUsers = (): Promise<StudioUsersDto> =>
+  fetch(`${base}/admin/studio-users`).then(r => ok<StudioUsersDto>(r));
 
 export interface UndoStateDto { available: boolean; label: string | null; at: string | null }
 

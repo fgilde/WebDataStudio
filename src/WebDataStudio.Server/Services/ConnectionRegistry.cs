@@ -16,19 +16,30 @@ public sealed class ConnectionRegistry
     private readonly IReadOnlyList<ConnectionSpec> _environment;
     private readonly ConnectionStore _store;
     private readonly bool _forceReadOnly;
+    // Absent in the few places that construct a registry outside the container.
+    private readonly CurrentUser? _current;
 
-    public ConnectionRegistry(IConfiguration config, ConnectionStore store)
+    public ConnectionRegistry(IConfiguration config, ConnectionStore store, CurrentUser? current = null)
     {
         _store = store;
+        _current = current;
         _environment = EnvironmentConnections.Parse(
             config.AsEnumerable().ToDictionary(kv => kv.Key, kv => kv.Value));
         _forceReadOnly = string.Equals(config["WDS_READONLY"], "true", StringComparison.OrdinalIgnoreCase);
     }
 
-    public IReadOnlyList<ConnectionSpec> All() =>
-        _environment.Concat(_store.List())
-            .Select(c => _forceReadOnly ? c with { ReadOnly = true } : c)
+    /// Everything this request may see. Filtering here rather than in each endpoint is the point:
+    /// every path that opens a session goes through `Find`, so a connection somebody may not see
+    /// does not exist for them — not in the list, not by guessing its id.
+    public IReadOnlyList<ConnectionSpec> All()
+    {
+        var user = _current?.User;
+
+        return _environment.Concat(_store.List())
+            .Where(c => user is null || user.MaySee(c.Id, c.Name))
+            .Select(c => _forceReadOnly || user?.ReadOnly == true ? c with { ReadOnly = true } : c)
             .ToList();
+    }
 
     public ConnectionSpec? Find(string id) => All().FirstOrDefault(c => c.Id == id);
 

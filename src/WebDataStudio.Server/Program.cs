@@ -17,6 +17,9 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 // builder (WebApplicationFactory in tests, and anything layered on later) only land in the composed
 // IConfiguration after Build().
 builder.Services.AddSingleton(sp => AuthOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton(sp => UserStore.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton<CurrentUser>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o =>
@@ -138,15 +141,26 @@ app.UseAuthorization();
 // endpoints stay open so the SPA can load and log in; without credentials nothing is guarded.
 app.Use(async (ctx, next) =>
 {
-    var options = ctx.RequestServices.GetRequiredService<AuthOptions>();
+    var users = ctx.RequestServices.GetRequiredService<UserStore>();
     var path = ctx.Request.Path;
     var open = !path.StartsWithSegments("/api")
                || path.StartsWithSegments("/api/auth")
                || path.StartsWithSegments("/api/health");
 
-    if (!options.Anonymous && !open && !(ctx.User.Identity?.IsAuthenticated ?? false))
+    if (!users.Anonymous && !open && !(ctx.User.Identity?.IsAuthenticated ?? false))
     {
         ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return;
+    }
+
+    // The administration surface kills sessions and reads server-wide state, so it belongs to
+    // admins. Everything else is bounded by which connections the account may see, and a viewer's
+    // connections are read-only wherever they are opened.
+    var current = ctx.RequestServices.GetRequiredService<CurrentUser>().User;
+    if (current is not null && !current.IsAdmin && path.StartsWithSegments("/api/admin"))
+    {
+        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await ctx.Response.WriteAsJsonAsync(new { message = "this needs the admin role" });
         return;
     }
 

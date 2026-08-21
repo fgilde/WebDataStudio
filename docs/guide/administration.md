@@ -78,3 +78,35 @@ The health report names its fixes — `CREATE INDEX`, `DROP INDEX`, `VACUUM (ANA
 **Apply this…** button that runs it through the same preview-and-confirm path the table designer
 uses: the script, whether it is destructive, and one place where it goes into the database. A
 recommendation nobody can act on is a recommendation nobody acts on.
+
+## Alerts
+
+The studio runs the analysis behind its health report on a timer and posts what is **new** to a
+webhook, so somebody hears about a missing index without opening the studio first.
+
+| Variable | Meaning |
+|---|---|
+| `WDS_ALERT_WEBHOOK` | the URL to post to; without it nothing is watched |
+| `WDS_ALERT_INTERVAL_MINUTES` | how often to look, default `60` |
+| `WDS_ALERT_MIN_SEVERITY` | `info`, `warning` (default) or `critical` |
+| `WDS_ALERT_CONNECTIONS` | connection names to watch, comma-separated. Empty means all |
+
+```bash
+WDS_ALERT_WEBHOOK=https://hooks.slack.com/services/…
+WDS_ALERT_INTERVAL_MINUTES=120
+```
+
+The payload carries a `text` field — what Slack, Mattermost, Discord and Teams render — and the
+findings themselves, each with the statement that would fix it:
+
+```json
+{
+  "text": "*SHOP* — 2 new health findings\n• [warning] events has no primary key",
+  "connection": { "id": "env-…", "name": "SHOP", "engine": "sqlite" },
+  "findings": [{ "category": "no-primary-key", "severity": "warning", "title": "…", "fix": null }]
+}
+```
+
+Only new findings are sent: the same warning every hour is a message people learn to ignore. A post
+that fails is retried on the next sweep rather than swallowed, and a connection that cannot be
+reached is a log line rather than an alert — whatever watches uptime already knows.

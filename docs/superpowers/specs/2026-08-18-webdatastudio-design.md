@@ -452,6 +452,7 @@ it works for every engine whose capability set claims support for it.
 | F22.4 | A chat with sessions, in the corner, using those tools where they exist |
 | F22.5 | An agent can ask why something is slow, and what the studio thinks is wrong |
 | F22.6 | A deployment decides which tools its agents get |
+| F24.1 | Somebody hears about a health finding without opening the studio |
 
 ## 10. Safety behaviour
 

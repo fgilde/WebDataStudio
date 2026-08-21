@@ -67,6 +67,10 @@ builder.Services.AddSingleton<Assistant>();
 builder.Services.AddSingleton(sp => McpOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<McpToolbox>();
 builder.Services.AddSingleton<McpAvailability>();
+builder.Services.AddSingleton(sp => AlertOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<HealthAlerts>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<HealthAlerts>());
+builder.Services.AddHttpClient("alerts", client => client.Timeout = TimeSpan.FromSeconds(20));
 builder.Services.AddHttpClient("assist", client => client.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddSingleton<DriverRegistry>();
 builder.Services.AddSingleton<TunnelManager>();
@@ -107,7 +111,7 @@ foreach (var (label, path, error) in new[]
 }
 
 app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assistantOptions,
-    McpAvailability mcpAvailability) => Results.Ok(new
+    McpAvailability mcpAvailability, AlertOptions alertOptions) => Results.Ok(new
 {
     status = connectionStore.Available && workspaceStore.Available ? "ok" : "degraded",
     version,
@@ -125,6 +129,10 @@ app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assista
     // Off unless configured, and said out loud: a studio that quietly talks to an endpoint would
     // be the wrong kind of surprise.
     assist = assistantOptions.Configured,
+    // Whether anything is watching the health report, and how often.
+    alerts = alertOptions.Configured
+        ? new { intervalMinutes = (int)alertOptions.Interval.TotalMinutes, minSeverity = alertOptions.MinSeverity }
+        : null,
     // The MCP endpoint, so a client can find it without being told where to look — and so a
     // studio that refuses to serve it says why instead of advertising a path that answers HTML.
     mcp = mcpAvailability.Describe(),

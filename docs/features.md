@@ -150,3 +150,4 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F22.4 | A chat in the corner with sessions that survive a reload, the MCP tools where they exist, and one click from a suggested statement to the editor | done | all | Chat panel |
 | F22.5 | MCP tools for the plan, the health report, server activity and a Redis value | done | all | MCP endpoint |
 | F22.6 | The MCP endpoint can be narrowed to named tools, enforced on the call as well as the listing | done | all | MCP endpoint |
+| F24.1 | New health findings posted to a webhook on a timer, deduplicated, retried on failure | done | postgresql, mysql, sqlserver, sqlite, oracle | Environment |

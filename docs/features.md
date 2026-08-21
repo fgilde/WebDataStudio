@@ -154,3 +154,4 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F24.2 | Schema snapshots on start, with the drift since the last one per table, on an endpoint, in the log and in an alert | done | all | Environment, schema panel |
 | F24.3 | A folder of .sql files imported as saved queries at start, idempotently, with the connection and folder in comments | done | all | Saved panel |
 | F24.4 | A seed script run once per connection, never on a read-only or production one | done | all | Environment |
+| F24.5 | Scheduled read-only queries exported to files, on an interval or daily, with the last run per job on an endpoint | done | all | Environment |

@@ -456,6 +456,7 @@ it works for every engine whose capability set claims support for it.
 | F24.2 | A schema that moved without a migration is noticed |
 | F24.3 | The queries a team shares live in its repository, not in a chat |
 | F24.4 | A fresh stack comes up with data in it |
+| F24.5 | A report runs itself, and reads only |
 
 ## 10. Safety behaviour
 

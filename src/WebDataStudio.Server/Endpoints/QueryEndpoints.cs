@@ -79,6 +79,37 @@ public static class QueryEndpoints
             return Results.Empty;
         });
 
+        // The schedule, what it last did, and a way to run one now. Absent state rather than an
+        // error when no schedule file is configured: the UI can ask without knowing.
+        app.MapGet("/api/schedule", (ScheduledQueries queries) => Results.Ok(new
+        {
+            configured = queries.Configured,
+            jobs = queries.Read().Select(job => new
+            {
+                job.Name,
+                job.Connection,
+                job.Sql,
+                job.EveryMinutes,
+                job.DailyAtUtc,
+                format = job.Format ?? "csv",
+            }),
+            runs = queries.Runs,
+        }));
+
+        app.MapPost("/api/schedule/{name}/run", async (string name, ScheduledQueries queries,
+            CancellationToken ct) =>
+        {
+            var job = queries.Read().FirstOrDefault(candidate =>
+                candidate.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+            if (job is null)
+                return Results.NotFound(new { message = $"there is no scheduled query called '{name}'" });
+
+            var run = await queries.RunAsync(job, ct);
+
+            return run.Error is null ? Results.Ok(run) : Results.BadRequest(run);
+        });
+
         app.MapPost("/api/query/{runId}/cancel", (string runId, QueryRunner runner) =>
             runner.Cancel(runId) ? Results.NoContent() : Results.NotFound());
 

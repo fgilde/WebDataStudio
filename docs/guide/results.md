@@ -68,3 +68,40 @@ A table opened with a double-click gets the same **Copy** and **Export** actions
 copy takes the page on screen, export streams the whole table. Its column headers carry a menu for
 sorting and filtering, and both run on the server — a page holds 200 of possibly millions of rows,
 so sorting in the browser would order the wrong set.
+
+## Scheduled queries
+
+`WDS_SCHEDULE_FILE` points at a JSON file of queries the studio runs on its own and writes as files —
+the nightly report nobody wants to remember to run.
+
+```bash
+WDS_SCHEDULE_FILE=/data/schedule/schedule.json
+WDS_SCHEDULE_OUTPUT_DIR=/data/exports          # the default
+```
+
+```json
+[
+  {
+    "name": "orders-per-day",
+    "connection": "SHOP",
+    "sql": "SELECT date(created_at) AS day, count(*) FROM orders GROUP BY 1 ORDER BY 1",
+    "dailyAtUtc": "03:00",
+    "format": "csv"
+  },
+  {
+    "name": "queue-depth",
+    "connection": "SHOP",
+    "sql": "SELECT count(*) FROM jobs WHERE state = 'pending'",
+    "everyMinutes": 15,
+    "format": "json"
+  }
+]
+```
+
+- **Reading only.** A scheduled statement goes through the same guard the MCP `run_query` tool uses,
+  so a schedule file cannot become a way to run a `DELETE` at 03:00 every night.
+- **`everyMinutes` or `dailyAtUtc`**, not cron: the studio is not a scheduler, it runs a report.
+- Masking applies — a file is a file that leaves the machine.
+- The file is re-read every minute, so editing the schedule needs no restart.
+- `GET /api/schedule` reports the jobs and what each last did; `POST /api/schedule/{name}/run` runs
+  one now. A failed run is a message when [alerts](administration.md#alerts) are configured.

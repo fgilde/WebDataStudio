@@ -144,3 +144,5 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F21.3 | Generated test rows with a strategy per column, foreign keys pointing at existing rows, seeded | done | all | Data tab, generate dialog |
 | F21.4 | Notebooks: SQL and prose cells with their results, saved in the workspace, Markdown in and out | done | all | Notebook panel |
 | F22.1 | Optional explain and draft-SQL against an OpenAI-compatible endpoint; absent unless configured, sends no row of data, executes nothing | done | all | Query tab |
+| F22.2 | MCP server over JSON-RPC/HTTP: list, describe, browse, read-only query, and a previewed write behind a flag; masking and read-only enforced for agents too | done | all | MCP endpoint, header dialog |
+| F22.3 | The assistant answers from the database through the MCP tools, naming the ones it used | done | all | Query tab, assistant dialog |

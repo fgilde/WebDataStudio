@@ -12,6 +12,8 @@
 | `WDS_SECRET_KEY` | AES key (base64, 32 bytes) for stored secrets; generated into `/data/.key` if absent |
 | `WDS_READONLY` | when `true`, every connection is read-only regardless of its own flag |
 | `WDS_ASSIST_ENDPOINT`, `WDS_ASSIST_KEY`, `WDS_ASSIST_MODEL` | optional assistance; without the endpoint the feature does not exist — see [Optional assistance](assistant.md) |
+| `WDS_ASSIST_TOOLS` | `false` keeps the assistant from using the MCP tools; otherwise it uses them when both are configured |
+| `WDS_MCP_ENABLED`, `WDS_MCP_PATH`, `WDS_MCP_KEY`, `WDS_MCP_ALLOW_WRITE` | serve the studio as an MCP server for AI agents — see [MCP for AI agents](mcp.md). A studio with accounts requires the key |
 | `WDS_QUERY_TIMEOUT_SECONDS` | default statement timeout, default `300` |
 | `WDS_MAX_ROWS` | default fetch cap per result, default `1000` |
 | `WDS_MAX_SESSIONS` | open sessions per connection, default `8` |

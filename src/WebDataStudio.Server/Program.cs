@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using WebDataStudio.Server.Drivers;
 using WebDataStudio.Server.Endpoints;
 using WebDataStudio.Server.Export;
+using WebDataStudio.Server.Mcp;
 using WebDataStudio.Server.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -63,6 +64,8 @@ builder.Services.AddSingleton<UndoStore>();
 builder.Services.AddSingleton<Federation>();
 builder.Services.AddSingleton(sp => AssistantOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<Assistant>();
+builder.Services.AddSingleton(sp => McpOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<McpToolbox>();
 builder.Services.AddHttpClient("assist", client => client.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddSingleton<DriverRegistry>();
 builder.Services.AddSingleton<TunnelManager>();
@@ -102,7 +105,8 @@ foreach (var (label, path, error) in new[]
     else startupLog.LogError("{Store} database at {Path} is not usable: {Error}", label, path, error);
 }
 
-app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assistantOptions) => Results.Ok(new
+app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assistantOptions,
+    McpOptions mcpOptions) => Results.Ok(new
 {
     status = connectionStore.Available && workspaceStore.Available ? "ok" : "degraded",
     version,
@@ -120,6 +124,10 @@ app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assista
     // Off unless configured, and said out loud: a studio that quietly talks to an endpoint would
     // be the wrong kind of surprise.
     assist = assistantOptions.Configured,
+    // The MCP endpoint, so a client can find it without being told where to look.
+    mcp = mcpOptions.Enabled
+        ? new { path = mcpOptions.Path, writes = mcpOptions.AllowWrite, needsKey = mcpOptions.Key is not null }
+        : null,
 })).AllowAnonymous();
 
 // A stuck data directory is a dependency failure, not a bug in the request: say so, with the path
@@ -191,6 +199,7 @@ app.MapDiagramEndpoints();
 app.MapSavedQueryEndpoints();
 app.MapFederationEndpoints();
 app.MapAssistantEndpoints();
+app.MapMcpEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();

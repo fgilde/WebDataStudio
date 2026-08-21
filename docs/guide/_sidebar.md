@@ -17,6 +17,7 @@
 - [Safety](safety.md)
 - [Joining across connections](federation.md)
 - [Optional assistance](assistant.md)
+- [MCP for AI agents](mcp.md)
 - [Diagrams](diagrams.md)
 - [Redis](redis.md)
 - [Engine capabilities](engines.md)

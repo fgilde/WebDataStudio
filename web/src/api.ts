@@ -56,6 +56,8 @@ export interface HealthDto {
   connections: number;
   /// True when an assistance endpoint is configured. Absent on older servers.
   assist?: boolean;
+  /// Where the MCP endpoint is, when the studio has one. Null when it has none.
+  mcp?: { path: string; writes: boolean; needsKey: boolean } | null;
 }
 
 export const health = (): Promise<HealthDto> => fetch(`${base}/health`).then(r => ok<HealthDto>(r));
@@ -196,7 +198,37 @@ export const hashStudioPassword = (password: string): Promise<{ hash: string }> 
   fetch(`${base}/admin/studio-users/hash`, json("POST", { password }))
     .then(r => ok<{ hash: string }>(r));
 
-export interface AssistReplyDto { text: string; statements: string[] }
+export interface AssistReplyDto {
+  text: string;
+  statements: string[];
+  /// Tools the model used to answer, when it had any. Naming them is what makes an answer
+  /// checkable rather than something to believe.
+  usedTools?: string[] | null;
+}
+
+export interface AssistCapabilitiesDto {
+  configured: boolean; tools: boolean; toolNames: string[];
+}
+
+export const assistCapabilities = (): Promise<AssistCapabilitiesDto> =>
+  fetch(`${base}/assist/capabilities`).then(r => ok<AssistCapabilitiesDto>(r));
+
+/// A question the assistant may use the studio's own tools to answer.
+export const assistAsk = (conn: string, question: string, includeSchema: boolean): Promise<AssistReplyDto> =>
+  fetch(`${base}/assist/ask`, json("POST", { connectionId: conn, question, includeSchema }))
+    .then(r => ok<AssistReplyDto>(r));
+
+export interface McpInfoDto {
+  name: string;
+  protocolVersion: string;
+  writes: boolean;
+  authentication: string;
+  tools: { name: string; description: string; writes: boolean }[];
+}
+
+/// The MCP endpoint describes itself on a GET. It lives outside /api, so it takes its own path.
+export const mcpInfo = (path: string): Promise<McpInfoDto> =>
+  fetch(path, { headers: { accept: "application/json" } }).then(r => ok<McpInfoDto>(r));
 
 /// Both calls answer 501 when no assistance endpoint is configured, which is how the UI knows not
 /// to offer them at all.

@@ -31,6 +31,7 @@ cd web && npx vitest run         # SPA units
 cd web && npm run smoke          # browser check against a running server
 cd web && npm run smoke:admin    # diagram, administration and comparison panels
 cd web && npm run smoke:p9       # palette, saved queries, builder, charts, parameters
+cd web && npm run smoke:mcp      # the MCP endpoint and its dialog (needs WDS_MCP_ENABLED=true)
 ```
 
 The server suite runs one behaviour suite against every engine fixture, so a driver that is added

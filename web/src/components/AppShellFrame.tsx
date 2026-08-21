@@ -5,6 +5,7 @@ import { IconDatabaseCog, IconLayoutBoard, IconPalette, IconTable } from "@table
 import { Link, useLocation } from "react-router-dom";
 import { ThemeDrawer } from "../ThemeDrawer";
 import { UserMenu } from "../auth/UserMenu";
+import { McpButton } from "../mcp/McpButton";
 import { BrandLinks } from "./BrandLinks";
 import { useStudioTitle } from "./useStudioTitle";
 
@@ -61,6 +62,8 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
                 <IconPalette size={18} />
               </ActionIcon>
             </Tooltip>
+            {/* Only when the studio actually is an MCP server. */}
+            <McpButton />
             {/* Only on a studio with accounts; it renders nothing otherwise. */}
             <UserMenu />
             {/* What this studio does, and where it comes from, are two different kinds of link. */}

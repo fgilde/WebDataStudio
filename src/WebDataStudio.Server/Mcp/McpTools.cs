@@ -1,0 +1,449 @@
+using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
+using WebDataStudio.Server.Drivers.Abstractions;
+using WebDataStudio.Server.Endpoints;
+using WebDataStudio.Server.Services;
+
+namespace WebDataStudio.Server.Mcp;
+
+/// One tool an agent can call, with the JSON Schema it takes.
+public sealed record McpTool(string Name, string Description, object InputSchema, bool Writes);
+
+/// What a tool call produced: text for the agent, and whether it went wrong.
+public sealed record McpToolResult(string Text, bool IsError = false);
+
+/// The studio's own capabilities, offered as MCP tools — and to the studio's assistant, which
+/// calls the same registry.
+///
+/// The rules are the studio's rules, not looser ones: a read-only connection stays read-only, a
+/// masked column stays masked, and a write is previewed before it runs. An agent gets the same
+/// deal a person gets, which is the only way this is safe to expose at all.
+public sealed class McpToolbox(
+    ConnectionRegistry registry, SessionFactory factory, MaskPolicyStore policies,
+    McpOptions options, IMemoryCache cache)
+{
+    /// Rows a single tool call may return. An agent that wants more can page with `offset`.
+    private const int MaxRows = 200;
+
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+    };
+
+    public IReadOnlyList<McpTool> Tools =>
+        [.. All().Where(tool => options.AllowWrite || !tool.Writes)];
+
+    private static IEnumerable<McpTool> All()
+    {
+        yield return new McpTool("list_connections",
+            "The databases this studio can reach: id, name, engine, whether it is read-only, and "
+            + "the group and colour it carries. Every other tool takes one of these ids.",
+            Object(), Writes: false);
+
+        yield return new McpTool("list_objects",
+            "Walks the object tree of a connection. Without a parent it lists the top level "
+            + "(schemas or folders); with one it lists that node's children. A node's `ref` is what "
+            + "describe_object and browse_rows take.",
+            Object(
+                ("connectionId", "string", "Connection id from list_connections.", true),
+                ("parent", "string", "A node ref, e.g. \"Schema:public\". Omit for the top level.", false)),
+            Writes: false);
+
+        yield return new McpTool("describe_object",
+            "Columns, indexes, foreign keys and triggers of one table or view, plus its row count "
+            + "where the engine knows it.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("ref", "string", "Object ref, e.g. \"Table:public/orders\".", true)),
+            Writes: false);
+
+        yield return new McpTool("browse_rows",
+            "A page of rows from one table or view, with the same masking and the same row cap the "
+            + "studio's data tab applies.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("ref", "string", "Object ref of a table or view.", true),
+                ("limit", "integer", $"Rows to return, at most {MaxRows}.", false),
+                ("offset", "integer", "Rows to skip.", false)),
+            Writes: false);
+
+        yield return new McpTool("run_query",
+            "Runs a read-only statement and returns its rows. Writes and DDL are refused here — "
+            + "preview_script and apply_script are the way to change anything. Masked columns stay "
+            + "masked.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("sql", "string", "One statement. SELECT, SHOW, EXPLAIN, WITH … and the like.", true),
+                ("limit", "integer", $"Rows to return, at most {MaxRows}.", false)),
+            Writes: false);
+
+        yield return new McpTool("preview_script",
+            "Splits a script into statements, says which of them are destructive, and returns a "
+            + "hash. Nothing runs. The hash is what apply_script takes, so what runs is what was "
+            + "read.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("sql", "string", "The script to look at.", true)),
+            Writes: true);
+
+        yield return new McpTool("apply_script",
+            "Runs a script that preview_script returned a hash for. Refused on a read-only "
+            + "connection, and refused when the hash is unknown or expired.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("hash", "string", "Hash from preview_script.", true)),
+            Writes: true);
+    }
+
+    public async Task<McpToolResult> CallAsync(string name, JsonElement arguments, CancellationToken ct)
+    {
+        var tool = All().FirstOrDefault(t => t.Name == name);
+
+        if (tool is null)
+            return new McpToolResult($"there is no tool called '{name}'", IsError: true);
+
+        if (tool.Writes && !options.AllowWrite)
+            return new McpToolResult(
+                "this studio's MCP endpoint is read-only; set WDS_MCP_ALLOW_WRITE=true to change that",
+                IsError: true);
+
+        try
+        {
+            return name switch
+            {
+                "list_connections" => ListConnections(),
+                "list_objects" => await ListObjectsAsync(arguments, ct),
+                "describe_object" => await DescribeAsync(arguments, ct),
+                "browse_rows" => await BrowseAsync(arguments, ct),
+                "run_query" => await QueryAsync(arguments, ct),
+                "preview_script" => await PreviewAsync(arguments, ct),
+                "apply_script" => await ApplyAsync(arguments, ct),
+                _ => new McpToolResult($"there is no tool called '{name}'", IsError: true),
+            };
+        }
+        catch (UnknownConnectionException e) { return new McpToolResult(e.Message, IsError: true); }
+        catch (FormatException e) { return new McpToolResult(e.Message, IsError: true); }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception e) { return new McpToolResult(e.Message, IsError: true); }
+    }
+
+    // --- the tools themselves ---------------------------------------------------------------
+
+    private McpToolResult ListConnections() => Ok(registry.All().Select(spec => new
+    {
+        id = spec.Id,
+        name = spec.Name,
+        engine = spec.Engine,
+        readOnly = spec.ReadOnly,
+        group = spec.Group,
+        colour = spec.Color,
+    }));
+
+    private async Task<McpToolResult> ListObjectsAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var parent = Optional(arguments, "parent");
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            var target = parent is null ? null : SchemaNodeRef.Parse(parent);
+            var nodes = await driver.IntrospectAsync(session, target, ct);
+
+            return Ok(nodes.Select(node => new
+            {
+                @ref = node.Ref.ToString(),
+                label = node.Label,
+                kind = node.Ref.Kind.ToString(),
+                hasChildren = node.HasChildren,
+                detail = node.Detail,
+            }));
+        }
+    }
+
+    private async Task<McpToolResult> DescribeAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var reference = Required(arguments, "ref");
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            var detail = await driver.DescribeAsync(session, SchemaNodeRef.Parse(reference), ct);
+            var policy = policies.For(connection);
+
+            return Ok(new
+            {
+                @ref = detail.Ref.ToString(),
+                rowCount = detail.RowCount,
+                sizeBytes = detail.SizeBytes,
+                comment = detail.Comment,
+                columns = detail.Columns.Select(column => new
+                {
+                    column.Name,
+                    column.DataType,
+                    column.Nullable,
+                    column.IsPrimaryKey,
+                    column.Default,
+                    // Said out loud, so an agent does not report dots as the value.
+                    masked = SensitiveColumns.ShouldMask(column.Name, policy),
+                }),
+                indexes = detail.Indexes.Select(index => new
+                {
+                    index.Name, index.Columns, index.Unique, index.Primary,
+                }),
+                foreignKeys = detail.ForeignKeys.Select(key => new
+                {
+                    key.Name, key.Columns, key.ReferencedSchema, key.ReferencedTable,
+                    key.ReferencedColumns,
+                }),
+                triggers = detail.Triggers.Select(trigger => new
+                {
+                    trigger.Name, trigger.Timing, trigger.Event,
+                }),
+            });
+        }
+    }
+
+    private async Task<McpToolResult> BrowseAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var reference = Required(arguments, "ref");
+        var limit = Math.Clamp(Number(arguments, "limit") ?? 50, 1, MaxRows);
+        var offset = Math.Max(Number(arguments, "offset") ?? 0, 0);
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            if (!driver.Caps.TabularBrowse)
+                return new McpToolResult(
+                    $"{driver.Info.Label} has no rows to browse; it is a key/value store",
+                    IsError: true);
+
+            var target = SchemaNodeRef.Parse(reference);
+            var table = Qualify(target, driver.Dialect);
+            var sql = driver.Dialect.Paginate($"SELECT * FROM {table}", offset, limit);
+
+            return await ReadAsync(driver, session, connection, sql, limit, ct);
+        }
+    }
+
+    private async Task<McpToolResult> QueryAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var sql = Required(arguments, "sql");
+        var limit = Math.Clamp(Number(arguments, "limit") ?? 50, 1, MaxRows);
+
+        if (!ReadOnlyStatement.Looks(sql))
+            return new McpToolResult(
+                "run_query only runs statements that read. Use preview_script and apply_script to "
+                + "change something — they show the script before it runs.",
+                IsError: true);
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session) return await ReadAsync(driver, session, connection, sql, limit, ct);
+    }
+
+    private async Task<McpToolResult> ReadAsync(IDbDriver driver, IDbSession session,
+        string connection, string sql, int limit, CancellationToken ct)
+    {
+        var columns = new List<ColumnMeta>();
+        var rows = new List<object?[]>();
+        string? error = null;
+
+        var request = new ScriptRequest(sql, limit, 60);
+        var policy = policies.For(connection);
+
+        await foreach (var chunk in Masking.Stream(driver.ExecuteAsync(session, request, ct), policy, ct))
+            switch (chunk)
+            {
+                case ResultChunk.Columns c: columns = [.. c.Items]; break;
+                case ResultChunk.Rows r: rows.AddRange(r.Items); break;
+                case ResultChunk.Error e: error = e.Text; break;
+            }
+
+        if (error is not null) return new McpToolResult(error, IsError: true);
+
+        return Ok(new
+        {
+            columns = columns.Select(column => new { column.Name, column.DataType }),
+            rowCount = rows.Count,
+            rows = rows.Take(limit).Select(row => row.Select(Text).ToArray()),
+        });
+    }
+
+    private async Task<McpToolResult> PreviewAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var sql = Required(arguments, "sql");
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            if (session.Spec.ReadOnly)
+                return new McpToolResult("this connection is read-only", IsError: true);
+
+            var statements = StatementSplitter.Split(sql, driver.Dialect);
+            if (statements.Count == 0)
+                return new McpToolResult("there is nothing to run", IsError: true);
+
+            var hash = Hash(connection, sql);
+            cache.Set($"mcp:{hash}", (connection, sql), TimeSpan.FromMinutes(10));
+
+            return Ok(new
+            {
+                hash,
+                statements = statements.Select(statement => new
+                {
+                    sql = statement.Text.Trim(),
+                    destructive = Destructive(statement.Text),
+                }),
+                note = "nothing has run yet; call apply_script with this hash to run it",
+            });
+        }
+    }
+
+    private async Task<McpToolResult> ApplyAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var hash = Required(arguments, "hash");
+
+        if (cache.Get($"mcp:{hash}") is not ValueTuple<string, string> planned
+            || planned.Item1 != connection)
+            return new McpToolResult(
+                "that hash is unknown or expired; call preview_script again", IsError: true);
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            if (session.Spec.ReadOnly)
+                return new McpToolResult("this connection is read-only", IsError: true);
+
+            var affected = 0L;
+            string? error = null;
+
+            var request = new ScriptRequest(planned.Item2, MaxRows, 300, Transactional: true);
+
+            await foreach (var chunk in driver.ExecuteAsync(session, request, ct))
+                switch (chunk)
+                {
+                    case ResultChunk.End e: affected += e.RowsAffected; break;
+                    case ResultChunk.Error e: error = e.Text; break;
+                }
+
+            if (error is not null) return new McpToolResult(error, IsError: true);
+
+            cache.Remove($"mcp:{hash}");
+            return Ok(new { applied = true, rowsAffected = affected });
+        }
+    }
+
+    // --- plumbing ---------------------------------------------------------------------------
+
+    private static string Qualify(SchemaNodeRef target, SqlDialect dialect) =>
+        target.Path.Count > 1
+            ? $"{dialect.QuoteIdentifier(target.Path[0])}.{dialect.QuoteIdentifier(target.Name)}"
+            : dialect.QuoteIdentifier(target.Name);
+
+    private static bool Destructive(string sql) =>
+        new[] { "DROP", "TRUNCATE", "DELETE", "ALTER TABLE", "UPDATE" }
+            .Any(word => sql.TrimStart().StartsWith(word, StringComparison.OrdinalIgnoreCase));
+
+    private static string Hash(string connection, string sql) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            Encoding.UTF8.GetBytes(connection + "\n" + sql)))[..32].ToLowerInvariant();
+
+    private static string? Text(object? value) => value switch
+    {
+        null => null,
+        string text => text,
+        byte[] bytes => Convert.ToBase64String(bytes),
+        DateTime date => date.ToString("O"),
+        DateTimeOffset date => date.ToString("O"),
+        _ => value.ToString(),
+    };
+
+    private static McpToolResult Ok(object payload) =>
+        new(JsonSerializer.Serialize(payload, Json));
+
+    private static string Required(JsonElement arguments, string name) =>
+        arguments.ValueKind == JsonValueKind.Object
+        && arguments.TryGetProperty(name, out var value)
+        && value.ValueKind == JsonValueKind.String
+        && value.GetString() is { Length: > 0 } text
+            ? text
+            : throw new FormatException($"'{name}' is required");
+
+    private static string? Optional(JsonElement arguments, string name) =>
+        arguments.ValueKind == JsonValueKind.Object
+        && arguments.TryGetProperty(name, out var value)
+        && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static int? Number(JsonElement arguments, string name)
+    {
+        if (arguments.ValueKind != JsonValueKind.Object
+            || !arguments.TryGetProperty(name, out var value))
+            return null;
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.Number => value.TryGetInt32(out var number) ? number : null,
+            JsonValueKind.String => int.TryParse(value.GetString(), out var parsed) ? parsed : null,
+            _ => null,
+        };
+    }
+
+    /// A JSON Schema object from (name, type, description, required) tuples — enough of the spec
+    /// for a tool definition, without a schema library.
+    private static object Object(params (string Name, string Type, string Description, bool Required)[] fields)
+    {
+        var properties = new Dictionary<string, object>();
+        foreach (var field in fields)
+            properties[field.Name] = new { type = field.Type, description = field.Description };
+
+        return new
+        {
+            type = "object",
+            properties,
+            required = fields.Where(field => field.Required).Select(field => field.Name).ToArray(),
+        };
+    }
+}
+
+/// Whether a statement only reads. Deliberately a whitelist: anything this does not recognise is
+/// treated as a write, so a new keyword cannot slip through as "probably fine".
+public static class ReadOnlyStatement
+{
+    private static readonly string[] Reading =
+    [
+        "SELECT", "WITH", "SHOW", "EXPLAIN", "DESCRIBE", "DESC", "PRAGMA", "VALUES", "TABLE",
+        // Redis and MongoDB consoles speak their own commands; these are their read verbs.
+        "GET", "MGET", "HGET", "HGETALL", "LRANGE", "SMEMBERS", "ZRANGE", "SCAN", "TTL", "TYPE",
+        "EXISTS", "INFO", "DBSIZE", "FIND", "COUNT", "AGGREGATE", "DISTINCT",
+    ];
+
+    public static bool Looks(string sql)
+    {
+        var trimmed = sql.TrimStart();
+
+        // A leading comment is fine; skip line comments before judging the first word.
+        while (trimmed.StartsWith("--", StringComparison.Ordinal))
+        {
+            var newline = trimmed.IndexOf('\n');
+            if (newline < 0) return false;
+            trimmed = trimmed[(newline + 1)..].TrimStart();
+        }
+
+        var word = new string([.. trimmed.TakeWhile(char.IsLetter)]);
+        if (word.Length == 0) return false;
+
+        // One statement only: a reading first statement followed by a write would sail through.
+        var rest = trimmed.TrimEnd().TrimEnd(';');
+        if (rest.Contains(';', StringComparison.Ordinal)) return false;
+
+        return Reading.Contains(word, StringComparer.OrdinalIgnoreCase);
+    }
+}

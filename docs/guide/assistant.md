@@ -55,11 +55,30 @@ Exactly this:
 Never a row of data. Not a sample, not a value, not a masked one. A column called `secret_token`
 travels as a name when the schema is sent, because that is what a schema is — its contents do not.
 
+## Answering from the database
+
+With an [MCP endpoint](mcp.md) configured, the dialog grows a third button: **Answer it from the
+database**. The model then gets the studio's own tools — the same registry the MCP endpoint exposes,
+with the same rules — and looks things up instead of guessing:
+
+> *How many rows does the people table have?*
+> → read the database with `run_query` → "The people table has 3 rows."
+
+The answer names the tools it used, so it can be checked rather than believed. Nothing else changes:
+masked columns stay masked, a read-only connection stays read-only, and a write needs
+`WDS_MCP_ALLOW_WRITE=true` and goes through a preview and its hash.
+
+`WDS_ASSIST_TOOLS=false` turns this off and leaves the explain-and-draft buttons.
+
 ## What it cannot do
 
 Nothing it returns is executed. A suggested statement is put into the editor when you ask for it,
 and from there it goes through the same run, the same preview and the same read-only checks as
 anything typed by hand. There is no path from a reply to a write.
+
+The one exception is deliberate and has to be switched on: with `WDS_MCP_ALLOW_WRITE=true` the
+tools include `preview_script` and `apply_script`, so the assistant can change data — after showing
+the script, and never in one step.
 
 ## Leaving it off
 

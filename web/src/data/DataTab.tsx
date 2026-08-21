@@ -3,15 +3,15 @@ import {
   ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Pagination, Text, Tooltip,
 } from "@mantine/core";
 import {
-  IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
+  IconArrowBackUp, IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
   IconFilter, IconLock, IconPlus, IconRefresh, IconRestore, IconSortAscending, IconSortDescending,
   IconTrash,
   IconWand,
 } from "@tabler/icons-react";
 import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
 import {
-  browseData, getMaskPolicy, lookupValues, saveMaskPolicy,
-  type DataPageDto, type ForeignKeyDto,
+  browseData, getMaskPolicy, getUndoState, lookupValues, saveMaskPolicy,
+  type DataPageDto, type ForeignKeyDto, type UndoStateDto,
 } from "../api";
 
 import { CellValue } from "../grid/CellValue";
@@ -53,6 +53,9 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   // doing either in the browser would order and filter the wrong set.
   const [sort, setSort] = useState<{ column: string; desc: boolean } | null>(null);
   const [filter, setFilter] = useState<{ column: string; value: string } | null>(null);
+  // What the server says could be taken back on this table, and whether its script is open.
+  const [undoState, setUndoState] = useState<UndoStateDto | null>(null);
+  const [undoOpen, setUndoOpen] = useState(false);
   // Masking happens on the server, so revealing is a fresh request rather than a render flag.
   const [reveal, setReveal] = useState(false);
 
@@ -90,6 +93,15 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
     return () => { cancelled = true; };
   }, [connectionId, objectRef, pageIndex, nonce, sort, filter, reveal]);
 
+  // Re-read after every apply: what can be undone changes with the data, not with the render.
+  useEffect(() => {
+    let cancelled = false;
+    getUndoState(connectionId, objectRef)
+      .then(state => { if (!cancelled) setUndoState(state); })
+      .catch(() => { if (!cancelled) setUndoState(null); });
+    return () => { cancelled = true; };
+  }, [connectionId, objectRef, nonce]);
+
   if (error) return <Text c="red" size="xs" p="xs">{error}</Text>;
   if (!page) return <Loader size="xs" m="xs" />;
 
@@ -118,6 +130,12 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
             Save
           </Button>
         </Tooltip>
+        {undoState?.available ? (
+          <Tooltip label={`Undo the last applied change (${undoState.label}) — the script is shown first`}>
+            <ActionIcon size="sm" variant="subtle" color="orange" aria-label="Undo last change"
+              onClick={() => setUndoOpen(true)}><IconArrowBackUp size={14} /></ActionIcon>
+          </Tooltip>
+        ) : null}
         <Tooltip label="Revert all pending changes">
           <ActionIcon size="sm" variant="subtle" aria-label="Revert" disabled={!changeSet.isDirty}
             onClick={changeSet.revertAll}><IconRestore size={14} /></ActionIcon>
@@ -368,6 +386,12 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
         <Group justify="center" py={4}>
           <Pagination size="xs" total={totalPages} value={pageIndex} onChange={setPageIndex} />
         </Group>
+      )}
+
+      {undoOpen && (
+        <ChangePreviewModal connectionId={connectionId} objectRef={objectRef} tableName={tableName}
+          changes={null} undo onClose={() => setUndoOpen(false)}
+          onApplied={() => { changeSet.revertAll(); setNonce(n => n + 1); }} />
       )}
 
       <ChangePreviewModal

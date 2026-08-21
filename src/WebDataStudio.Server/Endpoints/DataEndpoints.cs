@@ -16,6 +16,11 @@ public static class DataEndpoints
     public record ChangeRequest(List<ChangeDto> Changes);
     public record ApplyRequest(string Hash);
 
+    /// What a preview leaves behind for its apply: the exact script that was approved, plus what
+    /// the inverse needs - the change set itself and the columns that address a row.
+    private sealed record Prepared(
+        SchemaNodeRef Target, ChangeScript Script, ChangeSet Changes, IReadOnlyList<string> KeyColumns);
+
     public static void MapDataEndpoints(this WebApplication app)
     {
         var defaultLimit = int.TryParse(app.Configuration["WDS_MAX_ROWS"], out var m) ? m : 1000;
@@ -153,7 +158,9 @@ public static class DataEndpoints
 
                     // The built script is cached, so apply executes exactly what was approved
                     // rather than rebuilding it from a request that could have changed.
-                    cache.Set($"changes:{hash}", (target, script), TimeSpan.FromMinutes(10));
+                    cache.Set($"changes:{hash}",
+                        new Prepared(target, script, changeSet, identity.KeyColumns),
+                        TimeSpan.FromMinutes(10));
 
                     return Results.Ok(new
                     {
@@ -170,14 +177,17 @@ public static class DataEndpoints
         });
 
         app.MapPost("/api/data/{conn}/apply-changes", async (string conn, [FromQuery(Name = "ref")] string objectRef,
-            ApplyRequest body, SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
+            ApplyRequest body, SessionFactory factory, IMemoryCache cache, UndoStore undo,
+            CancellationToken ct) =>
         {
-            if (cache.Get($"changes:{body.Hash}") is not ValueTuple<SchemaNodeRef, ChangeScript> cached)
+            if (cache.Get($"changes:{body.Hash}") is not Prepared prepared)
                 return Results.Json(
                     new { message = "the preview expired or the data changed; preview again before applying" },
                     statusCode: StatusCodes.Status409Conflict);
 
-            var (_, script) = cached;
+            var script = prepared.Script;
+            // Set when this apply is itself an undo, so the entry can be consumed once it worked.
+            var undoing = cache.Get($"undo-of:{body.Hash}") as string;
 
             try
             {
@@ -195,6 +205,11 @@ public static class DataEndpoints
 
                     try
                     {
+                        // Read the rows this change is about to overwrite, inside the same
+                        // transaction: anything read after the commit is somebody else's data.
+                        var before = await Undo.CaptureAsync(session, transaction, driver.Dialect,
+                            prepared.Target, prepared.Changes, ct);
+
                         foreach (var statement in script.Statements)
                         {
                             await using var command = session.Connection.CreateCommand();
@@ -215,7 +230,27 @@ public static class DataEndpoints
 
                         if (transaction is not null) await transaction.CommitAsync(ct);
                         cache.Remove($"changes:{body.Hash}");
-                        return Results.Ok(new { applied, failedAt = (int?)null, error = (string?)null });
+
+                        if (undoing is not null)
+                        {
+                            undo.Consume(conn, undoing);
+                            cache.Remove($"undo-of:{body.Hash}");
+                        }
+
+                        // The step is undoable only if the inverse could be built *and* stored.
+                        // An undo is not itself recorded: one step back is a model people can hold,
+                        // "undo the undo" is not.
+                        var inverse = undoing is null
+                            ? Undo.BuildInverse(prepared.Changes, prepared.KeyColumns, before)
+                            : [];
+                        var undoable = inverse.Count > 0 && undo.Push(conn, new UndoEntry(
+                            Guid.NewGuid().ToString("n"), prepared.Target.ToString(),
+                            Undo.Describe(prepared.Changes), DateTimeOffset.UtcNow, inverse));
+
+                        return Results.Ok(new
+                        {
+                            applied, failedAt = (int?)null, error = (string?)null, undoable,
+                        });
                     }
                     catch (DbException e)
                     {
@@ -236,6 +271,59 @@ public static class DataEndpoints
                 }
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // What could be undone here, so the button knows whether it has anything to offer.
+        app.MapGet("/api/data/{conn}/undo", (string conn, [FromQuery(Name = "ref")] string objectRef,
+            UndoStore undo) =>
+        {
+            var entry = undo.Newest(conn, objectRef);
+            return entry is null
+                ? Results.Ok(new { available = false, label = (string?)null, at = (DateTimeOffset?)null })
+                : Results.Ok(new { available = true, label = entry.Label, at = entry.At });
+        });
+
+        // An undo is a change like any other, so it goes through the same preview-then-apply
+        // handshake: the inverse script is shown first, and apply-changes executes it.
+        app.MapPost("/api/data/{conn}/undo/preview", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, SessionFactory factory, UndoStore undo,
+            IMemoryCache cache, CancellationToken ct) =>
+        {
+            var entry = undo.Newest(conn, objectRef);
+            if (entry is null)
+                return Results.BadRequest(new { message = "there is nothing to undo on this table" });
+
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var target = SchemaEndpoints.ParseObjectRef(objectRef);
+                    var detail = await driver.DescribeAsync(session, target, ct);
+                    var identity = RowIdentity.Resolve(detail);
+
+                    var changeSet = new ChangeSet(conn, target.ToString(), entry.Changes);
+                    var script = ChangeScriptBuilder.Build(changeSet, detail, driver.Dialect);
+                    var hash = changeSet.Hash();
+
+                    cache.Set($"changes:{hash}",
+                        new Prepared(target, script, changeSet, identity.KeyColumns),
+                        TimeSpan.FromMinutes(10));
+                    cache.Set($"undo-of:{hash}", entry.Id, TimeSpan.FromMinutes(10));
+
+                    return Results.Ok(new
+                    {
+                        hash,
+                        script = script.Text,
+                        statementCount = script.Statements.Count,
+                        destructive = script.Statements.Any(s => s.Destructive),
+                        label = entry.Label,
+                    });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 

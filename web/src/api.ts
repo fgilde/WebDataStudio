@@ -179,6 +179,18 @@ export const browseData = (conn: string, ref: string,
   return fetch(`${base}/data/${conn}?${refQuery(ref, query)}`).then(r => ok<DataPageDto>(r));
 };
 
+export interface UndoStateDto { available: boolean; label: string | null; at: string | null }
+
+export const getUndoState = (conn: string, ref: string): Promise<UndoStateDto> =>
+  fetch(`${base}/data/${conn}/undo?${refQuery(ref, new URLSearchParams())}`)
+    .then(r => ok<UndoStateDto>(r));
+
+/// The inverse of the last change, as a script to approve. Applying it goes through the same
+/// apply-changes call every other change uses.
+export const previewUndo = (conn: string, ref: string): Promise<ChangePreviewDto> =>
+  fetch(`${base}/data/${conn}/undo/preview?${refQuery(ref, new URLSearchParams())}`,
+    { method: "POST" }).then(r => ok<ChangePreviewDto>(r));
+
 export interface MaskPolicyDto { maskByDefault: boolean; extra: string[]; never: string[] }
 
 export const getMaskPolicy = (conn: string): Promise<MaskPolicyDto> =>

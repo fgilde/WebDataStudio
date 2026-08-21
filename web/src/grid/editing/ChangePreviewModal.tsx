@@ -1,15 +1,19 @@
 import { useEffect, useState } from "react";
 import { Alert, Badge, Button, Group, Modal, ScrollArea, Stack, Text, TextInput } from "@mantine/core";
-import { previewChanges, applyChanges, type ChangePreviewDto } from "../../api";
+import { applyChanges, previewChanges, previewUndo, type ChangePreviewDto } from "../../api";
 import type { RowChange } from "./useChangeSet";
 
 /// Nothing is written until the user has seen this script and confirmed it. A destructive script
 /// additionally requires the table name typed out.
-export function ChangePreviewModal({ connectionId, objectRef, tableName, changes, onClose, onApplied }: {
+export function ChangePreviewModal({ connectionId, objectRef, tableName, changes, undo = false,
+  onClose, onApplied }: {
   connectionId: string;
   objectRef: string;
   tableName: string;
   changes: RowChange[] | null;
+  /// Previews the inverse of the last applied change rather than a pending edit. The approval and
+  /// the apply are the same in both cases, so they share this modal.
+  undo?: boolean;
   onClose: () => void;
   onApplied: () => void;
 }) {
@@ -19,16 +23,19 @@ export function ChangePreviewModal({ connectionId, objectRef, tableName, changes
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!changes) { setPreview(null); return; }
+    if (!changes && !undo) { setPreview(null); return; }
 
     setPreview(null);
     setError(null);
     setConfirmation("");
-    previewChanges(connectionId, objectRef, changes).then(setPreview)
+    const request = undo
+      ? previewUndo(connectionId, objectRef)
+      : previewChanges(connectionId, objectRef, changes ?? []);
+    request.then(setPreview)
       .catch(e => setError(e instanceof Error ? e.message : String(e)));
-  }, [changes, connectionId, objectRef]);
+  }, [changes, undo, connectionId, objectRef]);
 
-  if (!changes) return null;
+  if (!changes && !undo) return null;
 
   const needsTypedConfirmation = preview?.destructive === true;
   const confirmed = !needsTypedConfirmation || confirmation.trim() === tableName;
@@ -49,7 +56,7 @@ export function ChangePreviewModal({ connectionId, objectRef, tableName, changes
   };
 
   return (
-    <Modal opened onClose={onClose} title="Review changes" size="lg">
+    <Modal opened onClose={onClose} title={undo ? "Undo the last change" : "Review changes"} size="lg">
       <Stack gap="sm">
         {error && <Text c="red" size="sm">{error}</Text>}
 

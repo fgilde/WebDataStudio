@@ -56,6 +56,7 @@ builder.Services.AddSingleton(sp => new ConnectionStore(
     sp.GetRequiredService<SecretProtector>()));
 builder.Services.AddSingleton<ConnectionRegistry>();
 builder.Services.AddSingleton<MaskPolicyStore>();
+builder.Services.AddSingleton<UndoStore>();
 builder.Services.AddSingleton<DriverRegistry>();
 builder.Services.AddSingleton<TunnelManager>();
 builder.Services.AddSingleton(sp => new SessionPool(sp.GetRequiredService<IConfiguration>()));

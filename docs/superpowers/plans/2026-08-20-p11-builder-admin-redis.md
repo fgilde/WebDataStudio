@@ -498,16 +498,23 @@ reference for scope, not for code.
 - Produces: `string BuildInverse(IReadOnlyList<Change> changes, IReadOnlyList<Row> before)` and
   `record UndoEntry(string Id, string ConnectionId, string ObjectRef, string Script, DateTimeOffset At)`.
 
-- [ ] **Step 1: Write the failing test** — updating two rows and undoing restores the old values
+- [x] **Step 1: Write the failing test** — updating two rows and undoing restores the old values
       exactly; an insert's inverse is a delete by key; a delete's inverse re-inserts every column;
       undoing twice is refused because the entry is consumed.
-- [ ] **Step 2: Run it** — expect failure.
-- [ ] **Step 3: Implement** — capture the affected rows inside the same transaction that applies
+- [x] **Step 2: Run it** — expect failure.
+- [x] **Step 3: Implement** — capture the affected rows inside the same transaction that applies
       the change, generate the inverse from them, keep the last N (default 20) entries per
       connection in the workspace store, and refuse when the store is unavailable rather than
       pretending the change is reversible.
-- [ ] **Step 4: Run it** — green.
-- [ ] **Step 5: Commit** — `feat(safety): undo the last data change, script shown first`
+
+      *As built:* the undo goes through the same preview-then-apply handshake as any other change
+      (`POST /api/data/{conn}/undo/preview` caches the inverse under `changes:{hash}`, the existing
+      `apply-changes` executes it and consumes the entry). An apply reports `undoable`, which is
+      false when the inverse could not be built (a generated key) or not stored (no workspace) —
+      the button then simply is not offered. An undo is not itself recorded, so there is no
+      "undo the undo".
+- [x] **Step 4: Run it** — green.
+- [x] **Step 5: Commit** — `feat(safety): undo the last data change, script shown first`
 
 ### Task 4.3: Several users, each with their own connections
 

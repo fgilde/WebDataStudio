@@ -30,12 +30,13 @@ public static class RedisOperations
         foreach (var group in await db.StreamGroupInfoAsync(key))
         {
             groups.Add(new ConsumerGroupDto(
-                group.Name, group.ConsumerCount, group.PendingMessageCount, group.LastDeliveredId));
+                group.Name, group.ConsumerCount, group.PendingMessageCount,
+                group.LastDeliveredId ?? ""));
 
             // The pending list is what "stuck" looks like: delivered, not acknowledged, and by whom.
             foreach (var entry in await db.StreamPendingMessagesAsync(key, group.Name, 20, RedisValue.Null))
                 pending.Add(new PendingEntryDto(
-                    entry.MessageId, entry.ConsumerName, entry.IdleTimeInMilliseconds,
+                    entry.MessageId.ToString(), entry.ConsumerName.ToString(), entry.IdleTimeInMilliseconds,
                     entry.DeliveryCount));
         }
 

@@ -68,7 +68,11 @@ builder.Services.AddSingleton(sp => McpOptions.FromConfiguration(sp.GetRequiredS
 builder.Services.AddSingleton<McpToolbox>();
 builder.Services.AddSingleton<McpAvailability>();
 builder.Services.AddSingleton(sp => AlertOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<HealthAlertSink>();
 builder.Services.AddSingleton<HealthAlerts>();
+builder.Services.AddSingleton(sp => SnapshotOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<SchemaSnapshots>();
+builder.Services.AddHostedService<SchemaSnapshotStartup>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<HealthAlerts>());
 builder.Services.AddHttpClient("alerts", client => client.Timeout = TimeSpan.FromSeconds(20));
 builder.Services.AddHttpClient("assist", client => client.Timeout = TimeSpan.FromSeconds(60));

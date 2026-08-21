@@ -43,3 +43,26 @@ break a view is a decision rather than a surprise.
 
 Their source is shown and can be edited where the engine exposes it. The same preview-then-apply
 rule holds.
+
+## Snapshots and drift
+
+With `WDS_SCHEMA_SNAPSHOT_DIR` set, the studio writes a snapshot of every connection's schema
+shortly after it starts and reports what moved since the last one: tables added or removed, and per
+table which columns, indexes and foreign keys came or went.
+
+```bash
+WDS_SCHEMA_SNAPSHOT_DIR=/data/snapshots
+```
+
+- `GET /api/schema/{connection}/drift` — what moved, or `no change`.
+- `POST /api/schema/snapshot` — take one now, which is the answer to "did my migration do what I
+  think it did".
+- The drift is also a log line, and a message when [alerts](administration.md#alerts) are
+  configured.
+
+The first snapshot is a baseline, not a change. Each snapshot then becomes the baseline for the next
+comparison, so a change is reported once. Files are written through a temporary name, and a file
+that cannot be read is treated as no file rather than as a schema that vanished.
+
+What it does **not** do is version your schema — that is a migration tool's job. This catches the
+drift a migration tool cannot see: the column somebody added by hand on staging at 23:40.

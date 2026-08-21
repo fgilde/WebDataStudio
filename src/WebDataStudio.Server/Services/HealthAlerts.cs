@@ -1,4 +1,3 @@
-using System.Net.Http.Json;
 using System.Text;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Models;
@@ -49,7 +48,7 @@ public sealed record AlertOptions(
 /// never open.
 public sealed class HealthAlerts(
     AlertOptions options, ConnectionRegistry registry, SessionFactory factory,
-    IHttpClientFactory clients, ILogger<HealthAlerts> log) : BackgroundService
+    HealthAlertSink sink, ILogger<HealthAlerts> log) : BackgroundService
 {
     /// Findings already reported, as "connection|category|title". Kept in memory: after a restart
     /// one repeat is better than a store to keep in sync.
@@ -121,6 +120,8 @@ public sealed class HealthAlerts(
     private async Task<bool> PostAsync(
         ConnectionSpec spec, IReadOnlyList<AnalyzeFinding> findings, CancellationToken ct)
     {
+        _ = log;
+
         // `text` is what Slack, Mattermost, Discord and Teams all read; the structured fields ride
         // along for anything that wants more than a sentence.
         var text = new StringBuilder($"*{spec.Name}* — {findings.Count} new health finding");
@@ -146,19 +147,7 @@ public sealed class HealthAlerts(
             }),
         };
 
-        try
-        {
-            var client = clients.CreateClient("alerts");
-            using var response = await client.PostAsJsonAsync(options.Webhook, payload, ct);
-
-            if (response.IsSuccessStatusCode) return true;
-
-            log.LogWarning("the alert webhook answered {Status}", (int)response.StatusCode);
-        }
-        catch (Exception e)
-        {
-            log.LogWarning(e, "the alert webhook could not be reached");
-        }
+        if (await sink.PostAsync(payload, ct)) return true;
 
         // Not sent: forget them, so the next sweep tries again rather than swallowing them.
         foreach (var finding in findings) _seen.Remove($"{spec.Id}|{finding.Category}|{finding.Title}");

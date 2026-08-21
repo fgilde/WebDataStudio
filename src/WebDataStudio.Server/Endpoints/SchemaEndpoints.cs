@@ -9,6 +9,38 @@ public static class SchemaEndpoints
 {
     public static void MapSchemaEndpoints(this WebApplication app)
     {
+        // What moved since the last snapshot, for anybody who wants to know why a query stopped
+        // working. Absent unless WDS_SCHEMA_SNAPSHOT_DIR is set: without it there is nothing to
+        // compare against.
+        app.MapGet("/api/schema/{conn}/drift", (string conn, SchemaSnapshots snapshots) =>
+            !snapshots.Configured
+                ? Results.Ok(new { configured = false, drift = (object?)null })
+                : Results.Ok(new
+                {
+                    configured = true,
+                    drift = snapshots.DriftOf(conn) is { } drift
+                        ? new
+                        {
+                            before = drift.Before,
+                            after = drift.After,
+                            summary = drift.Summary,
+                            drift.Added,
+                            drift.Removed,
+                            drift.Changed,
+                        }
+                        : null,
+                }));
+
+        // Takes one now rather than waiting for the next start — the button behind "did my
+        // migration do what I think it did".
+        app.MapPost("/api/schema/snapshot", async (SchemaSnapshots snapshots, CancellationToken ct) =>
+            snapshots.Configured
+                ? Results.Ok(new { moved = await snapshots.SweepAsync(ct) })
+                : Results.BadRequest(new
+                {
+                    message = "no snapshot directory is configured; set WDS_SCHEMA_SNAPSHOT_DIR",
+                }));
+
         app.MapGet("/api/drivers", (DriverRegistry drivers) =>
             Results.Ok(drivers.All().Select(d => new { d.Info, d.Caps })));
 

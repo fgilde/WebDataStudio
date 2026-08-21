@@ -702,16 +702,22 @@ Off unless configured: no key, no calls, no mention in the UI.
   and `record AssistReply(string Text, IReadOnlyList<string> Statements)`; configuration through
   `WDS_ASSIST_ENDPOINT`, `WDS_ASSIST_KEY`, `WDS_ASSIST_MODEL`.
 
-- [ ] **Step 1: Write the failing tests** — without configuration the endpoints answer 501 and
+- [x] **Step 1: Write the failing tests** — without configuration the endpoints answer 501 and
       `/api/health` reports `assist: false`; with a stub endpoint the request carries the schema
       only when `IncludeSchema` is true, and never carries a row of data; the reply's statements are
       returned as text and never executed.
-- [ ] **Step 2: Run them** — expect failure.
-- [ ] **Step 3: Implement** — a thin HTTP call to an OpenAI-compatible endpoint (`HttpClient`, no
+- [x] **Step 2: Run them** — expect failure.
+- [x] **Step 3: Implement** — a thin HTTP call to an OpenAI-compatible endpoint (`HttpClient`, no
       SDK), a schema summary built from the existing introspection, and a hard rule that nothing
       returned is executed automatically.
-- [ ] **Step 4: Run them** — green.
-- [ ] **Step 5: Commit** — `feat(assist): optional explain and draft-SQL, off without a key`
+
+      *As built:* `/api/health` reports `assist`, and the query tab reads it — without an endpoint
+      the button does not exist. A suggested statement is put into the editor, where it goes through
+      the same run and preview as anything typed by hand. The schema summary is table and column
+      names only, capped at 60 tables and 40 columns each, and it travels only when the caller asks
+      for it.
+- [x] **Step 4: Run them** — green.
+- [x] **Step 5: Commit** — `feat(assist): optional explain and draft-SQL, off without a key`
 
 ### Task 6.2: Documentation
 

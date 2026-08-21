@@ -54,6 +54,8 @@ export interface HealthDto {
   built: string;
   store: { path: string; available: boolean; error: string | null };
   connections: number;
+  /// True when an assistance endpoint is configured. Absent on older servers.
+  assist?: boolean;
 }
 
 export const health = (): Promise<HealthDto> => fetch(`${base}/health`).then(r => ok<HealthDto>(r));
@@ -193,6 +195,18 @@ export const listStudioUsers = (): Promise<StudioUsersDto> =>
 export const hashStudioPassword = (password: string): Promise<{ hash: string }> =>
   fetch(`${base}/admin/studio-users/hash`, json("POST", { password }))
     .then(r => ok<{ hash: string }>(r));
+
+export interface AssistReplyDto { text: string; statements: string[] }
+
+/// Both calls answer 501 when no assistance endpoint is configured, which is how the UI knows not
+/// to offer them at all.
+export const assistExplain = (conn: string, sql: string, includeSchema: boolean): Promise<AssistReplyDto> =>
+  fetch(`${base}/assist/explain`, json("POST", { connectionId: conn, sql, includeSchema }))
+    .then(r => ok<AssistReplyDto>(r));
+
+export const assistSql = (conn: string, question: string, includeSchema: boolean): Promise<AssistReplyDto> =>
+  fetch(`${base}/assist/sql`, json("POST", { connectionId: conn, question, includeSchema }))
+    .then(r => ok<AssistReplyDto>(r));
 
 export interface GenerateStrategiesDto {
   available: string[];

@@ -61,6 +61,9 @@ builder.Services.AddSingleton<ConnectionRegistry>();
 builder.Services.AddSingleton<MaskPolicyStore>();
 builder.Services.AddSingleton<UndoStore>();
 builder.Services.AddSingleton<Federation>();
+builder.Services.AddSingleton(sp => AssistantOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<Assistant>();
+builder.Services.AddHttpClient("assist", client => client.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddSingleton<DriverRegistry>();
 builder.Services.AddSingleton<TunnelManager>();
 builder.Services.AddSingleton(sp => new SessionPool(sp.GetRequiredService<IConfiguration>()));
@@ -99,7 +102,7 @@ foreach (var (label, path, error) in new[]
     else startupLog.LogError("{Store} database at {Path} is not usable: {Error}", label, path, error);
 }
 
-app.MapGet("/api/health", (ConnectionRegistry registry) => Results.Ok(new
+app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assistantOptions) => Results.Ok(new
 {
     status = connectionStore.Available && workspaceStore.Available ? "ok" : "degraded",
     version,
@@ -114,6 +117,9 @@ app.MapGet("/api/health", (ConnectionRegistry registry) => Results.Ok(new
         error = connectionStore.Error ?? workspaceStore.Error,
     },
     connections = registry.All().Count,
+    // Off unless configured, and said out loud: a studio that quietly talks to an endpoint would
+    // be the wrong kind of surprise.
+    assist = assistantOptions.Configured,
 })).AllowAnonymous();
 
 // A stuck data directory is a dependency failure, not a bug in the request: say so, with the path
@@ -184,6 +190,7 @@ app.MapRedisEndpoints();
 app.MapDiagramEndpoints();
 app.MapSavedQueryEndpoints();
 app.MapFederationEndpoints();
+app.MapAssistantEndpoints();
 
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();

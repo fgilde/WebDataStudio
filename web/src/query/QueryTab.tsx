@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActionIcon, Group, Select, Switch, Text, Tooltip } from "@mantine/core";
-import { IconPlayerPlay, IconPlayerStop, IconPlayerTrackNext } from "@tabler/icons-react";
+import {
+  IconPlayerPlay, IconPlayerStop, IconPlayerTrackNext, IconSparkles,
+} from "@tabler/icons-react";
+import { AssistModal } from "../assist/AssistModal";
 import { QueryEditor } from "../editor/QueryEditor";
 import { describeDiff, diffRows } from "../grid/diffRows";
 import { ResultArea } from "./ResultArea";
 import { runQuery, type QueryRun } from "./runQuery";
 import { applyChunk, createResultState, type ResultState } from "./resultStore";
-import { addHistory } from "../api";
+import { addHistory, health } from "../api";
 import { findParameters } from "../editor/parameters";
 import { ParameterDialog } from "../editor/ParameterDialog";
 import { useUserSnippets } from "../editor/SnippetManager";
@@ -41,11 +44,18 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   const [watchSeconds, setWatchSeconds] = useState<number | null>(null);
   const [changed, setChanged] = useState<ReadonlySet<string> | undefined>(undefined);
   const [watchNote, setWatchNote] = useState<string | null>(null);
+  // Off unless a server says it is configured; the button then does not exist.
+  const [assistAvailable, setAssistAvailable] = useState(false);
+  const [assistOpen, setAssistOpen] = useState(false);
   // The rows the last run produced, to diff the next one against. A ref rather than state: the
   // comparison happens inside a run, not during a render.
   const lastRows = useRef<unknown[][] | null>(null);
 
   useEffect(() => { onSqlChange?.(tabId, sql); }, [tabId, sql, onSqlChange]);
+
+  useEffect(() => {
+    health().then(state => setAssistAvailable(state.assist === true)).catch(() => {});
+  }, []);
 
   const run = useCallback(async (text: string, parameters?: Record<string, string | null>) => {
     if (!text.trim()) return;
@@ -153,6 +163,14 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
           <Switch size="xs" ml={6} label="single transaction" checked={transactional}
             onChange={e => setTransactional(e.currentTarget.checked)} />
         </Tooltip>
+        {assistAvailable && (
+          <Tooltip label="Explain this statement, or draft one from a question">
+            <ActionIcon variant="subtle" aria-label="Ask about this query"
+              onClick={() => setAssistOpen(true)}>
+              <IconSparkles size={16} />
+            </ActionIcon>
+          </Tooltip>
+        )}
         <Tooltip label="Re-run this query and highlight what changed">
           <Select size="xs" w={110} ml={6} placeholder="watch off" clearable
             aria-label="Watch interval"
@@ -189,6 +207,9 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
         <ResultArea result={result} changed={changed}
           onExport={onExport ? () => onExport(sql) : undefined} />
       </div>
+
+      <AssistModal connectionId={connectionId} sql={sql} opened={assistOpen}
+        onClose={() => setAssistOpen(false)} onUseStatement={setSql} />
 
       <ParameterDialog names={pending?.names ?? null} initial={lastValues}
         onCancel={() => setPending(null)}

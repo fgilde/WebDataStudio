@@ -103,7 +103,15 @@ const DIALECTS: Record<string, DialectId> = {
 export const dialectFor = (engine: string): DialectId => DIALECTS[engine] ?? "postgresql";
 
 function StructurePanel() {
-  return <ObjectDetailPanel selection={useShell().selection} />;
+  const shell = useShell();
+
+  return (
+    <ObjectDetailPanel selection={shell.selection}
+      // The SQL tab and the privilege statements open a query tab rather than running anything:
+      // a GRANT goes through the editor's preview like every other change.
+      onOpenInEditor={sql => shell.selection
+        && shell.runStatement(shell.selection.connectionId, sql)} />
+  );
 }
 
 function QueryPanel(props: IDockviewPanelProps<{ tabId: string }>) {

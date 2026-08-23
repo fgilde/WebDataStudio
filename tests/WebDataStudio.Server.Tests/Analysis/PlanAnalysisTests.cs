@@ -46,6 +46,40 @@ public class PlanRulesTests
         Assert.Contains("ANALYZE", finding.Statement);
     }
 
+    /// The engine says it in the detail line — "Disk:", "external merge" — and in no field of its
+    /// own, so nothing else here would notice it.
+    [Fact]
+    public void Flags_a_sort_that_spilled_to_disk()
+    {
+        var findings = PlanRules.Evaluate(
+            Node("Sort", "Sort Method: external merge  Disk: 24680kB"));
+
+        var finding = Assert.Single(findings, f => f.Category == "spilled-to-disk");
+        Assert.Contains("work_mem", finding.Detail);
+    }
+
+    [Fact]
+    public void Leaves_an_in_memory_sort_alone()
+    {
+        Assert.Empty(PlanRules.Evaluate(Node("Sort", "Sort Method: quicksort  Memory: 25kB")));
+    }
+
+    /// A nested loop can be the wrong shape without an inner scan: enough rows through it and a
+    /// hash or merge join is what the planner should have chosen.
+    [Fact]
+    public void Flags_a_nested_loop_carrying_many_rows()
+    {
+        var findings = PlanRules.Evaluate(Node("Nested Loop", actualRows: 900_000));
+
+        Assert.Single(findings, f => f.Category == "nested-loop-rows");
+    }
+
+    [Fact]
+    public void Leaves_a_small_nested_loop_alone()
+    {
+        Assert.Empty(PlanRules.Evaluate(Node("Nested Loop", actualRows: 300)));
+    }
+
     [Fact]
     public void Passes_through_engine_warnings()
     {

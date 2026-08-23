@@ -47,3 +47,44 @@ back to everything else.
 then stays where it was. The window carries the studio's theme, and closing it docks the panel back
 into the studio. A second monitor with the query editor on one side and the result on the other is
 what this is for.
+
+## What the structure panel answers
+
+Selecting a table or view fills the structure panel. Beyond its columns, indexes and keys, four tabs
+answer the questions people otherwise go looking for in a catalogue by hand:
+
+**Statistics** — how big the object is (total, table, indexes), how many rows the engine thinks it
+has, how many of them are dead, when it was last vacuumed and analysed, and how often it is read by
+a scan rather than an index. Underneath, every index with its size and its scan count: an index with
+**0 scans** that is not a primary key is the clearest "delete me" a database ever gives you.
+PostgreSQL, MySQL, SQL Server and Oracle answer this; SQLite keeps no such statistics and the tab
+says so rather than showing a table of blanks.
+
+**Privileges** — who has what on this object, and whether they may pass it on. The field above the
+list builds a `GRANT`, and the bin next to a row builds the matching `REVOKE`. Neither runs: the
+statement opens in a query tab, where it goes through the same preview as any other change. It lists
+**grants**, not effective access — an owner and a superuser still reach the object without one.
+
+**Dependencies** — what breaks if this changes, and what this needs. The question before every
+`DROP`. On an engine with no dependency catalogue (SQLite) the answer is a search of the other
+objects' definitions, and the tab says as much.
+
+**SQL** — the object as a `CREATE` statement, to copy or to open in a query tab. Engines that keep
+the original text hand that over; for the rest the studio generates it from the shape it read.
+
+## Query plans
+
+The plan panel reads the plan rather than only drawing it. Besides the heat map over node costs, the
+findings list names the shapes that are usually the problem:
+
+| Finding | What it means |
+|---|---|
+| Sequential scan over many rows | an index on the filtered or joined column turns it into a lookup |
+| Nested loop over a scan | the inner side is scanned once per outer row |
+| Nested loop over many rows | a hash or merge join is usually the shape for that many |
+| Row estimate off by 10× or more | the planner is choosing on stale statistics — `ANALYZE` |
+| Sort or hash spilled to disk | it did not get the memory it wanted (`work_mem`, `sort_buffer_size`) |
+| Anything the engine itself warned about | passed through as the engine said it |
+
+Each carries the statement that would fix it where there is one, and that statement goes through the
+migration preview like everything else.

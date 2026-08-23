@@ -2,23 +2,31 @@ import { useEffect, useState } from "react";
 import { Badge, Group, Loader, ScrollArea, Table, Tabs, Text } from "@mantine/core";
 import { describeObject, type ObjectDetailDto } from "../api";
 import type { ExplorerSelection } from "./ExplorerTree";
+import {
+  DependenciesTab, PrivilegesTab, SqlTab, StatisticsTab,
+} from "./ObjectTabs";
 
 const DESCRIBABLE = ["Table", "View", "MaterializedView"];
 
-export function ObjectDetailPanel({ selection }: { selection: ExplorerSelection | null }) {
+export function ObjectDetailPanel({ selection, onOpenInEditor }: {
+  selection: ExplorerSelection | null;
+  /// Opens SQL in a query tab — used by the SQL tab and by the privilege statements, which go
+  /// through the editor's own preview rather than running from here.
+  onOpenInEditor?: (sql: string) => void;
+}) {
   const [detail, setDetail] = useState<ObjectDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDetail(null);
-    setError(null);
     if (!selection || !DESCRIBABLE.includes(selection.node.kind)) return;
 
     let cancelled = false;
     describeObject(selection.connectionId, selection.node.ref)
-      .then(d => { if (!cancelled) setDetail(d); })
+      .then(d => { if (!cancelled) { setDetail(d); setError(null); } })
       .catch(e => { if (!cancelled) setError(e.message); });
-    return () => { cancelled = true; };
+
+    // Cleared on the way out, so a new selection never renders under the previous object's shape.
+    return () => { cancelled = true; setDetail(null); setError(null); };
   }, [selection]);
 
   if (!selection) return <Text size="xs" c="dimmed" p="xs">Select an object.</Text>;
@@ -33,8 +41,32 @@ export function ObjectDetailPanel({ selection }: { selection: ExplorerSelection 
         <Tabs.Tab value="columns">Columns</Tabs.Tab>
         <Tabs.Tab value="indexes">Indexes</Tabs.Tab>
         <Tabs.Tab value="keys">Keys</Tabs.Tab>
+        <Tabs.Tab value="statistics">Statistics</Tabs.Tab>
+        <Tabs.Tab value="privileges">Privileges</Tabs.Tab>
+        <Tabs.Tab value="dependencies">Dependencies</Tabs.Tab>
+        <Tabs.Tab value="sql">SQL</Tabs.Tab>
         <Tabs.Tab value="info">Info</Tabs.Tab>
       </Tabs.List>
+
+      {/* The four tabs pgAdmin taught people to look for. Each asks the server for itself, so
+          opening an object stays one request. */}
+      <Tabs.Panel value="statistics" keepMounted={false}>
+        <StatisticsTab connectionId={selection.connectionId} objectRef={selection.node.ref} />
+      </Tabs.Panel>
+
+      <Tabs.Panel value="privileges" keepMounted={false}>
+        <PrivilegesTab connectionId={selection.connectionId} objectRef={selection.node.ref}
+          onScript={onOpenInEditor} />
+      </Tabs.Panel>
+
+      <Tabs.Panel value="dependencies" keepMounted={false}>
+        <DependenciesTab connectionId={selection.connectionId} objectRef={selection.node.ref} />
+      </Tabs.Panel>
+
+      <Tabs.Panel value="sql" keepMounted={false}>
+        <SqlTab connectionId={selection.connectionId} objectRef={selection.node.ref}
+          onOpenInEditor={onOpenInEditor} />
+      </Tabs.Panel>
 
       <Tabs.Panel value="columns">
         <ScrollArea h="calc(100vh - 160px)">

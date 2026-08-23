@@ -230,6 +230,44 @@ export const assistChat = (conn: string,
   fetch(`${base}/assist/chat`, json("POST", { connectionId: conn, messages, includeSchema }))
     .then(r => ok<AssistReplyDto>(r));
 
+export interface ObjectStatisticsDto {
+  supported: boolean;
+  table: { name: string; value: string | null; kind: string }[];
+  indexes: { name: string; sizeBytes: number | null; scans: number | null; unique: boolean; primary: boolean }[];
+}
+
+/// What the engine knows about one object beyond its shape. `supported: false` on an engine that
+/// keeps no statistics — an empty list would read as "nothing to report".
+export const objectStatistics = (conn: string, ref: string): Promise<ObjectStatisticsDto> =>
+  fetch(`${base}/schema/${conn}/statistics?${refQuery(ref, new URLSearchParams())}`)
+    .then(r => ok<ObjectStatisticsDto>(r));
+
+export interface ObjectPrivilegesDto {
+  supported: boolean;
+  grants: { grantee: string; privilege: string; grantable: boolean }[];
+  privileges: string[];
+}
+
+export const objectPrivileges = (conn: string, ref: string): Promise<ObjectPrivilegesDto> =>
+  fetch(`${base}/schema/${conn}/privileges?${refQuery(ref, new URLSearchParams())}`)
+    .then(r => ok<ObjectPrivilegesDto>(r));
+
+/// The GRANT or REVOKE as text. Nothing runs here: it goes through the script preview.
+export const privilegeStatement = (conn: string, ref: string, grantee: string, privilege: string,
+  revoke: boolean): Promise<{ sql: string }> =>
+  fetch(`${base}/schema/${conn}/privileges/statement?${refQuery(ref, new URLSearchParams())}`,
+    json("POST", { grantee, privilege, revoke })).then(r => ok<{ sql: string }>(r));
+
+export const objectDependencies = (conn: string, ref: string):
+  Promise<{ dependsOn: string[]; usedBy: string[]; bestEffort: boolean }> =>
+  fetch(`${base}/ddl/${conn}/dependencies?${refQuery(ref, new URLSearchParams())}`)
+    .then(r => ok<{ dependsOn: string[]; usedBy: string[]; bestEffort: boolean }>(r));
+
+export const objectDdl = (conn: string, ref: string):
+  Promise<{ create: string | null; supported: boolean }> =>
+  fetch(`${base}/ddl/${conn}?${refQuery(ref, new URLSearchParams())}`)
+    .then(r => ok<{ create: string | null; supported: boolean }>(r));
+
 export interface SharedResultDto {
   id: string;
   connectionName: string;

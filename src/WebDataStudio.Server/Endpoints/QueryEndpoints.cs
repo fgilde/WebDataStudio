@@ -138,6 +138,9 @@ public static class QueryEndpoints
                 {
                     var mode = body.Mode.Equals("actual", StringComparison.OrdinalIgnoreCase)
                         ? PlanMode.Actual : PlanMode.Estimated;
+
+                    // The plan alone. `/api/query/analyze` is the one that reads it — one analyser,
+                    // in Analysis/PlanRules, rather than two that drift apart.
                     return Results.Ok(await driver.ExplainAsync(session, body.Sql, mode, ct));
                 }
             }

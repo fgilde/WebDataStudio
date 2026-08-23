@@ -10,6 +10,9 @@ public static class PlanRules
     private const double ManyRows = 10_000;
     private const double EstimateDriftFactor = 10;
 
+    /// A nested loop below this is the right shape and saying otherwise is noise.
+    private const double ManyLoopedRows = 100_000;
+
     /// Engine-independent: every rule reads only the normalised plan fields, so a new driver gets
     /// the whole rule set for free the moment it can produce a PlanNode tree.
     public static IReadOnlyList<AnalyzeFinding> Evaluate(PlanNode root)
@@ -45,6 +48,26 @@ public static class PlanRules
                 "Stale statistics make the planner pick the wrong strategy.",
                 node.Detail is { Length: > 0 } ? $"ANALYZE {node.Detail};" : null));
 
+        // Spilling to disk is the engine saying it did not get the memory it wanted. It is in the
+        // detail rather than in a warning, so nothing else here would notice it.
+        if (SpilledToDisk(node))
+            findings.Add(new AnalyzeFinding("spilled-to-disk", "warning",
+                $"{node.Operation} spilled to disk",
+                $"{node.Operation} did not get the memory it wanted and used disk instead " +
+                "(work_mem on PostgreSQL, sort_buffer_size on MySQL). More memory, or fewer rows " +
+                "reaching this node, turns it back into an in-memory operation.",
+                null));
+
+        // A nested loop can be the wrong shape without an inner scan: enough rows through it and a
+        // hash or merge join is what the planner should have chosen.
+        if (IsNestedLoop(node) && (node.ActualRows ?? node.EstimatedRows) is { } looped
+            && looped >= ManyLoopedRows)
+            findings.Add(new AnalyzeFinding("nested-loop-rows", "warning",
+                "Nested loop over many rows",
+                $"The loop carries about {Rows(looped)} rows. A hash or merge join is usually the " +
+                "shape for that many; the planner picks a loop when it expects far fewer.",
+                null));
+
         foreach (var warning in node.Warnings)
             findings.Add(new AnalyzeFinding("plan-warning", warning.Contains("spill", StringComparison.OrdinalIgnoreCase)
                 ? "warning" : "info",
@@ -65,6 +88,22 @@ public static class PlanRules
         || node.Operation.Contains("Table Scan", StringComparison.OrdinalIgnoreCase)
         || node.Operation.Contains("Clustered Index Scan", StringComparison.OrdinalIgnoreCase)
         || node.Operation.Contains("full table scan", StringComparison.OrdinalIgnoreCase);
+
+    /// Every engine says it differently in the detail line — "Disk:", "external merge", "spill" —
+    /// and none of them says it in a field of its own.
+    private static bool SpilledToDisk(PlanNode node)
+    {
+        if (node.Detail is not { Length: > 0 } detail) return false;
+
+        var interesting = node.Operation.Contains("Sort", StringComparison.OrdinalIgnoreCase)
+            || node.Operation.Contains("Hash", StringComparison.OrdinalIgnoreCase)
+            || node.Operation.Contains("Aggregate", StringComparison.OrdinalIgnoreCase);
+
+        return interesting
+            && (detail.Contains("disk", StringComparison.OrdinalIgnoreCase)
+                || detail.Contains("external", StringComparison.OrdinalIgnoreCase)
+                || detail.Contains("spill", StringComparison.OrdinalIgnoreCase));
+    }
 
     private static bool IsNestedLoop(PlanNode node) =>
         node.Operation.Contains("Nested Loop", StringComparison.OrdinalIgnoreCase);

@@ -157,3 +157,8 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F24.5 | Scheduled read-only queries exported to files, on an interval or daily, with the last run per job on an endpoint | done | all | Environment |
 | F24.6 | A result kept as a snapshot behind a random link, masked before storage, expiring, public only on purpose | done | all | Result area, share page |
 | F24.7 | The studio's own traces and metrics over OTLP: a span per run and per tool call, counters for statements, rows and tool calls | done | all | Environment |
+| F25.1 | Statistics per object: size, rows, dead rows, last vacuum and analyze, and every index with its size and scan count | done | postgresql, mysql, sqlserver, oracle | Structure panel, statistics tab |
+| F25.2 | Privileges per object, with GRANT and REVOKE built as statements that go through the migration preview | done | postgresql, mysql, sqlserver, oracle | Structure panel, privileges tab |
+| F25.3 | Dependencies per object — what breaks if this changes, and what this needs | done | all | Structure panel, dependencies tab |
+| F25.4 | The object as a CREATE statement, to copy or open in a query tab | done | all | Structure panel, SQL tab |
+| F25.5 | Plan findings for a spilled sort and a nested loop carrying many rows | done | postgresql, mysql, sqlserver, oracle | Plan panel |

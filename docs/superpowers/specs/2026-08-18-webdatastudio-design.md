@@ -459,6 +459,11 @@ it works for every engine whose capability set claims support for it.
 | F24.5 | A report runs itself, and reads only |
 | F24.6 | "Here is what I am seeing" is a link, not a screenshot |
 | F24.7 | The studio is visible in the same collector as everything else |
+| F25.1 | An object says what it costs and which of its indexes anybody reads |
+| F25.2 | Who may do what to an object, and the statement that changes it |
+| F25.3 | What breaks if this object changes |
+| F25.4 | Any object can be read as the statement that creates it |
+| F25.5 | A plan that spilled to disk says so |
 
 ## 10. Safety behaviour
 

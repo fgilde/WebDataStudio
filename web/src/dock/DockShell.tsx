@@ -4,7 +4,7 @@ import type { DockviewApi, DockviewReadyEvent, DockviewGroupPanel, IDockviewPane
 import { ActionIcon, Group, Modal, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
-  IconArrowsJoin, IconNotebook,
+  IconArchive, IconArrowsJoin, IconBinaryTree, IconNotebook,
   IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconKey, IconLayoutBoard,
   IconSettingsCog, IconSitemap, IconSquarePlus, IconTable,
 } from "@tabler/icons-react";
@@ -12,6 +12,9 @@ import "dockview-react/dist/styles/dockview.css";
 import "../editor/dockview-mantine.css";
 import { useAppTheme } from "../ThemeProvider";
 import { FederationPanel } from "../federate/FederationPanel";
+import { PerspectivePanel } from "../perspective/PerspectivePanel";
+import { ArchivePanel } from "../archive/ArchivePanel";
+import { ArchiveDialog, type ArchiveTarget } from "../archive/KeepArchiveButton";
 import { NotebookPanel } from "../notebook/NotebookPanel";
 import { isAdmin, useRole } from "../auth/useRole";
 import { ExplorerTree, type ExplorerAction, type ExplorerSelection } from "../explorer/ExplorerTree";
@@ -233,6 +236,18 @@ function FederationDockPanel() {
   return <FederationPanel connections={shell.connections} />;
 }
 
+function PerspectiveDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+  return <PerspectivePanel connectionId={props.params.connectionId} />;
+}
+
+function ArchiveDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+  const shell = useShell();
+  return (
+    <ArchivePanel connectionId={props.params.connectionId}
+      onScript={sql => shell.runStatement(props.params.connectionId, sql)} />
+  );
+}
+
 function NotebookDockPanel(props: IDockviewPanelProps<{ connectionId?: string }>) {
   const shell = useShell();
   return <NotebookPanel connections={shell.connections} connectionId={props.params.connectionId} />;
@@ -307,6 +322,18 @@ function ExplorerDockPanel() {
             <IconNotebook size={15} />
           </ActionIcon>
         </Tooltip>
+        <Tooltip label="Archives: results kept as files">
+          <ActionIcon size="sm" variant="subtle" aria-label="Archives" disabled={!connection}
+            onClick={() => explorer.openTool("archive", "Archives", connection)}>
+            <IconArchive size={15} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Perspective: a row, and everything related to it">
+          <ActionIcon size="sm" variant="subtle" aria-label="Perspective" disabled={!connection}
+            onClick={() => explorer.openTool("perspective", "Perspective", connection)}>
+            <IconBinaryTree size={15} />
+          </ActionIcon>
+        </Tooltip>
         <Tooltip label="Join across connections">
           <ActionIcon size="sm" variant="subtle" aria-label="Federated query"
             disabled={!connection}
@@ -363,6 +390,7 @@ const components = {
   diagram: DiagramDockPanel, admin: AdminDockPanel, compare: CompareDockPanel,
   saved: SavedQueriesDockPanel, builder: QueryDesignerDockPanel, redis: RedisDockPanel,
   federate: FederationDockPanel, notebook: NotebookDockPanel,
+  perspective: PerspectiveDockPanel, archive: ArchiveDockPanel,
 };
 
 /// The default arrangement, in one place: the initial layout and the reset command must produce
@@ -455,6 +483,7 @@ export function DockShell() {
   const [indexTarget, setIndexTarget] = useState<
     { connectionId: string; objectRef: string; schema: string; label: string; column?: string } | null>(null);
   const [grantTarget, setGrantTarget] = useState<GrantTarget | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<ArchiveTarget | null>(null);
   const [newDatabase, setNewDatabase] = useState<DatabaseTarget | null>(null);
   const [dropDatabaseTarget, setDropDatabaseTarget] = useState<DatabaseTarget | null>(null);
   const [propertiesFor, setPropertiesFor] = useState<{ connectionId: string; label: string } | null>(null);
@@ -818,6 +847,12 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
           .catch(e => notifications.show({ color: "red", message: String(e.message ?? e) }));
         break;
 
+      case "archive-table":
+        setArchiveTarget({
+          connectionId: s.connectionId, objectRef: s.node.ref, suggested: s.node.label,
+        });
+        break;
+
       case "grant-schema":
         setGrantTarget({ connectionId: s.connectionId, schema: s.node.label });
         break;
@@ -946,6 +981,8 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     openCompare: () => openTool("compare", "Compare", activeConnection),
     openNotebook: () => openTool("notebook", "Notebook", activeConnection),
     openFederation: () => openTool("federate", "Federated", activeConnection),
+    openPerspective: () => openTool("perspective", "Perspective", activeConnection),
+    openArchives: () => openTool("archive", "Archives", activeConnection),
     openHistory: () => focusPanel("history"),
     openSavedQueries: () => focusPanel("saved"),
     saveCurrentQuery: () => focusPanel("saved"),
@@ -1130,6 +1167,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         label={propertiesFor?.label ?? ""} onClose={() => setPropertiesFor(null)} />
 
       <GrantDialog target={grantTarget} onClose={() => setGrantTarget(null)} onScript={runStatement} />
+      <ArchiveDialog target={archiveTarget} onClose={() => setArchiveTarget(null)} />
 
       <NewDatabaseDialog target={newDatabase} onClose={() => setNewDatabase(null)}
         onDone={() => setExplorerNonce(n => n + 1)} />

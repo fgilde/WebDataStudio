@@ -29,6 +29,8 @@ export interface CommandContext {
   openInBuilder: () => void;
   openNotebook: () => void;
   openFederation: () => void;
+  openPerspective: () => void;
+  openArchives: () => void;
   switchTheme: () => void;
   saveLayout: () => void;
   resetLayout: () => void;
@@ -58,6 +60,8 @@ export function buildCommands(context: CommandContext): Command[] {
     { id: "explorer.goto", label: "Go to object", group: "Connections", shortcut: "Ctrl+Shift+O", run: context.goToObject },
 
     { id: "tool.diagram", label: "Open ER diagram", group: "Tools", shortcut: "Ctrl+D", run: context.openDiagram },
+    { id: "tool.perspective", label: "Open perspective — a row and everything related to it", group: "Tools", run: context.openPerspective },
+    { id: "tool.archives", label: "Open archives — results kept as files", group: "Tools", run: context.openArchives },
     { id: "tool.health", label: "Open health report", group: "Tools", run: context.openHealth },
     { id: "tool.admin", label: "Open administration", group: "Tools", run: context.openAdmin },
     { id: "tool.compare", label: "Open compare", group: "Tools", run: context.openCompare },

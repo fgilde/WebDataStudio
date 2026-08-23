@@ -10,6 +10,7 @@ import { CellViewerModal, type CellRef } from "./CellViewerModal";
 import { summarizeSelection } from "./aggregate";
 import { GroupedTable } from "./GroupedTable";
 import { MenuFilterInput } from "./MenuFilterInput";
+import { filterKindOf, matchesFilter } from "./filterLanguage";
 import { loadWorkspaceItem, saveWorkspaceItem } from "../api";
 
 const WIDTH_KEY = "grid-column-widths";
@@ -103,8 +104,10 @@ export function ResultGrid({ result, onSelectionChange, changed }: {
 
     const active = Object.entries(filters).filter(([, v]) => v.trim() !== "");
     if (active.length > 0)
+      // The same filter language the server applies to a table browse — see filterLanguage.ts.
+      // A plain word still means "contains", which is what it meant before.
       out = out.filter(row => active.every(([i, v]) =>
-        String(row[Number(i)] ?? "").toLowerCase().includes(v.toLowerCase())));
+        matchesFilter(row[Number(i)], filterKindOf(result.columns[Number(i)]?.dataType), v)));
 
     if (search.trim() !== "")
       out = out.filter(row => row.some(cell =>

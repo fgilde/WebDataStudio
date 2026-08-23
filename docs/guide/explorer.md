@@ -132,6 +132,26 @@ a read-only connection refuses the run rather than pretending the rollback makes
 **SQL** — the object as a `CREATE` statement, to copy or to open in a query tab. Engines that keep
 the original text hand that over; for the rest the studio generates it from the shape it read.
 
+## A column from the other side of a key
+
+The column menu of a table browse offers the columns of the table a foreign key points at: pick one
+and it appears next to the id, marked **borrowed**. The join happens on the server, so sorting and
+filtering still work on the table's own columns, and the borrowed column is read-only — an edit there
+would be an update to a row this grid is not addressing.
+
+Only single-column keys are offered. A composite key cannot be followed by comparing one value, and
+showing the wrong row would be worse than not offering it.
+
+## Perspective — a row and everything related to it
+
+The **Perspective** panel starts from one table and lets a row be opened: what it points at, and
+what points back at it, each as a nested list, as deep as you care to open. It reads the same
+foreign-key graph the ER diagram draws, so nothing has to be typed.
+
+Each level is one page of rows rather than the whole table, and each opened relation is one query —
+they are collapsed until asked for. Only single-column keys are followed, for the same reason as
+above. For paging through a table in full, the data tab is still the right place.
+
 ## Query plans
 
 The plan panel reads the plan rather than only drawing it. Besides the heat map over node costs, the

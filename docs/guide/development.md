@@ -33,6 +33,7 @@ cd web && npm run smoke:admin    # diagram, administration and comparison panels
 cd web && npm run smoke:p9       # palette, saved queries, builder, charts, parameters
 cd web && npm run smoke:mcp      # the MCP endpoint and its dialog (needs WDS_MCP_ENABLED=true)
 cd web && npm run smoke:objects  # policies, partitions, a function run, preferences, snapshots
+cd web && npm run smoke:dbgate   # the filter language, archives, perspective, the map
 ```
 
 The server suite runs one behaviour suite against every engine fixture, so a driver that is added

@@ -168,3 +168,86 @@ describe("aggregates, HAVING and DISTINCT", () => {
     expect(parseModel("SELECT 1 /* wds:model not-json */")).toBeNull();
   });
 });
+
+describe("EXISTS", () => {
+  const customers = (): QueryModel => ({
+    ...emptyModel(),
+    tables: [{ name: "customers", alias: "a" }],
+    columns: [{ table: "a", column: "id" }],
+  });
+
+  it("writes the condition a join cannot express", () => {
+    const sql = buildSelect({
+      ...customers(),
+      exists: [{
+        name: "orders", schema: "public", outerTable: "a", outerColumn: "id",
+        column: "customer_id", negated: true,
+      }],
+    }, "postgresql");
+
+    expect(sql).toContain('NOT EXISTS (SELECT 1 FROM "public"."orders" "x1"');
+    expect(sql).toContain('WHERE "x1"."customer_id" = "a"."id")');
+  });
+
+  it("opens the WHERE clause when there is nothing else in it", () => {
+    const sql = buildSelect({
+      ...customers(),
+      exists: [{ name: "orders", outerTable: "a", outerColumn: "id", column: "customer_id", negated: false }],
+    }, "postgresql");
+
+    expect(sql).toContain(' WHERE EXISTS');
+    expect(sql).not.toContain("AND EXISTS");
+  });
+
+  it("joins onto the conditions that are already there", () => {
+    const sql = buildSelect({
+      ...customers(),
+      filters: [{ table: "a", column: "country", operator: "=", value: "PT" }],
+      exists: [{ name: "orders", outerTable: "a", outerColumn: "id", column: "customer_id", negated: true }],
+    }, "postgresql");
+
+    expect(sql).toContain('WHERE "a"."country" = :p1');
+    expect(sql).toContain("   AND NOT EXISTS");
+  });
+
+  it("gives every subquery its own alias, so two cannot collide", () => {
+    const sql = buildSelect({
+      ...customers(),
+      exists: [
+        { name: "orders", outerTable: "a", outerColumn: "id", column: "customer_id", negated: true },
+        { name: "carts", outerTable: "a", outerColumn: "id", column: "customer_id", negated: false },
+      ],
+    }, "postgresql");
+
+    expect(sql).toContain('"x1"');
+    expect(sql).toContain('"x2"');
+  });
+
+  it("skips an entry that is not finished being filled in", () => {
+    const sql = buildSelect({
+      ...customers(),
+      exists: [{ name: "orders", outerTable: "a", outerColumn: "id", column: "", negated: true }],
+    }, "postgresql");
+
+    expect(sql).not.toContain("EXISTS");
+  });
+
+  it("quotes the way the engine does", () => {
+    const model: QueryModel = {
+      ...customers(),
+      exists: [{ name: "orders", outerTable: "a", outerColumn: "id", column: "customer_id", negated: true }],
+    };
+
+    expect(buildSelect(model, "mysql")).toContain("`orders` `x1`");
+    expect(buildSelect(model, "sqlserver")).toContain("[orders] [x1]");
+  });
+
+  it("survives the round trip through the model comment", () => {
+    const sql = buildSelectWithModel({
+      ...customers(),
+      exists: [{ name: "orders", outerTable: "a", outerColumn: "id", column: "customer_id", negated: true }],
+    }, "postgresql");
+
+    expect(parseModel(sql)!.exists?.[0]).toMatchObject({ name: "orders", negated: true });
+  });
+});

@@ -14,6 +14,19 @@ public abstract class SqlDialect
 
     public string QuoteLiteral(string value) => "'" + value.Replace("'", "''") + "'";
 
+    /// The type name this engine accepts in a CAST to text.
+    public virtual string TextType => "TEXT";
+
+    /// How a parameter that arrived as text is read as a number. Parameters travel as strings
+    /// (see ScriptRequest), and PostgreSQL will not compare `numeric > $1` when `$1` is text — it
+    /// says so rather than guessing, which is the right call and has to be answered here.
+    /// <c>{0}</c> is the parameter.
+    public virtual string NumberCast => "CAST({0} AS numeric)";
+
+    /// The same for a timestamp. Written as an expression rather than a type name because Oracle
+    /// needs a format string and everybody else does not.
+    public virtual string TimestampCast => "CAST({0} AS timestamp)";
+
     /// Classifies a statement so a read-only connection can refuse anything that writes.
     public virtual bool IsReadOnlyStatement(string sql)
     {

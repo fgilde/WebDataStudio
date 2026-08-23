@@ -129,6 +129,18 @@ builder.Services.AddMemoryCache();
 builder.Services.AddSingleton(sp => new WorkspaceStore(
     sp.GetRequiredService<IConfiguration>()["DB_PATH"] ?? "/data/webdatastudio.db"));
 
+// Archived results are files, and they live next to the workspace database unless told otherwise —
+// the same volume that already has to survive a restart.
+builder.Services.AddSingleton(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var configured = config["WDS_ARCHIVE_DIR"];
+    if (configured is { Length: > 0 }) return new Archives(configured);
+
+    var dbPath = config["DB_PATH"] ?? defaultDbPath;
+    return new Archives(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(dbPath))!, "archives"));
+});
+
 var app = builder.Build();
 
 app.MapOpenApi();
@@ -255,6 +267,7 @@ app.MapSchemaEndpoints();
 app.MapQueryEndpoints();
 app.MapWorkspaceEndpoints();
 app.MapExportEndpoints();
+app.MapArchiveEndpoints();
 app.MapImportEndpoints();
 app.MapDataEndpoints();
 app.MapAnalysisEndpoints();

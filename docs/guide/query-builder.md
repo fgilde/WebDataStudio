@@ -58,3 +58,13 @@ history and into anything you paste it in to.
 
 A statement written by hand carries no such comment, and the builder does not pretend to understand
 it — there is no SQL parser behind this, and a half-working one would be worse than the honest limit.
+
+## EXISTS and NOT EXISTS
+
+The **Exists** section adds a condition over a table that is *not* part of the query: pick the table,
+the column on its side, and the column of the query it lines up with.
+
+`NOT EXISTS` is the reason this exists at all. "Customers with no orders" cannot be written as a
+join: a join that finds nothing removes the row instead of keeping it, and `LEFT JOIN … IS NULL` is
+the workaround everybody has to look up. Each subquery gets an alias of its own (`x1`, `x2`), so it
+cannot collide with the query's own tables.

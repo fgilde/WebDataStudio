@@ -14,6 +14,20 @@ export interface QueryFilter {
 }
 export interface QueryOrder { table: string; column: string; descending: boolean }
 
+/// "there is a row over there" / "there is none": the condition a join cannot express, because a
+/// join that finds nothing removes the row instead of keeping it.
+export interface QueryExists {
+  /// The table the subquery reads. It is only in the subquery — not one of the query's own tables.
+  name: string;
+  schema?: string;
+  /// The side in the outer query the subquery is tied to.
+  outerTable: string;
+  outerColumn: string;
+  /// The column on the inner table to compare against.
+  column: string;
+  negated: boolean;
+}
+
 export interface QueryModel {
   tables: QueryTable[];
   joins: QueryJoin[];
@@ -23,6 +37,7 @@ export interface QueryModel {
   grouping: boolean;
   having?: QueryFilter[];
   distinct?: boolean;
+  exists?: QueryExists[];
   order: QueryOrder[];
   limit?: number;
 }
@@ -174,6 +189,26 @@ export function buildSelect(model: QueryModel, dialect: DialectId): string {
     });
 
     lines.push(` WHERE ${conditions.join("\n   AND ")}`);
+  }
+
+  // EXISTS after the plain conditions, whether or not there were any: a query can consist of
+  // nothing but "and there is no order for this customer".
+  const existing = (model.exists ?? [])
+    .filter(entry => entry.name && entry.column && entry.outerColumn);
+
+  if (existing.length > 0) {
+    const conditions = existing.map((entry, index) => {
+      // An alias of its own, so the subquery cannot collide with the outer query's tables.
+      const inner = `x${index + 1}`;
+      const target = entry.schema ? `${q(entry.schema)}.${q(entry.name)}` : q(entry.name);
+
+      return `${entry.negated ? "NOT " : ""}EXISTS (SELECT 1 FROM ${target} ${q(inner)}`
+        + ` WHERE ${q(inner)}.${q(entry.column)} = ${q(entry.outerTable)}.${q(entry.outerColumn)})`;
+    });
+
+    lines.push(model.filters.length > 0
+      ? `   AND ${conditions.join("\n   AND ")}`
+      : ` WHERE ${conditions.join("\n   AND ")}`);
   }
 
   // An aggregate makes the grouping mandatory: every plain column has to be in GROUP BY, or the

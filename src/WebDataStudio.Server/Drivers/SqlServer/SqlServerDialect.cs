@@ -5,6 +5,13 @@ namespace WebDataStudio.Server.Drivers.SqlServer;
 public sealed class SqlServerDialect : SqlDialect
 {
     public override string QuoteIdentifier(string name) => "[" + name.Replace("]", "]]") + "]";
+    public override string TextType => "NVARCHAR(MAX)";
+
+    public override string NumberCast => "CAST({0} AS DECIMAL(38,10))";
+
+    // DATETIME2, not DATETIME: the older type cannot hold what an ISO string can say.
+    public override string TimestampCast => "CAST({0} AS DATETIME2)";
+
     public override string ParameterPrefix => "@";
     public override bool UsesGoBatchSeparator => true;
 

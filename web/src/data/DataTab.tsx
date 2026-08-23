@@ -16,6 +16,8 @@ import {
 
 import { CellValue } from "../grid/CellValue";
 import { MenuFilterInput } from "../grid/MenuFilterInput";
+import { DistinctValues } from "../grid/DistinctValues";
+import { LookupPicker } from "../grid/LookupPicker";
 import { EditableCell } from "../grid/editing/EditableCell";
 import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
 import { GenerateDialog } from "./GenerateDialog";
@@ -61,6 +63,9 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   const [undoState, setUndoState] = useState<UndoStateDto | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
+  // "customer_id.name": a column from the table a foreign key points at, shown next to the id
+  // instead of being reached by following it.
+  const [lookups, setLookups] = useState<string[]>([]);
   // Masking happens on the server, so revealing is a fresh request rather than a render flag.
   const [reveal, setReveal] = useState(false);
 
@@ -88,7 +93,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
     let cancelled = false;
     setError(null);
     browseData(connectionId, objectRef, {
-      offset: (pageIndex - 1) * pageSize, limit: pageSize,
+      offset: (pageIndex - 1) * pageSize, limit: pageSize, lookups,
       sort: sort?.column, desc: sort?.desc,
       filterColumn: filter?.column, filter: filter?.value,
       reveal: reveal || undefined,
@@ -96,7 +101,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
       .then(p => { if (!cancelled) setPage(p); })
       .catch(e => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [connectionId, objectRef, pageIndex, pageSize, nonce, sort, filter, reveal]);
+  }, [connectionId, objectRef, pageIndex, pageSize, nonce, sort, filter, reveal, lookups]);
 
   // Re-read after every apply: what can be undone changes with the data, not with the render.
   useEffect(() => {
@@ -116,6 +121,10 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   const visibleColumns = page ? page.columns.filter(c => !hidden.has(c.name)) : [];
 
   const fkForColumn = (column: string) => foreignKeys.find(fk => fk.columns.includes(column));
+
+  // Borrowed columns are read-only: an edit here would be an update to a row this grid is not
+  // addressing at all.
+  const isLookup = (column: string) => (page?.lookups ?? []).includes(column);
   const isBoolean = (type: string) => /bool|bit/i.test(type);
 
   const insertedRows = Array.from({ length: changeSet.insertedRows }, (_, i) => -(i + 1));
@@ -283,6 +292,9 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                       <Group gap={3} wrap="nowrap" style={{ cursor: "pointer" }}>
                         <Text size="xs" fw={600}>{c.name}</Text>
                         {page.keyColumns.includes(c.name) && <Badge size="xs" variant="light">key</Badge>}
+                        {isLookup(c.name) && (
+                          <Badge size="xs" variant="light" color="grape">borrowed</Badge>
+                        )}
                         {c.masked && <IconLock size={11} title="masked by the server" />}
                         {fkForColumn(c.name) && <IconArrowRight size={11} />}
                         {sort?.column === c.name && (sort.desc
@@ -312,6 +324,42 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                       <Menu.Item disabled={filter === null} onClick={() => setFilter(null)}>
                         Clear filter
                       </Menu.Item>
+                      {/* What is actually in this column, as checkboxes. Ticking values writes them
+                          into the box above as `=a,=b` — a way of typing, not a second filter. */}
+                      {!isLookup(c.name) && <>
+                        <Menu.Divider />
+                        <DistinctValues connectionId={connectionId} objectRef={objectRef}
+                          column={c.name}
+                          onPick={value => { setFilter({ column: c.name, value }); setPageIndex(1); }} />
+                      </>}
+
+                      {/* A column from the other side of the key, shown here rather than reached by
+                          following it. */}
+                      {fkForColumn(c.name) && (() => {
+                        const fk = fkForColumn(c.name)!;
+                        return (
+                          <>
+                            <Menu.Divider />
+                            <LookupPicker connectionId={connectionId} targetRef={refOf(fk)}
+                              targetLabel={fk.referencedTable}
+                              taken={lookups
+                                .filter(entry => entry.startsWith(`${c.name}.`))
+                                .map(entry => entry.slice(c.name.length + 1))}
+                              onPick={column => setLookups(current =>
+                                current.includes(`${c.name}.${column}`)
+                                  ? current
+                                  : [...current, `${c.name}.${column}`])} />
+                          </>
+                        );
+                      })()}
+
+                      {isLookup(c.name) && (
+                        <Menu.Item leftSection={<IconEyeOff size={13} />}
+                          onClick={() => setLookups(current =>
+                            current.filter(entry => entry !== c.name))}>
+                          Remove this borrowed column
+                        </Menu.Item>
+                      )}
                       <Menu.Divider />
                       <Menu.Item leftSection={<IconEyeOff size={13} />}
                         onClick={() => setHidden(h => new Set(h).add(c.name))}>
@@ -353,7 +401,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                         <EditableCell
                           value={changeSet.editedValue(rowIndex, c.name)}
                           state={changeSet.cellState(rowIndex, c.name)}
-                          editable={page.editable}
+                          editable={page.editable && !isLookup(c.name)}
                           boolean={isBoolean(c.dataType)}
                           lookup={fk ? text => lookupValues(
                             connectionId, refOf(fk), fk.referencedColumns[0], text) : undefined}

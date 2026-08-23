@@ -13,18 +13,80 @@ A switch above the grid picks how to read the same result:
 | Form | one row at a time when a table has forty columns |
 | Transposed | a wide table with few rows — columns become rows |
 | Chart | bar, line or pie over one label column and one or more numeric columns |
+| Map | geography drawn to scale — see [Geography](#geography) |
 | Compare | two results side by side, matched by key columns |
 
 ![Chart view](../assets/screenshots/chart-dark.png)
 
 ## In the grid
 
-- Sort, filter per column, and search the whole result.
+- Sort, filter per column (in the [filter language](#the-filter-language)), and search the whole
+  result.
 - Hide, pin, reorder and resize columns; widths are remembered by column name.
 - Group by a column: each group shows its count and the sums of the numeric columns.
 - Select cells and the status bar shows count, sum, average, minimum and maximum.
 - Double-click a cell to open the value viewer: text, JSON, XML, hex, images and BLOB download.
 - `NULL` is drawn differently from an empty string, because the difference matters.
+
+## The filter language
+
+Every per-column filter box — in a query result and in a table browse — reads a small language
+rather than a substring. A plain word still means "contains", which is what it meant before and what
+most people type.
+
+| Typing this | Means |
+|---|---|
+| `ada` | contains `ada` (text) or equals it (a number, a date, a boolean) |
+| `^ada`, `$son` | starts with, ends with |
+| `+ada`, `~ada` | contains, does not contain |
+| `!^ada`, `!$son`, `!=ada`, `<>ada` | the negations |
+| `=ada` | equals |
+| `>10`, `>=10`, `<10`, `<=10` | compared as a number, or as a date on a date column |
+| `NULL`, `NOT NULL` | there is no value / there is one |
+| `EMPTY`, `NOT EMPTY` | no value or the empty string / neither |
+| `TODAY`, `YESTERDAY`, `TOMORROW` | that day, in the browser's own timezone |
+| `THIS WEEK`, `LAST MONTH`, `NEXT YEAR`, … | the period, with weeks starting on Monday |
+| `2026`, `2026-08`, `2026-08-23` | a year, a month, a day — each the whole period |
+| `"two words"` | a value with a space, a comma or a leading operator in it |
+| `>10 <20` | a space is AND |
+| `=1,=2` | a comma is OR, and OR binds looser than AND |
+
+Text is compared without regard to case on every engine. PostgreSQL's `LIKE` is case-sensitive and
+MySQL's is not, so before this the same filter found different rows depending on which connection it
+was typed into.
+
+How a term is read depends on the column's declared type: `>10` on a number is arithmetic, on a text
+column it is alphabetical, and `TODAY` only means anything on a date. A value is always a parameter —
+nothing typed into a filter box reaches the SQL as text.
+
+In a table browse the filter runs on the server, so it filters the whole table rather than the page
+on screen. In a query result it runs in the browser over the rows that came back. Both read the same
+language, and a shared corpus of cases keeps them honest about it
+(`tests/filter-cases.json`).
+
+### The values a column holds
+
+The column menu in a table browse also lists the column's **distinct values with their counts**, most
+common first, as checkboxes — the Excel-style filter. Ticking values writes them into the filter box
+as `=a,=b`, so it is a way of typing rather than a second kind of filter, and it can be edited
+afterwards. A masked column has no list: the distinct values of a column of secrets are the secrets.
+
+## Geography
+
+The **Map** view draws whatever geography is in the result:
+
+- a column of GeoJSON, as text or as an object,
+- a column of WKT — `POINT(13.4 52.5)`, `LINESTRING`, `POLYGON` and their `MULTI` forms, with an
+  `SRID=` prefix ignored,
+- or a pair of columns called latitude and longitude.
+
+Points, lines and polygons are drawn to scale, with the bounds of the data on the label above and a
+grid behind them; hovering a shape says which row it is.
+
+There is deliberately **no basemap**. A container has no tile server, and a database studio that
+reaches out to one on the internet by itself is not something to ship quietly. What the view is for
+is "are these points where I think they are, and which one is the outlier" — for a map with
+coastlines on it, export the rows and open them in something that has a tile budget.
 
 ## Export
 
@@ -112,6 +174,27 @@ A link is a **snapshot**, and that is the whole design:
 
 `WDS_SHARE_PUBLIC=true` is the part worth thinking about — it puts those rows behind nothing but the
 URL. Off, a link still needs an account on the studio.
+
+## Archives
+
+A result can be kept: **Keep** next to Export writes it to a file on the studio's own disk, and the
+**Archives** panel lists what has been kept. It answers "what did this look like before the
+migration" without a second database to put it in.
+
+- The rows are read from the database again, so an archive is the whole result rather than the page
+  on screen.
+- The format is NDJSON: a header line naming the columns, when it was written and where it came
+  from, then one row per line as a JSON array. Anything can read it.
+- Masked columns are masked **in the file**. An archive of them would be a way around the masking.
+- A name that already exists is replaced.
+- **Keep as archive…** on a table in the explorer does the same for a whole table.
+
+Opening an archive shows its rows in a normal grid. **Script the rows as INSERTs…** writes them out
+for whichever table they should end up in next — as a script, which goes to the editor and through
+the same preview as any other change.
+
+Archives live in `archives/` next to the application database, or wherever
+`WDS_ARCHIVE_DIR` points; `WDS_ARCHIVE_MAX_ROWS` (default 100 000) caps how much one archive keeps.
 
 ## Scheduled queries
 

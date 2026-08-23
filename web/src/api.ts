@@ -189,6 +189,9 @@ export interface DataPageDto {
   totalEstimate: number | null;
   offset: number;
   limit: number;
+  /// Column names that came from the table a foreign key points at. Read-only: an edit here would
+  /// be an update to a row this grid is not addressing.
+  lookups?: string[];
 }
 export interface ChangePreviewDto {
   hash: string; script: string; statementCount: number; destructive: boolean;
@@ -197,10 +200,16 @@ export interface LookupItemDto { value: unknown; label: unknown }
 
 export const browseData = (conn: string, ref: string,
   params: { offset?: number; limit?: number; sort?: string; desc?: boolean;
-            filterColumn?: string; filter?: string; reveal?: boolean } = {}): Promise<DataPageDto> => {
+            filterColumn?: string; filter?: string; reveal?: boolean;
+            /// "customer_id.name": a column from the table that foreign key points at.
+            lookups?: string[] } = {}): Promise<DataPageDto> => {
   const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params))
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "lookups") continue;
     if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  // Repeated rather than joined: each one is its own value, and a column name may hold a comma.
+  for (const lookup of params.lookups ?? []) query.append("lookup", lookup);
   return fetch(`${base}/data/${conn}?${refQuery(ref, query)}`).then(r => ok<DataPageDto>(r));
 };
 
@@ -281,6 +290,21 @@ export const objectDdl = (conn: string, ref: string):
   Promise<{ create: string | null; supported: boolean }> =>
   fetch(`${base}/ddl/${conn}?${refQuery(ref, new URLSearchParams())}`)
     .then(r => ok<{ create: string | null; supported: boolean }>(r));
+
+export interface DistinctValuesDto {
+  /// True when the column is masked: the distinct values of a column of secrets are the secrets.
+  masked: boolean;
+  values: { value: unknown; count: number }[];
+  truncated: boolean;
+}
+
+export const distinctValues = (conn: string, ref: string, column: string, search?: string):
+  Promise<DistinctValuesDto> => {
+  const query = new URLSearchParams({ column });
+  if (search) query.set("search", search);
+  return fetch(`${base}/data/${conn}/distinct?${refQuery(ref, query)}`)
+    .then(r => ok<DistinctValuesDto>(r));
+};
 
 export interface RowSecurityDto {
   supported: boolean;
@@ -573,6 +597,57 @@ export const previewRename = (conn: string, ref: string, newName: string):
   fetch(`${base}/ddl/${conn}/rename`, json("POST", { objectRef: ref, newName }))
     .then(r => ok<{ hash: string; script: string; dependencies: DependencyReportDto }>(r));
 
+// --- archives ----------------------------------------------------------------
+export interface ArchiveInfoDto {
+  name: string;
+  columns: { name: string; dataType: string }[];
+  rows: number;
+  sizeBytes: number;
+  savedAt: string;
+  source: string | null;
+}
+
+export interface ArchiveListDto {
+  available: boolean;
+  path: string;
+  error: string | null;
+  items: ArchiveInfoDto[];
+}
+
+export const listArchives = (): Promise<ArchiveListDto> =>
+  fetch(`${base}/archives`).then(r => ok<ArchiveListDto>(r));
+
+export interface ArchivePageDto {
+  columns: { name: string; dataType: string }[];
+  rows: unknown[][];
+  total: number;
+  offset: number;
+}
+
+export const readArchive = (name: string, offset = 0, limit = 200): Promise<ArchivePageDto> =>
+  fetch(`${base}/archives/${encodeURIComponent(name)}?offset=${offset}&limit=${limit}`)
+    .then(r => ok<ArchivePageDto>(r));
+
+/// Keeps a statement's result, or a whole table, as a file on the studio's own disk. Masked
+/// columns are masked on the way in: an archive of them would be a way around the masking.
+export const saveArchive = (name: string, body: {
+  connectionId: string; sql?: string; objectRef?: string; maxRows?: number;
+}): Promise<ArchiveInfoDto> =>
+  fetch(`${base}/archives/${encodeURIComponent(name)}`, json("POST", body))
+    .then(r => ok<ArchiveInfoDto>(r));
+
+export const deleteArchive = (name: string): Promise<void> =>
+  fetch(`${base}/archives/${encodeURIComponent(name)}`, { method: "DELETE" }).then(r => ok<void>(r));
+
+/// The rows again as INSERT statements, for wherever they should end up next.
+export const archiveInsertScript = (name: string, connectionId: string, table: string, limit?: number):
+  Promise<{ sql: string; rows: number; truncated: boolean }> => {
+  const query = new URLSearchParams({ connectionId, table });
+  if (limit) query.set("limit", String(limit));
+  return fetch(`${base}/archives/${encodeURIComponent(name)}/insert-script?${query}`,
+    { method: "POST" }).then(r => ok<{ sql: string; rows: number; truncated: boolean }>(r));
+};
+
 // --- ER diagram --------------------------------------------------------------
 export interface DiagramColumnDto {
   name: string; type: string; nullable: boolean; primaryKey: boolean; foreignKey: boolean;
@@ -585,14 +660,16 @@ export interface DiagramEdgeDto {
   sourceColumns: string[]; targetColumns: string[]; resolved: boolean;
 }
 
+export interface DiagramDto { nodes: DiagramNodeDto[]; edges: DiagramEdgeDto[] }
+
 export const loadDiagram = (conn: string, schema?: string, refresh = false):
-  Promise<{ nodes: DiagramNodeDto[]; edges: DiagramEdgeDto[] }> => {
+  Promise<DiagramDto> => {
   const query = new URLSearchParams();
   if (schema) query.set("schema", schema);
   if (refresh) query.set("refresh", "true");
 
   return fetch(`${base}/diagram/${conn}${query.size ? `?${query}` : ""}`)
-    .then(r => ok<{ nodes: DiagramNodeDto[]; edges: DiagramEdgeDto[] }>(r));
+    .then(r => ok<DiagramDto>(r));
 };
 
 // --- administration ----------------------------------------------------------

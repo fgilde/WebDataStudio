@@ -34,7 +34,8 @@ public static class DataEndpoints
         // working on a machine with nothing in front of it.
         app.MapGet("/api/data/{conn}", async (string conn, [FromQuery(Name = "ref")] string objectRef,
             int? offset, int? limit, string? sort, bool? desc, string? filterColumn, string? filter,
-            bool? reveal, SessionFactory factory, MaskPolicyStore policies, CancellationToken ct) =>
+            bool? reveal, [FromQuery(Name = "lookup")] string[]? lookup, SessionFactory factory,
+            MaskPolicyStore policies, CancellationToken ct) =>
         {
             try
             {
@@ -58,26 +59,55 @@ public static class DataEndpoints
                     var take = Math.Clamp(limit ?? defaultLimit, 1, 100_000);
                     var skip = Math.Max(offset ?? 0, 0);
 
+                    // A column from the table on the other side of a foreign key, shown here rather
+                    // than reached by following it: "orders.customer_id.name" next to the id.
+                    var lookups = await LookupsAsync(driver, session, detail, lookup ?? [], ct);
+                    var alias = lookups.Count > 0 ? BaseAlias : null;
+
                     // Filter values are parameterised; only identifiers are interpolated, and those
                     // are checked against the real column list before they go anywhere near SQL.
                     var columnNames = detail.Columns.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
                     var where = "";
                     var parameters = new Dictionary<string, object?>();
 
-                    if (filterColumn is { Length: > 0 } && columnNames.Contains(filterColumn) && filter is not null)
+                    if (filterColumn is { Length: > 0 } && columnNames.Contains(filterColumn)
+                        && filter is { Length: > 0 })
                     {
-                        where = $" WHERE CAST({driver.Dialect.QuoteIdentifier(filterColumn)} AS " +
-                                $"{CharType(driver)}) LIKE {driver.Dialect.ParameterPrefix}f";
-                        parameters["f"] = $"%{filter}%";
+                        // The filter is a small language rather than a substring: see
+                        // FilterExpression. A plain word still means "contains", which is what it
+                        // meant before.
+                        var column = detail.Columns
+                            .First(c => c.Name.Equals(filterColumn, StringComparison.OrdinalIgnoreCase));
+
+                        var condition = FilterExpression.Build(driver.Dialect,
+                            Address(driver, alias, column.Name),
+                            FilterExpression.KindOf(column.DataType), filter, "f");
+
+                        if (!condition.IsEmpty)
+                        {
+                            where = $" WHERE {condition.Sql}";
+                            foreach (var (key, value) in condition.Parameters) parameters[key] = value;
+                        }
                     }
 
                     var order = sort is { Length: > 0 } && columnNames.Contains(sort)
-                        ? $" ORDER BY {driver.Dialect.QuoteIdentifier(sort)}{(desc == true ? " DESC" : "")}"
+                        ? $" ORDER BY {Address(driver, alias, sort)}{(desc == true ? " DESC" : "")}"
                         : "";
 
-                    var sql = driver.Dialect.Paginate($"SELECT * FROM {table}{where}{order}", skip, take);
+                    // Without lookups the statement stays exactly what it was: no alias, no join,
+                    // `SELECT *`. With them the base table needs a name to join against.
+                    var projection = alias is null
+                        ? "*"
+                        : $"{alias}.*, {string.Join(", ", lookups.Select(l => l.Projection))}";
+
+                    var from = alias is null
+                        ? table
+                        : $"{table} {alias}{string.Concat(lookups.Select(l => l.Join))}";
+
+                    var sql = driver.Dialect.Paginate(
+                        $"SELECT {projection} FROM {from}{where}{order}", skip, take);
                     var request = new ScriptRequest(sql, take, timeout,
-                        Parameters: parameters.ToDictionary(p => p.Key, p => (string?)p.Value?.ToString()));
+                        Parameters: FilterExpression.AsText(parameters));
 
                     var columns = new List<ColumnMeta>();
                     var rows = new List<object?[]>();
@@ -110,8 +140,91 @@ public static class DataEndpoints
                         keyColumns = identity.KeyColumns,
                         reason = session.Spec.ReadOnly ? "this connection is read-only" : identity.Reason,
                         totalEstimate = detail.RowCount,
+                        // Which of the columns came from another table. They are read-only: an
+                        // edit here would be an update to a row this grid is not addressing.
+                        lookups = lookups.Select(l => l.Name),
                         offset = skip,
                         limit = take,
+                    });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // The values a column actually holds, most common first — the checkbox list that saves
+        // guessing what to type into the filter. A masked column is refused rather than counted:
+        // the distinct values of a column of secrets are the secrets.
+        app.MapGet("/api/data/{conn}/distinct", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, string column, string? search, int? limit,
+            SessionFactory factory, MaskPolicyStore policies, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (!driver.Caps.TabularBrowse)
+                        return Results.BadRequest(new { message = $"{driver.Info.Label} has no columns to count" });
+
+                    var target = SchemaEndpoints.ParseObjectRef(objectRef);
+                    var detail = await driver.DescribeAsync(session, target, ct);
+
+                    var found = detail.Columns
+                        .FirstOrDefault(c => c.Name.Equals(column, StringComparison.OrdinalIgnoreCase));
+
+                    if (found is null)
+                        return Results.BadRequest(new { message = $"no column named '{column}'" });
+
+                    if (SensitiveColumns.ShouldMask(found.Name, policies.For(conn)))
+                        return Results.Ok(new { masked = true, values = Array.Empty<object>(), truncated = false });
+
+                    var take = Math.Clamp(limit ?? 200, 1, 1000);
+                    var quoted = driver.Dialect.QuoteIdentifier(found.Name);
+                    var parameters = new Dictionary<string, object?>();
+                    var where = "";
+
+                    // The search box narrows the list rather than paging through it: a column with
+                    // a hundred thousand values is not something to scroll.
+                    if (search is { Length: > 0 })
+                    {
+                        var condition = FilterExpression.Build(driver.Dialect, quoted,
+                            FilterExpression.KindOf(found.DataType), search, "d");
+
+                        if (!condition.IsEmpty)
+                        {
+                            where = $" WHERE {condition.Sql}";
+                            foreach (var (key, value) in condition.Parameters) parameters[key] = value;
+                        }
+                    }
+
+                    var sql = driver.Dialect.Paginate(
+                        $"SELECT {quoted}, count(*) AS n FROM {ChangeScriptBuilder.Qualify(target, driver.Dialect)}"
+                        + $"{where} GROUP BY {quoted} ORDER BY n DESC", 0, take + 1);
+
+                    var values = new List<object>();
+                    await foreach (var chunk in driver.ExecuteAsync(session,
+                        new ScriptRequest(sql, take + 1, timeout, Parameters: FilterExpression.AsText(parameters)), ct))
+                    {
+                        if (chunk is ResultChunk.Error error)
+                            return Results.Json(new { message = error.Text }, statusCode: 502);
+
+                        if (chunk is not ResultChunk.Rows rows) continue;
+
+                        foreach (var row in rows.Items)
+                            values.Add(new { value = row.ElementAtOrDefault(0), count = row.ElementAtOrDefault(1) });
+                    }
+
+                    // One more was asked for than is shown, which is how "there are more" is known
+                    // without counting the whole column.
+                    var truncated = values.Count > take;
+
+                    return Results.Ok(new
+                    {
+                        masked = false,
+                        values = values.Take(take),
+                        truncated,
                     });
                 }
             }
@@ -487,6 +600,72 @@ public static class DataEndpoints
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
+    }
+
+    /// One column borrowed from the table a foreign key points at.
+    private sealed record Lookup(string Name, string Projection, string Join);
+
+    /// The name the base table gets once something is joined to it. Both the join and every column
+    /// reference use it, so it lives in one place.
+    private const string BaseAlias = "wds_t";
+
+    /// How a column of the base table is addressed. With a lookup in play the table has an alias,
+    /// and an unqualified name would be ambiguous the moment the other table has one like it.
+    private static string Address(IDbDriver driver, string? alias, string column) =>
+        alias is null
+            ? driver.Dialect.QuoteIdentifier(column)
+            : $"{alias}.{driver.Dialect.QuoteIdentifier(column)}";
+
+    /// Turns `customer_id.name` into a join and a column. Anything that does not name a real
+    /// single-column foreign key and a real column on the other side is dropped: this comes from a
+    /// query string, and it ends up in SQL.
+    private static async Task<List<Lookup>> LookupsAsync(IDbDriver driver, IDbSession session,
+        ObjectDetail detail, string[] requested, CancellationToken ct)
+    {
+        var lookups = new List<Lookup>();
+
+        // Four is already an unusual grid; the cap is there so a crafted query string cannot ask
+        // for fifty joins.
+        foreach (var spec in requested.Take(8))
+        {
+            var dot = spec.LastIndexOf('.');
+            if (dot <= 0 || dot == spec.Length - 1) continue;
+
+            var from = spec[..dot];
+            var wanted = spec[(dot + 1)..];
+
+            // A composite key cannot be followed with one column, so it is not offered.
+            var key = detail.ForeignKeys.FirstOrDefault(fk =>
+                fk.Columns.Count == 1 && fk.ReferencedColumns.Count == 1
+                && fk.Columns[0].Equals(from, StringComparison.OrdinalIgnoreCase));
+
+            if (key is null) continue;
+
+            var targetRef = new SchemaNodeRef(SchemaNodeKind.Table,
+                [key.ReferencedSchema, key.ReferencedTable]);
+
+            ObjectDetail target;
+            try { target = await driver.DescribeAsync(session, targetRef, ct); }
+            catch (Exception) { continue; } // a table this account cannot read is not a lookup
+
+            var column = target.Columns
+                .FirstOrDefault(c => c.Name.Equals(wanted, StringComparison.OrdinalIgnoreCase));
+
+            if (column is null) continue;
+
+            var alias = $"wds_l{lookups.Count}";
+            var name = $"{key.Columns[0]}.{column.Name}";
+
+            lookups.Add(new Lookup(
+                name,
+                $"{alias}.{driver.Dialect.QuoteIdentifier(column.Name)} AS " +
+                driver.Dialect.QuoteIdentifier(name),
+                $" LEFT JOIN {ChangeScriptBuilder.Qualify(targetRef, driver.Dialect)} {alias}" +
+                $" ON {alias}.{driver.Dialect.QuoteIdentifier(key.ReferencedColumns[0])}" +
+                $" = {BaseAlias}.{driver.Dialect.QuoteIdentifier(key.Columns[0])}"));
+        }
+
+        return lookups;
     }
 
     /// The type name every engine accepts in a CAST to text.

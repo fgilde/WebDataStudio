@@ -474,6 +474,13 @@ it works for every engine whose capability set claims support for it.
 | F26.8 | A partitioned table shows its pieces and can hand one over or take one back |
 | F26.9 | Preferences that survive a restart, including rebinding any command's shortcut |
 | F26.10 | A history entry can keep the result it returned, and show it again |
+| F27.1 | A column filter is a small language, not a substring: operators, dates, NULL, AND and OR |
+| F27.2 | The values a column actually holds, as checkboxes |
+| F27.3 | A column from the table a foreign key points at, shown next to the id |
+| F27.4 | A row and everything related to it, nested as deep as you open it |
+| F27.5 | A result kept as a file, listed, reopened, and scripted back as INSERTs |
+| F27.6 | Geography in a result drawn as a shape rather than read as coordinates |
+| F27.7 | "there is no row over there" as a condition in the query builder |
 
 ## 10. Safety behaviour
 

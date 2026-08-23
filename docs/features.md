@@ -172,3 +172,10 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F26.8 | A partitioned table's pieces with their bounds and sizes, and ATTACH or DETACH as statements | done | postgresql | Structure panel, partitions tab |
 | F26.9 | Preferences in the workspace: page size, snapshots, and a new binding for any command | done | all | Preferences dialog |
 | F26.10 | A history entry that keeps its result, reopened as a grid | done | all | History panel |
+| F27.1 | A filter language in every column box: `^starts`, `$ends`, `+has`, `~hasn't`, `=`, `!=`, `>`, `<=`, `NULL`, `EMPTY`, `TODAY`, `LAST MONTH`, `2026-08`, quoted values, space for AND, comma for OR | done | all | Data tab, result grid |
+| F27.2 | The distinct values of a column with their counts, as checkboxes that write the filter | done | all | Data tab, column menu |
+| F27.3 | A column borrowed from the table a foreign key points at, joined server-side and read-only | done | all | Data tab, column menu |
+| F27.4 | A nested view over related rows: what this row points at, what points back, as deep as it is opened | partial: single-column keys only, and one page per level | all | Perspective panel |
+| F27.5 | Results kept as NDJSON files on the studio's disk, listed, reopened as a grid, and scripted back as INSERTs | done | all | Archive panel, result area, explorer |
+| F27.6 | GeoJSON, WKT or a latitude/longitude pair drawn to scale | partial: no basemap — a container has no tile server, and the studio will not reach out to one on its own | all | Result area, map view |
+| F27.7 | `EXISTS` and `NOT EXISTS` over a table that is not in the query | done | all | Query builder |

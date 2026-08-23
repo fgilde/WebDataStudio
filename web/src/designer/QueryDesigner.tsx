@@ -11,6 +11,7 @@ import { applyChunk, createResultState, type ResultState } from "../query/result
 import { ResultArea } from "../query/ResultArea";
 import {
   buildSelect, buildSelectWithModel, emptyModel, filterParameters, suggestJoin,
+  type QueryExists,
   type JoinKind, type LoadedTable, type QueryModel,
 } from "./buildSelect";
 import type { DialectId } from "../sql/splitStatements";
@@ -19,6 +20,31 @@ const OPERATORS = ["=", "<>", ">", ">=", "<", "<=", "LIKE", "IN", "IS NULL", "IS
 
 /// Enough rows to see whether the query is the one you meant, few enough to run on every edit.
 const PREVIEW_ROWS = 50;
+
+/// Where a subquery's table lives, read off the reference the tree handed over.
+function subqueryOf(node: { ref: string; label: string }, entry: QueryExists): Partial<QueryExists> {
+  const parts = node.ref.split(":", 2)[1]?.split("/") ?? [];
+
+  return {
+    name: node.label,
+    schema: parts.length > 1 ? parts[0] : undefined,
+    // The column on the other side is unknown until its columns are read; keeping the old one would
+    // name a column of a different table.
+    column: entry.name === node.label ? entry.column : "",
+  };
+}
+
+const newExists = (node: { ref: string; label: string }, outer: { alias: string; columns: string[] }):
+  QueryExists => ({
+  name: node.label,
+  schema: node.ref.split(":", 2)[1]?.split("/").length === 2
+    ? node.ref.split(":", 2)[1]?.split("/")[0]
+    : undefined,
+  outerTable: outer.alias,
+  outerColumn: outer.columns[0] ?? "",
+  column: "",
+  negated: true,
+});
 
 /// A Select needs a value for "no aggregate", and an em dash reads as empty.
 const NO_AGGREGATE = "\u2014";
@@ -96,6 +122,37 @@ export function QueryDesigner({ connectionId, dialect, onOpenInTab, initialModel
       setLoaded(tables);
     })();
   }, [available, connectionId, initialModel]);
+
+  // The columns of the tables an EXISTS reads. They are not in `loaded`: a subquery's table is not
+  // part of the query, so nothing else needs its columns.
+  const [subqueryColumns, setSubqueryColumns] = useState<Record<string, string[]>>({});
+
+  useEffect(() => {
+    const wanted = (model.exists ?? [])
+      .map(entry => entry.name)
+      .filter(name => name && !(name in subqueryColumns));
+
+    if (wanted.length === 0) return;
+
+    (async () => {
+      const found: Record<string, string[]> = {};
+
+      for (const name of wanted) {
+        const node = available.find(candidate => candidate.label === name);
+        if (!node) continue;
+
+        const detail = await describeObject(connectionId, node.ref).catch(() => null);
+        found[name] = detail?.columns.map(column => column.name) ?? [];
+      }
+
+      if (Object.keys(found).length > 0) setSubqueryColumns(current => ({ ...current, ...found }));
+    })();
+  }, [model.exists, available, connectionId, subqueryColumns]);
+
+  const patchExists = (index: number, patch: Partial<QueryExists>) => setModel(m => ({
+    ...m,
+    exists: (m.exists ?? []).map((entry, i) => (i === index ? { ...entry, ...patch } : entry)),
+  }));
 
   const addTable = useCallback(async (ref: string) => {
     const node = available.find(n => n.ref === ref);
@@ -249,6 +306,44 @@ export function QueryDesigner({ connectionId, dialect, onOpenInTab, initialModel
                     onChange={e => patchFilter(index, { value: e.currentTarget.value })} />
                   <ActionIcon size="sm" variant="subtle" color="red" aria-label="Remove filter"
                     onClick={() => setModel(m => ({ ...m, filters: m.filters.filter((_, i) => i !== index) }))}>
+                    <IconTrash size={13} />
+                  </ActionIcon>
+                </Group>
+              ))}
+            </Section>
+
+            {/* The condition a join cannot express: a join that finds nothing drops the row
+                instead of keeping it, which is the opposite of what NOT EXISTS is for. */}
+            <Section title="Exists" onAdd={loaded.length === 0 || available.length === 0
+              ? undefined
+              : () => setModel(m => ({
+                ...m,
+                exists: [...(m.exists ?? []), newExists(available[0], loaded[0])],
+              }))}>
+              {(model.exists ?? []).map((entry, index) => (
+                <Group key={index} gap={4} wrap="nowrap">
+                  <Select size="xs" w={110} data={["EXISTS", "NOT EXISTS"]}
+                    value={entry.negated ? "NOT EXISTS" : "EXISTS"}
+                    onChange={v => patchExists(index, { negated: v === "NOT EXISTS" })} />
+                  <Select size="xs" w={140} searchable
+                    data={available.map(node => node.label)} value={entry.name}
+                    onChange={v => {
+                      const node = available.find(candidate => candidate.label === v);
+                      if (node) patchExists(index, subqueryOf(node, entry));
+                    }} />
+                  <Select size="xs" w={130} data={subqueryColumns[entry.name] ?? [entry.column]}
+                    value={entry.column}
+                    onChange={v => patchExists(index, { column: v ?? entry.column })} />
+                  <Text size="10px" c="dimmed">=</Text>
+                  <Select size="xs" w={60} data={loaded.map(t => t.alias)} value={entry.outerTable}
+                    onChange={v => patchExists(index, { outerTable: v ?? entry.outerTable })} />
+                  <Select size="xs" w={130} data={columnsOf(loaded, entry.outerTable)}
+                    value={entry.outerColumn}
+                    onChange={v => patchExists(index, { outerColumn: v ?? entry.outerColumn })} />
+                  <ActionIcon size="sm" variant="subtle" color="red" aria-label="Remove exists"
+                    onClick={() => setModel(m => ({
+                      ...m, exists: (m.exists ?? []).filter((_, i) => i !== index),
+                    }))}>
                     <IconTrash size={13} />
                   </ActionIcon>
                 </Group>

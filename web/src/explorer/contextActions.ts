@@ -10,7 +10,7 @@ export type ExplorerAction =
   | "script-drop-index" | "script-reindex"
   | "script-drop-constraint"
   | "script-execute" | "script-refresh-matview" | "script-refresh-matview-live"
-  | "grant-schema";
+  | "grant-schema" | "archive-table";
 
 export interface ContextItem {
   action: ExplorerAction;
@@ -40,6 +40,7 @@ const TABLE: ContextItem[] = [
   { action: "script-update", label: "Script: UPDATE" },
   { action: "script-delete", label: "Script: DELETE" },
   { action: "export", label: "Export…", divider: true },
+  { action: "archive-table", label: "Keep as archive…" },
   { action: "import", label: "Import into this table…" },
   { action: "copy-table", label: "Copy to another connection…" },
   { action: "copy-name", label: "Copy name", divider: true },

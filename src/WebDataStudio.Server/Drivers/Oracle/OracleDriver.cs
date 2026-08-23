@@ -8,6 +8,14 @@ namespace WebDataStudio.Server.Drivers.Oracle;
 public sealed class OracleDialect : SqlDialect
 {
     public override string QuoteIdentifier(string name) => "\"" + name.Replace("\"", "\"\"") + "\"";
+    public override string TextType => "VARCHAR2(4000)";
+
+    public override string NumberCast => "CAST({0} AS NUMBER)";
+
+    // Oracle reads a timestamp by the session's NLS format, which is not something to rely on, so
+    // the format is spelled out.
+    public override string TimestampCast => "TO_TIMESTAMP({0},'YYYY-MM-DD HH24:MI:SS')";
+
     public override string ParameterPrefix => ":";
 
     public override string Paginate(string sql, int offset, int limit) =>

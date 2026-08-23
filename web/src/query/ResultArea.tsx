@@ -10,8 +10,10 @@ import { ResultChart } from "../chart/ResultChart";
 import { ResultCompare, type NamedResult } from "../compare/ResultCompare";
 import type { ResultState } from "./resultStore";
 import { ShareButton } from "../share/ShareButton";
+import { GeoView } from "../geo/GeoView";
+import { KeepArchiveButton } from "../archive/KeepArchiveButton";
 
-type View = "grid" | "form" | "transposed" | "chart" | "compare";
+type View = "grid" | "form" | "transposed" | "chart" | "map" | "compare";
 
 export function ResultArea({ result, onExport, changed, connectionId, sql }: {
   result: ResultState;
@@ -74,6 +76,7 @@ export function ResultArea({ result, onExport, changed, connectionId, sql }: {
                     { label: "Form", value: "form" },
                     { label: "Transposed", value: "transposed" },
                     { label: "Chart", value: "chart" },
+                    { label: "Map", value: "map" },
                     // Comparing needs a second result; the switch stays but says why it is empty.
                     { label: "Compare", value: "compare" },
                   ]} />
@@ -97,6 +100,10 @@ export function ResultArea({ result, onExport, changed, connectionId, sql }: {
                     </Menu.Dropdown>
                   </Menu>
                   {connectionId && sql && <ShareButton connectionId={connectionId} sql={sql} />}
+                  {/* A share is a link to a snapshot; an archive is a file the studio keeps. */}
+                  {connectionId && sql && (
+                    <KeepArchiveButton connectionId={connectionId} sql={sql} />
+                  )}
                   {onExport && (
                     <Button size="compact-xs" variant="default" leftSection={<IconDownload size={13} />}
                       onClick={onExport}>
@@ -111,6 +118,7 @@ export function ResultArea({ result, onExport, changed, connectionId, sql }: {
                   : view === "form" ? <RowFormView result={s} index={formRow} onIndexChange={setFormRow} />
                   : view === "transposed" ? <TransposedView columns={s.columns} rows={s.rows} />
                   : view === "chart" ? <ResultChart columns={s.columns} rows={s.rows} />
+                  : view === "map" ? <GeoView columns={s.columns} rows={s.rows} />
                   : <ResultCompare initialLeft={`s${s.index}`} results={result.statements
                       .filter(x => x.columns.length > 0)
                       .map<NamedResult>(x => ({

@@ -77,6 +77,24 @@ PostgreSQL außerhalb der Transaktion führt — eine weitergezählte Sequenz, e
 überleben das Rollback, und eine schreibgeschützte Verbindung lehnt den Lauf ab, statt so zu tun,
 als machte das Rollback ihn sicher.
 
+## Eine Spalte von der anderen Seite des Schlüssels
+
+Das Spaltenmenü der Tabellenansicht bietet die Spalten der Tabelle an, auf die ein Fremdschlüssel
+zeigt: eine auswählen, und sie steht neben der Id, markiert als **borrowed**. Der Join passiert auf
+dem Server, Sortieren und Filtern gelten weiter für die eigenen Spalten, und die geliehene Spalte ist
+schreibgeschützt — eine Änderung dort wäre ein Update auf eine Zeile, die dieses Grid nicht adressiert.
+
+Nur einspaltige Schlüssel: einem zusammengesetzten Schlüssel kann ein einzelner Wert nicht folgen.
+
+## Perspective — eine Zeile und alles, was mit ihr zu tun hat
+
+Das Panel **Perspective** beginnt bei einer Tabelle und lässt eine Zeile aufklappen: worauf sie
+zeigt, und was auf sie zeigt, jeweils verschachtelt, so tief wie man öffnet. Es liest denselben
+Fremdschlüssel-Graphen, den das ER-Diagramm zeichnet — zu tippen ist nichts.
+
+Jede Ebene ist eine Seite Zeilen, nicht die ganze Tabelle, und jede geöffnete Beziehung ist eine
+Abfrage; deshalb sind sie zugeklappt, bis man sie will. Gefolgt wird nur einspaltigen Schlüsseln.
+
 ## Objekte des Servers im Baum
 
 Unter einer PostgreSQL-Verbindung stehen neben den Schemas auch **Extensions** (mit Version),

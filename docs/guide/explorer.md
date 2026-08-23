@@ -21,6 +21,43 @@ The list comes from the same cached walk the editor's completion and `Ctrl+Shift
 first search on a connection costs one pass over its schema and later ones are instant. The refresh
 button drops that cache, which is what to press after somebody else changed the schema.
 
+## What the tree shows
+
+Under a connection PostgreSQL keeps more than its schemas, and the tree lists that next to them:
+
+| Folder | What is in it |
+|---|---|
+| Extensions | every installed extension with its version |
+| Roles | login roles and groups, superusers marked as such (the `pg_` built-ins are left out) |
+| Tablespaces | where the data actually lies |
+| Publications / Subscriptions | logical replication, both ends of it |
+| Types and domains | per schema: enums, composites and domains |
+
+They are read-only listings — the studio names what is there rather than offering to change it. The
+other engines show their schemas as before; a folder they have no catalogue for is left out rather
+than shown empty.
+
+## Privileges for a whole schema
+
+**Privileges on everything here…** on a schema builds one script instead of one dialog per table:
+the privileges you tick, for the role you name, on every table in that schema. On PostgreSQL that is
+`GRANT … ON ALL TABLES IN SCHEMA`, plus `ALTER DEFAULT PRIVILEGES` when "also for tables created
+later" is on — without that second half a table created tomorrow is not covered. The other engines
+get one statement per table, because that is what they have.
+
+The script opens in a query tab. Nothing changes until it runs there.
+
+## Refreshing a materialised view
+
+Materialised views sit in the **Views** folder next to the ordinary ones, with their own icon and
+their own menu — `pg_views` leaves them out, so before this release PostgreSQL never showed one at
+all.
+
+A materialised view has **Script: REFRESH** and **Script: REFRESH CONCURRENTLY**. Concurrently keeps
+the view readable while it rebuilds and needs a unique index on it; plain is faster and locks it.
+Both come back as statements from the server, which knows how the engine spells it — Oracle's is
+`DBMS_MVIEW.REFRESH` — and refuses to build one for an object that is not a materialised view.
+
 ## Panels
 
 Every panel is a dockview panel: drag it by its tab, drop it anywhere, split the group, and the
@@ -50,8 +87,8 @@ what this is for.
 
 ## What the structure panel answers
 
-Selecting a table or view fills the structure panel. Beyond its columns, indexes and keys, four tabs
-answer the questions people otherwise go looking for in a catalogue by hand:
+Selecting a table or view fills the structure panel. Beyond its columns, indexes and keys, these
+tabs answer the questions people otherwise go looking for in a catalogue by hand:
 
 **Statistics** — how big the object is (total, table, indexes), how many rows the engine thinks it
 has, how many of them are dead, when it was last vacuumed and analysed, and how often it is read by
@@ -68,6 +105,29 @@ statement opens in a query tab, where it goes through the same preview as any ot
 **Dependencies** — what breaks if this changes, and what this needs. The question before every
 `DROP`. On an engine with no dependency catalogue (SQLite) the answer is a search of the other
 objects' definitions, and the tab says as much.
+
+**Policies** — on a table, whether row-level security is on, whether it is forced for the owner
+too, and every policy with what it applies to and the expression behind it. The field below builds a
+`CREATE POLICY`, the bin a `DROP POLICY`. Security that is on with no policy means "nobody but the
+owner sees anything", and the tab says so rather than letting it look like an empty list of rules.
+PostgreSQL only — it is a PostgreSQL feature, and the other engines say that instead of showing
+nothing.
+
+**Partitions** — on a partitioned table, how it is cut up (`RANGE`, `LIST`, `HASH` and the key),
+with every partition, its bound, its size and its row estimate. Detaching leaves the data behind as
+a table of its own; attaching takes an existing table in and needs the bound spelled out. Both are
+statements, and "detach concurrently" is offered because it does not block readers — and cannot run
+inside a transaction.
+
+**Inspect** — on a function or procedure: its language, what it returns, its declared parameters,
+its source, and a **run that is rolled back**. Fill in the arguments, press the button, and the
+studio runs it inside a transaction it always rolls back, showing what came back, how long it took
+and every `RAISE NOTICE` it raised on the way.
+
+This is not a stepping debugger: there are no breakpoints and no variable inspection. For PL/pgSQL
+it covers what most of that debugging actually is. Two things to know: a side effect PostgreSQL
+keeps outside the transaction — a sequence that moved, a `dblink` call — survives the rollback, and
+a read-only connection refuses the run rather than pretending the rollback makes it safe.
 
 **SQL** — the object as a `CREATE` statement, to copy or to open in a query tab. Engines that keep
 the original text hand that over; for the rest the studio generates it from the shape it read.

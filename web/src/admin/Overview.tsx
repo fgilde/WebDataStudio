@@ -1,8 +1,11 @@
-import { useCallback } from "react";
-import { Alert, Badge, Group, Paper, Progress, Stack, Table, Text } from "@mantine/core";
+import { useCallback, useState } from "react";
+import {
+  Alert, Badge, Group, Paper, Progress, SegmentedControl, Stack, Table, Text,
+} from "@mantine/core";
 import { serverActivity, serverStats, type ActivityDto, type ServerStatsDto } from "../api";
 import { sparklinePath, useMetricHistory } from "./history";
 import { BlockingTree } from "./BlockingTree";
+import { TimeChart } from "./TimeChart";
 
 interface Sample { stats: ServerStatsDto; activity: ActivityDto; at: number }
 
@@ -19,7 +22,8 @@ export function Overview({ connectionId }: { connectionId: string }) {
     return { stats, activity, at: Date.now() };
   }, [connectionId]);
 
-  const { samples, latest, error } = useMetricHistory(sample, 5_000, 60);
+  const { samples, latest, error } = useMetricHistory(sample, 5_000, 360);
+  const [span, setSpan] = useState("60");
 
   if (error && latest === null)
     return <Alert color="red" m="xs"><Text size="xs">{error}</Text></Alert>;
@@ -29,11 +33,17 @@ export function Overview({ connectionId }: { connectionId: string }) {
   const metric = (name: string) =>
     latest.stats.metrics.find(entry => entry.name.toLowerCase().includes(name.toLowerCase()));
 
+  // The graphs show a slice of what is kept, so a wider window costs nothing but is there when the
+  // question is "since when".
+  const shown = samples.slice(-Number(span));
+
   const series = (name: string) => samples
     .map(entry => Number(entry.stats.metrics
       .find(m => m.name.toLowerCase().includes(name.toLowerCase()))?.value
       .replace(/[^0-9.]/g, "") ?? ""))
     .filter(value => Number.isFinite(value));
+
+  const windowed = (values: number[]) => values.slice(-Number(span));
 
   const running = latest.activity.operations;
   const longest = running.reduce((max, operation) => Math.max(max, operation.elapsedMs), 0);
@@ -57,6 +67,31 @@ export function Overview({ connectionId }: { connectionId: string }) {
         <Tile label="Size" value={metric("size")?.value ?? metric("database")?.value ?? "—"}
           series={series("size")} />
       </Group>
+
+      {/* The same numbers as the tiles, over the window rather than the last reading — pgAdmin's
+          dashboard graphs, without a second polling loop to keep in step. */}
+      <div>
+        <Group justify="space-between" mb={4}>
+          <Text size="xs" fw={600}>Over time</Text>
+          <SegmentedControl size="xs" value={span} onChange={setSpan} data={[
+            { label: "5 min", value: "60" },
+            { label: "15 min", value: "180" },
+            { label: "30 min", value: "360" },
+          ]} />
+        </Group>
+        <Group gap="xs" align="stretch" wrap="wrap">
+          <TimeChart title="Sessions" series={[
+            { label: "connections", color: "var(--mantine-color-blue-5)", values: windowed(series("connection")) },
+            { label: "running", color: "var(--mantine-color-teal-5)", values: shown.map(e => e.activity.operations.length) },
+            { label: "waiting", color: "var(--mantine-color-red-5)", values: shown.map(e => e.activity.waits.length) },
+          ]} />
+          <TimeChart title="Throughput" series={[
+            { label: "cache hit", color: "var(--mantine-color-grape-5)", values: windowed(series("cache")) },
+            { label: "transactions", color: "var(--mantine-color-orange-5)", values: windowed(series("transaction")) },
+            { label: "rows", color: "var(--mantine-color-cyan-5)", values: windowed(series("row")) },
+          ]} />
+        </Group>
+      </div>
 
       {/* Who is holding up whom, as a tree: the session to deal with is the one at the root. */}
       <BlockingTree connectionId={connectionId} waits={latest.activity.waits} />

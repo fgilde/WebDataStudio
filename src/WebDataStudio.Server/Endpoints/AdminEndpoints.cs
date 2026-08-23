@@ -12,7 +12,9 @@ public static class AdminEndpoints
     public record UserApplyRequest(string Hash);
     public record HashRequest(string Password);
     public record DatabaseRequest(string Name);
-    public record BackupRequest(bool? SchemaOnly, bool? DataOnly, List<string>? Tables, string? ServerPath);
+    public record BackupRequest(
+        bool? SchemaOnly, bool? DataOnly, List<string>? Tables, string? ServerPath,
+        string? Format, bool? NoOwner, bool? Clean, int? Compress);
 
     public static void MapAdminEndpoints(this WebApplication app)
     {
@@ -261,7 +263,8 @@ public static class AdminEndpoints
                     }
 
                     var plan = BackupService.Plan(driver, session.Spec,
-                        new BackupOptions(body.SchemaOnly ?? false, body.DataOnly ?? false, body.Tables));
+                        new BackupOptions(body.SchemaOnly ?? false, body.DataOnly ?? false, body.Tables,
+                            body.Format, body.NoOwner ?? false, body.Clean ?? false, body.Compress));
 
                     if (!BackupService.ToolAvailable(plan.File))
                         return Results.BadRequest(new
@@ -285,7 +288,18 @@ public static class AdminEndpoints
                     app.Logger.LogWarning("backup tool {Tool} exited with {Code}: {Error}",
                         plan.File, result.ExitCode, result.StandardError);
 
-                    if (counted.Written > 0) return Results.Empty; // truncated, but already sent
+                    if (counted.Written > 0)
+                    {
+                        // The bytes are already on their way, so the failure cannot become a status
+                        // code. A plain dump can carry the reason as a comment on its last line —
+                        // which is exactly where somebody restoring a truncated file will look.
+                        if (plan.ContentType == "application/sql")
+                            await ctx.Response.WriteAsync(
+                                $"\n-- {plan.File} failed after {counted.Written} bytes: " +
+                                $"{result.StandardError.Trim().ReplaceLineEndings(" ")}\n", ct);
+
+                        return Results.Empty;
+                    }
 
                     return Results.Json(new
                     {

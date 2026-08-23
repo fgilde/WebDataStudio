@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { DockviewReact } from "dockview-react";
 import type { DockviewApi, DockviewReadyEvent, DockviewGroupPanel, IDockviewPanelProps } from "dockview-react";
 import { ActionIcon, Group, Modal, Text, Tooltip } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import {
   IconArrowsJoin, IconNotebook,
   IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconKey, IconLayoutBoard,
@@ -29,6 +30,8 @@ import { parseModel } from "../designer/buildSelect";
 import { SavedQueriesPanel } from "../query/SavedQueriesPanel";
 import { SnippetManager } from "../editor/SnippetManager";
 import { CommandPalette, ShortcutsHelp } from "../shell/CommandPalette";
+import { PreferencesModal } from "../shell/PreferencesModal";
+import { comboOf, loadPreferences, preferences } from "../shell/preferences";
 import { StudioTab, TabPinsProvider, type TabPins } from "./StudioTab";
 import { VersionBadge } from "../shell/VersionBadge";
 import { LayoutPresetsModal, presetForSlot, useLayoutPresets } from "../shell/LayoutPresets";
@@ -37,12 +40,13 @@ import { buildDeepLink, parseDeepLink } from "../shell/deepLink";
 import { GoToObject } from "../shell/GoToObject";
 import { NewDatabaseDialog, DropDatabaseDialog, type DatabaseTarget } from "../explorer/DatabaseDialogs";
 import { PropertiesDialog } from "../explorer/PropertiesDialog";
+import { GrantDialog, type GrantTarget } from "../explorer/GrantDialog";
 import {
-  dropColumn, dropConstraint, dropIndex, executeRoutine, rebuildIndex, refreshMaterializedView,
+  dropColumn, dropConstraint, dropIndex, executeRoutine, rebuildIndex,
   selectColumn,
 } from "../sql/objectScripts";
 import {
-  applyDdl, describeObject, listConnections, loadTabs, previewRename, saveTabs,
+  applyDdl, describeObject, listConnections, loadTabs, previewRename, refreshStatement, saveTabs,
   type Connection, type ForeignKeyDto,
 } from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
@@ -444,11 +448,13 @@ export function DockShell() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [snippetsOpen, setSnippetsOpen] = useState(false);
+  const [prefsOpen, setPrefsOpen] = useState(false);
   const [layoutsOpen, setLayoutsOpen] = useState(false);
   const [explorerNonce, setExplorerNonce] = useState(0);
   const [gotoOpen, setGotoOpen] = useState(false);
   const [indexTarget, setIndexTarget] = useState<
     { connectionId: string; objectRef: string; schema: string; label: string; column?: string } | null>(null);
+  const [grantTarget, setGrantTarget] = useState<GrantTarget | null>(null);
   const [newDatabase, setNewDatabase] = useState<DatabaseTarget | null>(null);
   const [dropDatabaseTarget, setDropDatabaseTarget] = useState<DatabaseTarget | null>(null);
   const [propertiesFor, setPropertiesFor] = useState<{ connectionId: string; label: string } | null>(null);
@@ -456,6 +462,9 @@ export function DockShell() {
   const { presets, save: savePresets } = useLayoutPresets();
 
   useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, []);
+
+  // Preferences are read once; everything that reads them subscribes to the same copy.
+  useEffect(() => { void loadPreferences(); }, []);
 
   // Every way of reaching a panel goes through here, so the flash is not something half the
   // buttons remember to do.
@@ -803,7 +812,14 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         break;
 
       case "script-refresh-matview":
-        newTab(s.connectionId, refreshMaterializedView(engine, name));
+      case "script-refresh-matview-live":
+        refreshStatement(s.connectionId, s.node.ref, action === "script-refresh-matview-live")
+          .then(built => newTab(s.connectionId, built.sql))
+          .catch(e => notifications.show({ color: "red", message: String(e.message ?? e) }));
+        break;
+
+      case "grant-schema":
+        setGrantTarget({ connectionId: s.connectionId, schema: s.node.label });
         break;
 
       case "new-database":
@@ -954,6 +970,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       void navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}${link}`);
     },
     showShortcuts: () => setShortcutsOpen(true),
+    openPreferences: () => setPrefsOpen(true),
   }), [activeConnection, focusPanel, newTab, openInBuilder, openTool, resetLayout, selection, showExplorer, tabs, exportQuery]);
 
   // Ctrl+K everywhere, "?" only outside a text field — otherwise it eats a question mark.
@@ -961,6 +978,18 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const typing = target?.closest("input, textarea, .monaco-editor") !== null;
+
+      const rebound = Object.entries(preferences().shortcuts)
+        .find(([, combo]) => combo === comboOf(event))?.[0];
+
+      if (rebound && !(typing && !event.ctrlKey && !event.metaKey && !event.altKey)) {
+        const command = commands.find(entry => entry.id === rebound);
+        if (command && !command.disabled) {
+          event.preventDefault();
+          command.run();
+          return;
+        }
+      }
 
       // Ctrl+L opens the preset list and arms the chord: the digit that follows picks a layout, 0
       // resets. A chord keeps Ctrl+1…9 free, which the browser owns for its tabs.
@@ -992,6 +1021,11 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         return;
       }
 
+      if ((event.ctrlKey || event.metaKey) && event.key === ",") {
+        event.preventDefault();
+        setPrefsOpen(true);
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setPaletteOpen(true);
@@ -1015,7 +1049,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeConnection, applyLayout, presets, resetLayout, showExplorer]);
+  }, [activeConnection, applyLayout, commands, presets, resetLayout, showExplorer]);
 
   // The header button lives outside this component; the theme switch uses the same channel.
   useEffect(() => {
@@ -1095,6 +1129,8 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       <PropertiesDialog connectionId={propertiesFor?.connectionId ?? null}
         label={propertiesFor?.label ?? ""} onClose={() => setPropertiesFor(null)} />
 
+      <GrantDialog target={grantTarget} onClose={() => setGrantTarget(null)} onScript={runStatement} />
+
       <NewDatabaseDialog target={newDatabase} onClose={() => setNewDatabase(null)}
         onDone={() => setExplorerNonce(n => n + 1)} />
       <DropDatabaseDialog target={dropDatabaseTarget} onClose={() => setDropDatabaseTarget(null)}
@@ -1105,6 +1141,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       <CommandPalette commands={commands} opened={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ShortcutsHelp commands={commands} opened={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <SnippetManager opened={snippetsOpen} onClose={() => setSnippetsOpen(false)} />
+      <PreferencesModal commands={commands} opened={prefsOpen} onClose={() => setPrefsOpen(false)} />
       <LayoutPresetsModal opened={layoutsOpen} onClose={() => setLayoutsOpen(false)}
         connectionId={activeConnection || null}
         presets={presets} save={savePresets} slotsArmed={chordOpen}

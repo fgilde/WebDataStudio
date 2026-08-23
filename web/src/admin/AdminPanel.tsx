@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActionIcon, Alert, Badge, Button, Checkbox, Code, Group, Loader, Modal, ScrollArea,
-  Stack, Table, Tabs, Text, TextInput, Tooltip,
+  ActionIcon, Alert, Badge, Button, Checkbox, Code, Group, Loader, Modal, NumberInput, ScrollArea,
+  Select, Stack, Table, Tabs, Text, TextInput, Tooltip,
 } from "@mantine/core";
 import { IconPlayerStop, IconRefresh, IconTrash } from "@tabler/icons-react";
 import {
-  applyUserChange, createDatabase, downloadBackup, dropDatabase, killSession, listDatabases,
+  applyUserChange, createDatabase, downloadBackup, dropDatabase, killSession, listConnections,
+  listDatabases,
   listSessions, listUsers, previewUserChange, restoreBackup, runSystemCommand, serverLog,
   slowQueries, systemCommands, serverStats,
   type DatabaseDto, type SessionDto, type SystemCommandDto,
@@ -14,6 +15,8 @@ import { Overview } from "./Overview";
 import { StudioUsers } from "./StudioUsers";
 import { SizeTreemap } from "./SizeTreemap";
 import { Replication } from "./Replication";
+import { runJob } from "../shell/jobs";
+import { formatBytes } from "../redis/format";
 
 /// Every tab here is allowed to be empty or unavailable: the server tells us which of these an
 /// engine supports, and "not supported" is an answer, not an error.
@@ -288,11 +291,21 @@ function Users({ connectionId }: { connectionId: string }) {
 function Backup({ connectionId, database }: { connectionId: string; database: string }) {
   const [schemaOnly, setSchemaOnly] = useState(false);
   const [dataOnly, setDataOnly] = useState(false);
+  const [format, setFormat] = useState("plain");
+  const [noOwner, setNoOwner] = useState(false);
+  const [clean, setClean] = useState(false);
+  const [compress, setCompress] = useState(0);
+  const [written, setWritten] = useState(0);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [confirm, setConfirm] = useState("");
+
+  // Only pg_dump has the format and the flags around it. Showing them for mysqldump would be
+  // showing controls the server refuses.
+  const { data: connections } = useAsync(() => listConnections(), []);
+  const postgres = connections?.find(c => c.id === connectionId)?.engine === "postgresql";
 
   return (
     <Stack gap="xs" p="xs">
@@ -304,14 +317,37 @@ function Backup({ connectionId, database }: { connectionId: string; database: st
         <Button size="compact-xs" loading={busy} onClick={() => {
           setBusy(true);
           setFailure(null);
-          downloadBackup(connectionId, { schemaOnly, dataOnly })
+          setWritten(0);
+          runJob({ title: "Backup", message: "the engine's dump tool is running…" }, () =>
+            downloadBackup(connectionId, {
+              schemaOnly, dataOnly,
+              ...(postgres
+                ? { format, noOwner, clean: clean && format === "plain", compress: compress || undefined }
+                : {}),
+            }, setWritten))
             .catch(e => setFailure(e.message))
             .finally(() => setBusy(false));
         }}>Download backup</Button>
+        {written > 0 ? <Text size="xs" c="dimmed">{formatBytes(written)} so far</Text> : null}
       </Group>
 
+      {postgres ? (
+        <Group gap="md" align="flex-end">
+          <Select size="xs" w={110} label="Format" value={format} allowDeselect={false}
+            data={["plain", "custom", "tar"]} onChange={value => setFormat(value ?? "plain")} />
+          <NumberInput size="xs" w={110} label="Compression" min={0} max={9} value={compress}
+            onChange={value => setCompress(Number(value) || 0)} />
+          <Checkbox size="xs" label="No owner" checked={noOwner}
+            onChange={e => setNoOwner(e.currentTarget.checked)} />
+          <Checkbox size="xs" label="Include DROPs (clean)" checked={clean}
+            disabled={format !== "plain"}
+            onChange={e => setClean(e.currentTarget.checked)} />
+        </Group>
+      ) : null}
+
       <Text size="xs" c="dimmed">
-        The dump is produced by the engine's own tool and streamed straight to your browser.
+        The dump is produced by the engine's own tool and streamed straight to your browser. If the
+        tool fails part-way, a plain dump ends with a comment saying why.
       </Text>
 
       <Group gap={6} align="flex-end">

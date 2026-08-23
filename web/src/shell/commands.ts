@@ -34,6 +34,7 @@ export interface CommandContext {
   resetLayout: () => void;
   copyLink: () => void;
   showShortcuts: () => void;
+  openPreferences: () => void;
 }
 
 /// One registry, read by both the palette and the shortcut help. A command can never appear in
@@ -71,6 +72,7 @@ export function buildCommands(context: CommandContext): Command[] {
     { id: "view.resetLayout", label: "Reset layout", group: "View", shortcut: "Ctrl+L then 0", run: context.resetLayout },
     { id: "view.copyLink", label: "Copy link to this object", group: "View", run: context.copyLink },
     { id: "view.shortcuts", label: "Keyboard shortcuts", group: "View", shortcut: "?", run: context.showShortcuts },
+    { id: "view.preferences", label: "Preferences", group: "View", shortcut: "Ctrl+,", run: context.openPreferences },
   ];
 }
 

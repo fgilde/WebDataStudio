@@ -35,6 +35,19 @@ auch die ohne Kürzel.
 | `Strg+D` | ER-Diagramm |
 | `Strg+E` | Ergebnis exportieren |
 | `Strg+T` | nächstes Theme |
+| `Strg+,` | Einstellungen |
+
+## Einstellungen und eigene Kürzel
+
+`Strg+,` öffnet die Einstellungen. Sie liegen im Workspace, überleben also einen Neustart und
+begleiten dich in einen anderen Browser, statt in einem Local Storage zu wohnen: Zeilen pro Seite im
+Daten-Tab, ob ein Verlaufseintrag sein Ergebnis behält, und wie viele Zeilen davon.
+
+Der Tab **Keyboard** listet jeden Befehl, den die Palette kennt. Bindung anklicken, gewünschte
+Kombination drücken, fertig; Escape behält die bisherige, und der Pfeil daneben stellt die
+eingebaute wieder her. Ein neu gebundener Befehl läuft von überall aus, und die eingebauten
+Bindungen für alles Unangetastete gelten weiter. Modifier stehen in einer festen Reihenfolge
+(`Ctrl+Alt+Shift+K`), und auf dem Mac zählt die Command-Taste als `Ctrl`.
 
 Der Editor ist Monaco, seine eigenen Bindungen gelten also auch: Mehrfachcursor mit `Alt+Klick`,
 Suchen und Ersetzen mit `Strg+F` und `Strg+H`, reguläre Ausdrücke inklusive.

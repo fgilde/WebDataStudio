@@ -4,7 +4,12 @@ namespace WebDataStudio.Server.Endpoints;
 
 public static class WorkspaceEndpoints
 {
-    public record HistoryRequest(string ConnectionId, string Sql, long? ElapsedMs, long? RowCount, string? Error);
+    public record HistoryRequest(string ConnectionId, string Sql, long? ElapsedMs, long? RowCount,
+        string? Error, string? Snapshot);
+
+    /// A snapshot is a convenience, not an archive. Past this it is refused rather than quietly
+    /// truncated, because a truncated result that looks whole is worse than none.
+    private const int MaxSnapshotChars = 1_000_000;
 
     public static void MapWorkspaceEndpoints(this WebApplication app)
     {
@@ -13,8 +18,23 @@ public static class WorkspaceEndpoints
 
         app.MapPost("/api/history", (HistoryRequest body, WorkspaceStore store) =>
         {
-            store.AddHistory(body.ConnectionId, body.Sql, body.ElapsedMs, body.RowCount, body.Error);
+            if (body.Snapshot is { Length: > MaxSnapshotChars })
+                return Results.BadRequest(new
+                {
+                    message = $"the snapshot is larger than {MaxSnapshotChars / 1000} kB",
+                });
+
+            store.AddHistory(body.ConnectionId, body.Sql, body.ElapsedMs, body.RowCount, body.Error,
+                body.Snapshot);
             return Results.NoContent();
+        });
+
+        app.MapGet("/api/history/{id:long}/snapshot", (long id, WorkspaceStore store) =>
+        {
+            var snapshot = store.LoadSnapshot(id);
+            return snapshot is null
+                ? Results.NotFound(new { message = "that entry has no kept result" })
+                : Results.Content(snapshot, "application/json");
         });
 
         app.MapGet("/api/workspace/tabs", (WorkspaceStore store) =>

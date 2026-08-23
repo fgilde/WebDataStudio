@@ -21,12 +21,13 @@ import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
 import { GenerateDialog } from "./GenerateDialog";
 import { BulkUpdateModal } from "../grid/editing/BulkUpdateModal";
 import { useChangeSet, type RowChange } from "../grid/editing/useChangeSet";
+import { usePreferences } from "../shell/preferences";
 
 /// The referenced table as a schema node reference; an unqualified name means the same schema.
 const refOf = (fk: ForeignKeyDto) =>
   `Table:${fk.referencedSchema ? `${fk.referencedSchema}/` : ""}${fk.referencedTable}`;
 
-const PAGE_SIZE = 200;
+
 
 export interface DataTabProps {
   connectionId: string;
@@ -40,6 +41,8 @@ export interface DataTabProps {
 
 export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], onFollowForeignKey,
   onExport }: DataTabProps) {
+  // How many rows a page holds is a preference, not a constant: a wide table wants fewer.
+  const { pageSize } = usePreferences();
   const [page, setPage] = useState<DataPageDto | null>(null);
   const [pageIndex, setPageIndex] = useState(1);
   // Keyed by name, like every other piece of column state in this tab — the row editor, the key
@@ -85,7 +88,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
     let cancelled = false;
     setError(null);
     browseData(connectionId, objectRef, {
-      offset: (pageIndex - 1) * PAGE_SIZE, limit: PAGE_SIZE,
+      offset: (pageIndex - 1) * pageSize, limit: pageSize,
       sort: sort?.column, desc: sort?.desc,
       filterColumn: filter?.column, filter: filter?.value,
       reveal: reveal || undefined,
@@ -93,7 +96,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
       .then(p => { if (!cancelled) setPage(p); })
       .catch(e => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [connectionId, objectRef, pageIndex, nonce, sort, filter, reveal]);
+  }, [connectionId, objectRef, pageIndex, pageSize, nonce, sort, filter, reveal]);
 
   // Re-read after every apply: what can be undone changes with the data, not with the render.
   useEffect(() => {
@@ -116,7 +119,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   const isBoolean = (type: string) => /bool|bit/i.test(type);
 
   const insertedRows = Array.from({ length: changeSet.insertedRows }, (_, i) => -(i + 1));
-  const totalPages = page.totalEstimate ? Math.max(1, Math.ceil(page.totalEstimate / PAGE_SIZE)) : 1;
+  const totalPages = page.totalEstimate ? Math.max(1, Math.ceil(page.totalEstimate / pageSize)) : 1;
 
   const selectedCells = selected
     .map(s => ({ rowIndex: s.row, column: columns[s.col], value: changeSet.editedValue(s.row, columns[s.col]) }))

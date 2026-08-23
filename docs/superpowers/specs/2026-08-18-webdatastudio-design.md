@@ -464,6 +464,16 @@ it works for every engine whose capability set claims support for it.
 | F25.3 | What breaks if this object changes |
 | F25.4 | Any object can be read as the statement that creates it |
 | F25.5 | A plan that spilled to disk says so |
+| F26.1 | The tree shows the server's own objects: extensions, roles, tablespaces, publications, subscriptions, types |
+| F26.2 | Privileges for everything in a schema at once, including what is created later |
+| F26.3 | A materialised view can be refreshed, with or without blocking readers |
+| F26.4 | The dashboard draws its numbers over time, not only the last reading |
+| F26.5 | A backup says which format, which flags, and how many bytes have arrived |
+| F26.6 | A function can be read, run against a rolled-back transaction, and its notices seen |
+| F26.7 | Row-level security: whether it is on, what the policies say, and how to change them |
+| F26.8 | A partitioned table shows its pieces and can hand one over or take one back |
+| F26.9 | Preferences that survive a restart, including rebinding any command's shortcut |
+| F26.10 | A history entry can keep the result it returned, and show it again |
 
 ## 10. Safety behaviour
 

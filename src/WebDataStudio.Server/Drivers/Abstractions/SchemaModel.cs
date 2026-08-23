@@ -5,6 +5,15 @@ public enum SchemaNodeKind
     Database, Schema, TableFolder, ViewFolder, ProcedureFolder, FunctionFolder,
     TriggerFolder, SequenceFolder, Table, View, MaterializedView, Procedure,
     Function, Trigger, Sequence, Column, Index, ForeignKey,
+
+    // The rest of the catalogue. Schema-scoped: types and domains. Server-scoped: everything a
+    // database has one list of — extensions, roles, tablespaces, and logical replication.
+    TypeFolder, Type, Domain,
+    ExtensionFolder, Extension,
+    RoleFolder, Role,
+    TablespaceFolder, Tablespace,
+    PublicationFolder, Publication,
+    SubscriptionFolder, Subscription,
 }
 
 /// Identifies an object across the whole tree. `Path` is the ordered chain of names from the

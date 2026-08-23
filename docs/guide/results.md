@@ -67,7 +67,25 @@ changed, 1 added, 1 gone".
 A table opened with a double-click gets the same **Copy** and **Export** actions as a query result:
 copy takes the page on screen, export streams the whole table. Its column headers carry a menu for
 sorting and filtering, and both run on the server — a page holds 200 of possibly millions of rows,
-so sorting in the browser would order the wrong set.
+so sorting in the browser would order the wrong set. How many rows a page holds is a
+[preference](shortcuts.md#preferences-and-rebinding).
+
+## History
+
+`Ctrl+H` opens the history: every statement that ran, with when, how long it took, how many rows it
+returned and the error if it failed. It lives on the server, so a container restart does not lose it.
+Clicking an entry puts the statement back in a query tab.
+
+### Result snapshots
+
+With **Keep the result with each history entry** on in the
+[preferences](shortcuts.md#preferences-and-rebinding), a successful run also keeps what it returned.
+Those entries carry a small icon; clicking it opens the rows as they were then, in a normal grid,
+without running anything again. It is the answer to "it returned something different this morning".
+
+It is off by default and worth knowing why: a snapshot is a copy of the data in the workspace
+database. The number of rows kept is a preference too, a snapshot larger than a megabyte is refused
+rather than silently cut, and a result cut off at the row limit says so when it is reopened.
 
 ## Sharing a result
 

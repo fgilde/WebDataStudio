@@ -1,11 +1,23 @@
 import { useEffect, useState } from "react";
-import { Group, ScrollArea, Text, TextInput, UnstyledButton } from "@mantine/core";
-import { IconAlertTriangle, IconSearch } from "@tabler/icons-react";
-import { listHistory, type HistoryEntryDto } from "../api";
+import {
+  ActionIcon, Group, Modal, ScrollArea, Text, TextInput, Tooltip, UnstyledButton,
+} from "@mantine/core";
+import { IconAlertTriangle, IconPhoto, IconSearch } from "@tabler/icons-react";
+import { historySnapshot, listHistory, type HistoryEntryDto, type ResultSnapshot } from "../api";
+import { ResultGrid } from "../grid/ResultGrid";
 
 export function HistoryPanel({ onOpen }: { onOpen: (entry: HistoryEntryDto) => void }) {
   const [entries, setEntries] = useState<HistoryEntryDto[]>([]);
   const [search, setSearch] = useState("");
+  const [shown, setShown] = useState<{ entry: HistoryEntryDto; snapshot: ResultSnapshot } | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+
+  const openSnapshot = (entry: HistoryEntryDto) => {
+    setFailure(null);
+    historySnapshot(entry.id)
+      .then(snapshot => setShown({ entry, snapshot }))
+      .catch(e => setFailure(e instanceof Error ? e.message : String(e)));
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -30,10 +42,42 @@ export function HistoryPanel({ onOpen }: { onOpen: (entry: HistoryEntryDto) => v
               <Text size="10px" c="dimmed">{new Date(e.executedAt).toLocaleString()}</Text>
               {e.elapsedMs !== null && <Text size="10px" c="dimmed">{e.elapsedMs} ms</Text>}
               {e.rowCount !== null && <Text size="10px" c="dimmed">{e.rowCount} rows</Text>}
+              {/* The kept result, if this run kept one. Clicking it opens what came back then
+                  rather than running the statement again. */}
+              {e.hasSnapshot && (
+                <Tooltip label="Open the result this run returned">
+                  <ActionIcon size="xs" variant="subtle" aria-label="Open kept result"
+                    component="div" role="button"
+                    onClick={event => { event.stopPropagation(); openSnapshot(e); }}>
+                    <IconPhoto size={11} />
+                  </ActionIcon>
+                </Tooltip>
+              )}
             </Group>
           </UnstyledButton>
         ))}
+        {failure && <Text size="10px" c="red" p="xs">{failure}</Text>}
       </ScrollArea>
+
+      <Modal opened={shown !== null} onClose={() => setShown(null)} size="90%"
+        title={`Result kept ${shown ? new Date(shown.entry.executedAt).toLocaleString() : ""}`}>
+        {shown && (
+          <div style={{ height: "60vh" }}>
+            <ResultGrid result={{
+              index: 0,
+              columns: shown.snapshot.columns.map(name => ({ name, dataType: "", nullable: true })),
+              rows: shown.snapshot.rows,
+              documents: [],
+              rowsAffected: null,
+              elapsedMs: shown.entry.elapsedMs,
+              rowsRead: shown.snapshot.rows.length,
+              truncated: shown.snapshot.truncated,
+              error: null,
+              running: false,
+            }} />
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

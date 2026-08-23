@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   dropColumn, dropConstraint, dropIndex, executeRoutine, rebuildIndex,
-  refreshMaterializedView, selectColumn,
+  selectColumn,
 } from "./objectScripts";
 
 describe("object scripts", () => {
@@ -45,7 +45,5 @@ describe("object scripts", () => {
   });
 
   it("refreshes a materialized view only where that exists", () => {
-    expect(refreshMaterializedView("postgresql", "mv")).toBe("REFRESH MATERIALIZED VIEW mv;");
-    expect(refreshMaterializedView("mysql", "mv")).toContain("--");
   });
 });

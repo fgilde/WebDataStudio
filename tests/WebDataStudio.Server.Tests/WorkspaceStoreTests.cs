@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using WebDataStudio.Server.Services;
 
 namespace WebDataStudio.Server.Tests;
@@ -71,5 +72,67 @@ public class WorkspaceStoreTests : IDisposable
     public void Tabs_default_to_an_empty_array()
     {
         Assert.Equal("[]", NewStore().LoadTabs());
+    }
+
+    [Fact]
+    public void An_entry_without_a_snapshot_says_it_has_none()
+    {
+        var store = NewStore();
+        store.AddHistory("c1", "SELECT 1", 10, 1, null);
+
+        var entry = store.ListHistory(null, null, 10)[0];
+        Assert.False(entry.HasSnapshot);
+        Assert.Null(store.LoadSnapshot(entry.Id));
+    }
+
+    [Fact]
+    public void A_kept_result_comes_back_whole_and_is_not_in_the_list()
+    {
+        var store = NewStore();
+        const string snapshot = """{"columns":["n"],"rows":[[1]],"truncated":false}""";
+        store.AddHistory("c1", "SELECT 1 AS n", 10, 1, null, snapshot);
+
+        var entry = store.ListHistory(null, null, 10)[0];
+        Assert.True(entry.HasSnapshot);
+        // The rows travel separately: a history panel would otherwise carry every snapshot it ever
+        // took.
+        Assert.Equal(snapshot, store.LoadSnapshot(entry.Id));
+    }
+
+    [Fact]
+    public void A_file_written_before_snapshots_existed_gains_the_column()
+    {
+        var path = Path.Combine(_dir, "old.db");
+
+        // What the store looked like before: the same table without the snapshot column.
+        using (var db = new SqliteConnection($"Data Source={path}"))
+        {
+            db.Open();
+            using var command = db.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    connection_id TEXT NOT NULL,
+                    sql TEXT NOT NULL,
+                    executed_at TEXT NOT NULL,
+                    elapsed_ms INTEGER NULL,
+                    row_count INTEGER NULL,
+                    error TEXT NULL
+                );
+                INSERT INTO history (connection_id, sql, executed_at)
+                VALUES ('c1', 'SELECT 1', '2026-01-01T00:00:00+00:00');
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        var store = new WorkspaceStore(path);
+
+        Assert.True(store.Available);
+        var entry = Assert.Single(store.ListHistory(null, null, 10));
+        Assert.False(entry.HasSnapshot);
+
+        // And it keeps one from then on.
+        store.AddHistory("c1", "SELECT 2", 1, 1, null, """{"columns":[],"rows":[]}""");
+        Assert.True(store.ListHistory(null, null, 1)[0].HasSnapshot);
     }
 }

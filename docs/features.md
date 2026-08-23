@@ -162,3 +162,13 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F25.3 | Dependencies per object — what breaks if this changes, and what this needs | done | all | Structure panel, dependencies tab |
 | F25.4 | The object as a CREATE statement, to copy or open in a query tab | done | all | Structure panel, SQL tab |
 | F25.5 | Plan findings for a spilled sort and a nested loop carrying many rows | done | postgresql, mysql, sqlserver, oracle | Plan panel |
+| F26.1 | Extensions, roles, tablespaces, publications, subscriptions and types in the tree, next to the schemas | done | postgresql | Explorer |
+| F26.2 | GRANT or REVOKE for every table in a schema in one script, optionally for tables created later | done | postgresql, mysql, sqlserver, oracle | Explorer, schema menu |
+| F26.3 | REFRESH MATERIALIZED VIEW, plain or CONCURRENTLY, refused on anything that is not one | done | postgresql, oracle | Explorer, materialised view menu |
+| F26.4 | The dashboard's numbers as lines over five, fifteen or thirty minutes | done | all | Admin panel, overview |
+| F26.5 | Backup format, compression, no-owner and clean, with the bytes counted as they arrive | partial: format and its flags are pg_dump's; the other tools refuse them rather than ignore them | postgresql, mysql, mongodb, redis, sqlite, sqlserver | Admin panel, backup |
+| F26.6 | A function's source, parameters and a run inside a rolled-back transaction, with its notices and timing | partial: not a stepping debugger — no breakpoints and no variable inspection | postgresql | Structure panel, inspect tab |
+| F26.7 | Row-level security and its policies, created and dropped as statements | done | postgresql | Structure panel, policies tab |
+| F26.8 | A partitioned table's pieces with their bounds and sizes, and ATTACH or DETACH as statements | done | postgresql | Structure panel, partitions tab |
+| F26.9 | Preferences in the workspace: page size, snapshots, and a new binding for any command | done | all | Preferences dialog |
+| F26.10 | A history entry that keeps its result, reopened as a grid | done | all | History panel |

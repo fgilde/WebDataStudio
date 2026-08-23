@@ -104,6 +104,69 @@ public class BackupPlanTests
     [Fact]
     public void A_tool_that_is_not_installed_is_reported_as_missing() =>
         Assert.False(BackupService.ToolAvailable("wds-no-such-tool"));
+
+    private static WebDataStudio.Server.Models.ConnectionSpec Postgres =>
+        new("p", "P", "postgresql", "Host=db;Username=me;Database=shop", false, null, null,
+            WebDataStudio.Server.Models.ConnectionSource.Environment);
+
+    private static BackupPlan PgPlan(BackupOptions options) =>
+        BackupService.Plan(new WebDataStudio.Server.Drivers.PostgreSql.PostgreSqlDriver(),
+            Postgres, options);
+
+    [Fact]
+    public void A_custom_dump_is_named_like_one()
+    {
+        var plan = PgPlan(new BackupOptions(false, false, null, Format: "custom", NoOwner: true));
+
+        Assert.Contains("custom", plan.Arguments);
+        Assert.Contains("--no-owner", plan.Arguments);
+        // A custom dump called .sql is a file nobody can restore twice.
+        Assert.Equal("dump", plan.Extension);
+        Assert.Equal("application/octet-stream", plan.ContentType);
+    }
+
+    [Fact]
+    public void Compression_changes_what_a_plain_dump_is_called()
+    {
+        var plan = PgPlan(new BackupOptions(false, false, null, Compress: 6));
+
+        Assert.Contains("--compress", plan.Arguments);
+        Assert.Contains("6", plan.Arguments);
+        Assert.Equal("sql.gz", plan.Extension);
+    }
+
+    [Fact]
+    public void Clean_belongs_to_a_plain_dump_and_says_so_anywhere_else()
+    {
+        Assert.Contains("--clean", PgPlan(new BackupOptions(false, false, null, Clean: true)).Arguments);
+
+        var refused = Assert.Throws<NotSupportedException>(() =>
+            PgPlan(new BackupOptions(false, false, null, Format: "tar", Clean: true)));
+        Assert.Contains("plain", refused.Message);
+    }
+
+    [Fact]
+    public void A_format_pg_dump_does_not_have_is_refused_rather_than_passed_on() =>
+        Assert.Throws<NotSupportedException>(() =>
+            PgPlan(new BackupOptions(false, false, null, Format: "parquet")));
+
+    [Fact]
+    public void Compression_outside_the_range_is_refused() =>
+        Assert.Throws<NotSupportedException>(() =>
+            PgPlan(new BackupOptions(false, false, null, Compress: 12)));
+
+    [Fact]
+    public void An_option_only_pg_dump_has_is_refused_for_mysqldump()
+    {
+        var spec = new WebDataStudio.Server.Models.ConnectionSpec("m", "M", "mysql",
+            "Server=db;User Id=me;Database=shop", false, null, null,
+            WebDataStudio.Server.Models.ConnectionSource.Environment);
+
+        // Ignoring it would produce a file that does not match what the dialog said it asked for.
+        Assert.Throws<NotSupportedException>(() => BackupService.Plan(
+            new WebDataStudio.Server.Drivers.MySql.MySqlDriver(), spec,
+            new BackupOptions(false, false, null, NoOwner: true)));
+    }
 }
 
 public class AdminEndpointTests : IAsyncLifetime

@@ -131,11 +131,25 @@ export const describeObject = (conn: string, ref: string): Promise<ObjectDetailD
 export interface HistoryEntryDto {
   id: number; connectionId: string; sql: string; executedAt: string;
   elapsedMs: number | null; rowCount: number | null; error: string | null;
+  /// Whether the result was kept with the entry. The rows are fetched separately — a history list
+  /// would otherwise carry every snapshot it ever took.
+  hasSnapshot: boolean;
 }
 export interface HistoryInput {
   connectionId: string; sql: string;
   elapsedMs: number | null; rowCount: number | null; error: string | null;
+  snapshot?: string;
 }
+
+export interface ResultSnapshot {
+  columns: string[];
+  rows: unknown[][];
+  /// True when the result had more rows than the snapshot keeps.
+  truncated: boolean;
+}
+
+export const historySnapshot = (id: number): Promise<ResultSnapshot> =>
+  fetch(`${base}/history/${id}/snapshot`).then(r => ok<ResultSnapshot>(r));
 
 export const listHistory = (params: { connectionId?: string; search?: string; limit?: number } = {}):
   Promise<HistoryEntryDto[]> => {
@@ -267,6 +281,93 @@ export const objectDdl = (conn: string, ref: string):
   Promise<{ create: string | null; supported: boolean }> =>
   fetch(`${base}/ddl/${conn}?${refQuery(ref, new URLSearchParams())}`)
     .then(r => ok<{ create: string | null; supported: boolean }>(r));
+
+export interface RowSecurityDto {
+  supported: boolean;
+  enabled: boolean;
+  forced: boolean;
+  policies: {
+    name: string; command: string; roles: string; permissive: boolean;
+    using: string | null; check: string | null;
+  }[];
+}
+
+export const objectPolicies = (conn: string, ref: string): Promise<RowSecurityDto> =>
+  fetch(`${base}/schema/${conn}/policies?${refQuery(ref, new URLSearchParams())}`)
+    .then(r => ok<RowSecurityDto>(r));
+
+/// Every write here comes back as a statement: a policy is SQL, and reading it before it runs is
+/// the point of the whole tab.
+export const policyStatement = (conn: string, ref: string, body: {
+  name: string; command?: string; roles?: string; using?: string; check?: string; drop?: boolean;
+}): Promise<{ sql: string }> =>
+  fetch(`${base}/schema/${conn}/policies/statement?${refQuery(ref, new URLSearchParams())}`,
+    json("POST", body)).then(r => ok<{ sql: string }>(r));
+
+export const securityStatement = (conn: string, ref: string, enable: boolean, force: boolean):
+  Promise<{ sql: string }> =>
+  fetch(`${base}/schema/${conn}/policies/security-statement?${refQuery(ref, new URLSearchParams())}`,
+    json("POST", { enable, force })).then(r => ok<{ sql: string }>(r));
+
+export interface PartitioningDto {
+  supported: boolean;
+  partitioned: boolean;
+  strategy: string | null;
+  key: string | null;
+  partitions: { name: string; bound: string; sizeBytes: number | null; rows: number | null }[];
+}
+
+export const objectPartitions = (conn: string, ref: string): Promise<PartitioningDto> =>
+  fetch(`${base}/schema/${conn}/partitions?${refQuery(ref, new URLSearchParams())}`)
+    .then(r => ok<PartitioningDto>(r));
+
+export const partitionStatement = (conn: string, ref: string, body: {
+  partition: string; bound?: string; detach?: boolean; concurrently?: boolean;
+}): Promise<{ sql: string }> =>
+  fetch(`${base}/schema/${conn}/partitions/statement?${refQuery(ref, new URLSearchParams())}`,
+    json("POST", body)).then(r => ok<{ sql: string }>(r));
+
+/// Refreshing a materialised view. Concurrently keeps it readable and needs a unique index.
+export const refreshStatement = (conn: string, ref: string, concurrently: boolean):
+  Promise<{ sql: string }> =>
+  fetch(`${base}/schema/${conn}/refresh-statement?${refQuery(ref, new URLSearchParams())}`,
+    json("POST", { concurrently })).then(r => ok<{ sql: string }>(r));
+
+/// "SELECT on everything in this schema for that role" — one script rather than one dialog per
+/// table.
+export const bulkGrantStatement = (conn: string, body: {
+  schema: string; grantee: string; privileges: string[]; revoke?: boolean; includeFuture?: boolean;
+}): Promise<{ sql: string; tables: number }> =>
+  fetch(`${base}/schema/${conn}/privileges/bulk-statement`, json("POST", body))
+    .then(r => ok<{ sql: string; tables: number }>(r));
+
+export interface FunctionInfoDto {
+  supported: boolean;
+  language: string | null;
+  returns: string | null;
+  returnsSet: boolean;
+  arguments: { name: string; type: string; mode: string; hasDefault: boolean }[];
+  source: string | null;
+}
+
+export const functionInfo = (conn: string, ref: string): Promise<FunctionInfoDto> =>
+  fetch(`${base}/schema/${conn}/function?${refQuery(ref, new URLSearchParams())}`)
+    .then(r => ok<FunctionInfoDto>(r));
+
+export interface TrialRunDto {
+  columns: string[];
+  rows: unknown[][];
+  notices: string[];
+  elapsedMs: number;
+  truncated: boolean;
+}
+
+/// Runs the function inside a transaction the server always rolls back. Not a debugger: no
+/// stepping, no breakpoints — the source, the arguments, what came back and what it raised.
+export const functionTrialRun = (conn: string, ref: string, args: (string | null)[]):
+  Promise<TrialRunDto> =>
+  fetch(`${base}/schema/${conn}/function/run?${refQuery(ref, new URLSearchParams())}`,
+    json("POST", { arguments: args })).then(r => ok<TrialRunDto>(r));
 
 export interface SharedResultDto {
   id: string;
@@ -548,13 +649,23 @@ export const serverLog = (conn: string, lines = 200): Promise<ServerLogDto> =>
   fetch(`${base}/admin/logs/${conn}?lines=${lines}`).then(r => ok<ServerLogDto>(r));
 
 /// The backup answers with the dump itself, so it is downloaded rather than parsed.
-export const downloadBackup = async (conn: string, body: {
+export interface BackupOptionsInput {
   schemaOnly?: boolean; dataOnly?: boolean; tables?: string[];
-}): Promise<void> => {
+  /// pg_dump only: plain, custom or tar. The server refuses it on the other engines rather than
+  /// producing a plain dump under a misleading name.
+  format?: string; noOwner?: boolean; clean?: boolean; compress?: number;
+}
+
+export const downloadBackup = async (conn: string, body: BackupOptionsInput,
+  onBytes?: (written: number) => void): Promise<void> => {
   const response = await fetch(`${base}/admin/backup/${conn}`, json("POST", body));
   if (!response.ok) await fail(response);
 
-  const blob = await response.blob();
+  // A dump has no length up front — the tool is still running. Counting what arrives is the only
+  // progress there is, and it is the one worth showing.
+  const blob = onBytes && response.body
+    ? await countingBlob(response.body, response.headers.get("content-type"), onBytes)
+    : await response.blob();
   const disposition = response.headers.get("content-disposition") ?? "";
   const name = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "backup";
 
@@ -565,6 +676,23 @@ export const downloadBackup = async (conn: string, body: {
   link.click();
   URL.revokeObjectURL(url);
 };
+
+async function countingBlob(body: ReadableStream<Uint8Array>, contentType: string | null,
+  onBytes: (written: number) => void): Promise<Blob> {
+  const reader = body.getReader();
+  const chunks: BlobPart[] = [];
+  let written = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value as BlobPart);
+    written += value.byteLength;
+    onBytes(written);
+  }
+
+  return new Blob(chunks, { type: contentType ?? "application/octet-stream" });
+}
 
 export const restoreBackup = async (conn: string, file: File, confirm: string): Promise<string> => {
   const form = new FormData();

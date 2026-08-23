@@ -9,6 +9,20 @@ public static class SchemaEndpoints
 {
     public record GrantRequest(string Grantee, string Privilege, bool? Revoke);
 
+    public record BulkGrantRequest(
+        string Schema, string Grantee, string[] Privileges, bool? Revoke, bool? IncludeFuture);
+
+    public record PolicyRequest(
+        string Name, string? Command, string? Roles, string? Using, string? Check, bool? Drop);
+
+    public record SecurityRequest(bool Enable, bool? Force);
+
+    public record PartitionRequest(string Partition, string? Bound, bool? Detach, bool? Concurrently);
+
+    public record RefreshRequest(bool? Concurrently);
+
+    public record TrialRunRequest(List<string?>? Arguments);
+
     public static void MapSchemaEndpoints(this WebApplication app)
     {
         // What the engine knows about one table beyond its shape: how big it is, how much of it is
@@ -43,6 +57,138 @@ public static class SchemaEndpoints
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // What a function is: its source, its parameters, what it returns. Not a debugger — see
+        // FunctionInspector for what a "trial run" is and is not.
+        app.MapGet("/api/schema/{conn}/function", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                    return Results.Ok(await FunctionInspector.ReadAsync(
+                        driver, session, ParseObjectRef(objectRef), ct));
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // Runs it and rolls the transaction back. Refused on a read-only connection: a rollback
+        // undoes what the transaction held, and a function can do things a transaction does not.
+        app.MapPost("/api/schema/{conn}/function/run", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, TrialRunRequest body, SessionFactory factory,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (session.Spec.ReadOnly)
+                        return Results.Json(new
+                        {
+                            message = "this connection is read-only, and a trial run still runs the function",
+                        }, statusCode: StatusCodes.Status403Forbidden);
+
+                    return Results.Ok(await FunctionInspector.RunAsync(
+                        driver, session, ParseObjectRef(objectRef), body.Arguments ?? [], ct));
+                }
+            }
+            catch (ArgumentException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // Row-level security: whether it is on, and what the policies say. PostgreSQL-only,
+        // because it is a PostgreSQL feature — everything else says "not supported" rather than
+        // showing an empty list that reads like "no policies".
+        app.MapGet("/api/schema/{conn}/policies", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                    return Results.Ok(await ObjectAdmin.ReadSecurityAsync(
+                        driver, session, ParseObjectRef(objectRef), ct));
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        app.MapPost("/api/schema/{conn}/policies/statement", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, PolicyRequest body, SessionFactory factory,
+            CancellationToken ct) => await StatementAsync(conn, factory, ct, (driver, target) =>
+                ObjectAdmin.PolicyStatement(driver, target, body.Name, body.Command, body.Roles,
+                    body.Using, body.Check, body.Drop == true), objectRef));
+
+        app.MapPost("/api/schema/{conn}/policies/security-statement", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, SecurityRequest body, SessionFactory factory,
+            CancellationToken ct) => await StatementAsync(conn, factory, ct, (driver, target) =>
+                ObjectAdmin.SecurityStatement(driver, target, body.Enable, body.Force == true), objectRef));
+
+        // How a partitioned table is cut up, and what each piece costs.
+        app.MapGet("/api/schema/{conn}/partitions", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                    return Results.Ok(await ObjectAdmin.ReadPartitionsAsync(
+                        driver, session, ParseObjectRef(objectRef), ct));
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        app.MapPost("/api/schema/{conn}/partitions/statement", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, PartitionRequest body, SessionFactory factory,
+            CancellationToken ct) => await StatementAsync(conn, factory, ct, (driver, target) =>
+                ObjectAdmin.PartitionStatement(driver, target, body.Partition, body.Bound,
+                    body.Detach == true, body.Concurrently == true), objectRef));
+
+        // Refreshing a materialised view is a statement like any other, so it is previewed like one.
+        app.MapPost("/api/schema/{conn}/refresh-statement", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, RefreshRequest body, SessionFactory factory,
+            CancellationToken ct) => await StatementAsync(conn, factory, ct, (driver, target) =>
+                ObjectAdmin.RefreshStatement(driver, target, body.Concurrently == true), objectRef));
+
+        // "SELECT on everything in public for the reporting role" — one script rather than one
+        // dialog per table.
+        app.MapPost("/api/schema/{conn}/privileges/bulk-statement", async (string conn,
+            BulkGrantRequest body, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    // PostgreSQL says "ALL TABLES IN SCHEMA" in one statement; the others need the
+                    // list, so it is read here rather than guessed at in the browser.
+                    var tables = driver.Info.Id == "postgresql"
+                        ? []
+                        : await TablesOfAsync(driver, session, body.Schema, ct);
+
+                    return Results.Ok(new
+                    {
+                        sql = ObjectAdmin.BulkGrantStatement(driver, body.Schema, body.Grantee,
+                            body.Privileges ?? [], tables, body.Revoke == true,
+                            body.IncludeFuture == true),
+                        tables = tables.Count,
+                    });
+                }
+            }
+            catch (ArgumentException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
@@ -195,6 +341,36 @@ public static class SchemaEndpoints
             trigger.Name, false, $"{trigger.Timing} {trigger.Event}")));
 
         return nodes;
+    }
+
+    /// Every "give me the statement" endpoint has the same shape: open the connection, build the
+    /// text, hand it back. Nothing here runs anything — the script preview does that.
+    private static async Task<IResult> StatementAsync(string conn, SessionFactory factory,
+        CancellationToken ct, Func<IDbDriver, SchemaNodeRef, string> build, string objectRef)
+    {
+        try
+        {
+            var (driver, session) = await factory.OpenAsync(conn, ct);
+            await using (session)
+                return Results.Ok(new { sql = build(driver, ParseObjectRef(objectRef)) });
+        }
+        catch (ArgumentException e) { return Results.BadRequest(new { message = e.Message }); }
+        catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
+        catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+        catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+        catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+    }
+
+    /// The tables of one schema, for the engines that grant one at a time.
+    private static async Task<List<string>> TablesOfAsync(
+        IDbDriver driver, IDbSession session, string schema, CancellationToken ct)
+    {
+        var nodes = await driver.IntrospectAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.TableFolder, [schema, "tables"]), ct);
+
+        return [.. nodes
+            .Where(node => node.Ref.Kind == SchemaNodeKind.Table)
+            .Select(node => node.Ref.Name)];
     }
 
     internal static SchemaNodeRef ParseObjectRef(string value) =>

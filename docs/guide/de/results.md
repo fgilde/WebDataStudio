@@ -59,4 +59,18 @@ Engine-Grenzen hinweg.
 Eine mit Doppelklick geöffnete Tabelle hat dieselben Aktionen **Copy** und **Export** wie ein
 Abfrage-Ergebnis: Kopieren nimmt die Seite auf dem Schirm, Export streamt die ganze Tabelle. Die
 Spaltenköpfe haben ein Menü zum Sortieren und Filtern, und beides läuft auf dem Server — eine Seite
-hält 200 von womöglich Millionen Zeilen, im Browser wäre also die falsche Menge sortiert.
+hält standardmäßig 200 von womöglich Millionen Zeilen, im Browser wäre also die falsche Menge
+sortiert. Wie viele es sind, ist eine [Einstellung](shortcuts.md).
+
+## Verlauf
+
+`Strg+H` öffnet den Verlauf: jedes gelaufene Statement mit Zeitpunkt, Dauer, Zeilenzahl und Fehler.
+Er liegt auf dem Server, ein Neustart des Containers verliert ihn also nicht. Ein Klick legt das
+Statement zurück in einen Abfrage-Tab.
+
+Ist in den Einstellungen **Keep the result with each history entry** an, behält ein erfolgreicher
+Lauf auch, was er zurückgab. Solche Einträge tragen ein kleines Symbol; ein Klick darauf öffnet die
+Zeilen von damals in einem normalen Grid, ohne noch einmal etwas auszuführen. Standardmäßig aus, und
+das aus gutem Grund: ein Snapshot ist eine Kopie der Daten in der Workspace-Datenbank. Die Zeilenzahl
+ist ebenfalls eine Einstellung, und ein Snapshot über einem Megabyte wird abgelehnt statt still
+abgeschnitten.

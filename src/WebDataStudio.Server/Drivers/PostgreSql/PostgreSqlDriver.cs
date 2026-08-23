@@ -36,7 +36,8 @@ public sealed class PostgreSqlDriver : AdoDriverBase
         IDbSession session, SchemaNodeRef? parent, CancellationToken ct)
     {
         if (parent is null)
-            return await QueryNodesAsync(session, ct,
+        {
+            var schemas = await QueryNodesAsync(session, ct,
                 """
                 SELECT nspname FROM pg_namespace
                  WHERE nspname NOT IN ('pg_catalog','information_schema')
@@ -44,6 +45,24 @@ public sealed class PostgreSqlDriver : AdoDriverBase
                  ORDER BY nspname
                 """,
                 name => new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Schema, [name]), name, true));
+
+            // Below the schemas, the lists a database has one of. They sit at the same level
+            // because that is what they are: server-scoped, not part of any schema.
+            return
+            [
+                .. schemas,
+                ServerFolder(SchemaNodeKind.ExtensionFolder, "extensions", "Extensions"),
+                ServerFolder(SchemaNodeKind.RoleFolder, "roles", "Roles"),
+                ServerFolder(SchemaNodeKind.TablespaceFolder, "tablespaces", "Tablespaces"),
+                ServerFolder(SchemaNodeKind.PublicationFolder, "publications", "Publications"),
+                ServerFolder(SchemaNodeKind.SubscriptionFolder, "subscriptions", "Subscriptions"),
+            ];
+        }
+
+        // A server-scoped folder carries no schema, so it is answered before the schema is read.
+        if (ServerList(parent.Kind) is { } serverList)
+            return await QueryNodesAsync(session, ct, serverList.Sql,
+                name => new SchemaNode(new SchemaNodeRef(serverList.Kind, ["", name]), name, false));
 
         if (parent.Kind == SchemaNodeKind.Schema)
         {
@@ -55,6 +74,7 @@ public sealed class PostgreSqlDriver : AdoDriverBase
                 Folder(SchemaNodeKind.ProcedureFolder, s, "procedures", "Procedures"),
                 Folder(SchemaNodeKind.FunctionFolder, s, "functions", "Functions"),
                 Folder(SchemaNodeKind.SequenceFolder, s, "sequences", "Sequences"),
+                Folder(SchemaNodeKind.TypeFolder, s, "types", "Types and domains"),
             ];
         }
 
@@ -63,8 +83,15 @@ public sealed class PostgreSqlDriver : AdoDriverBase
         {
             SchemaNodeKind.TableFolder => await ListAsync(session, ct, schema, SchemaNodeKind.Table,
                 "SELECT tablename FROM pg_tables WHERE schemaname = @s ORDER BY tablename"),
-            SchemaNodeKind.ViewFolder => await ListAsync(session, ct, schema, SchemaNodeKind.View,
-                "SELECT viewname FROM pg_views WHERE schemaname = @s ORDER BY viewname"),
+            // pg_views leaves materialised views out, so they get their own listing and their own
+            // kind — a materialised view is refreshed, a view is not.
+            SchemaNodeKind.ViewFolder =>
+            [
+                .. await ListAsync(session, ct, schema, SchemaNodeKind.View,
+                    "SELECT viewname FROM pg_views WHERE schemaname = @s ORDER BY viewname"),
+                .. await ListAsync(session, ct, schema, SchemaNodeKind.MaterializedView,
+                    "SELECT matviewname FROM pg_matviews WHERE schemaname = @s ORDER BY matviewname"),
+            ],
             SchemaNodeKind.ProcedureFolder => await ListAsync(session, ct, schema, SchemaNodeKind.Procedure,
                 """
                 SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
@@ -77,6 +104,20 @@ public sealed class PostgreSqlDriver : AdoDriverBase
                 """),
             SchemaNodeKind.SequenceFolder => await ListAsync(session, ct, schema, SchemaNodeKind.Sequence,
                 "SELECT sequencename FROM pg_sequences WHERE schemaname = @s ORDER BY sequencename"),
+
+            // Composite types, enums and domains in one list: they are the same thing to anybody
+            // looking for "what is this column's type".
+            SchemaNodeKind.TypeFolder => await ListAsync(session, ct, schema, SchemaNodeKind.Type,
+                """
+                SELECT t.typname
+                  FROM pg_type t
+                  JOIN pg_namespace n ON n.oid = t.typnamespace
+                 WHERE n.nspname = @s
+                   AND (t.typtype IN ('c', 'e', 'd'))
+                   AND NOT EXISTS (SELECT 1 FROM pg_class c
+                                    WHERE c.oid = t.typrelid AND c.relkind <> 'c')
+                 ORDER BY t.typname
+                """),
             _ => [],
         };
     }
@@ -298,6 +339,46 @@ public sealed class PostgreSqlDriver : AdoDriverBase
         return nodes;
     }
 
+    private static SchemaNode ServerFolder(SchemaNodeKind kind, string slug, string label) =>
+        // An empty first segment says "no schema": the ref still round-trips through Parse.
+        new(new SchemaNodeRef(kind, ["", slug]), label, true);
+
+    /// The server-scoped lists, by the folder that holds them. `installed`, `superuser` and the
+    /// like ride along in the label so the tree says something useful without a detail pane.
+    private static (SchemaNodeKind Kind, string Sql)? ServerList(SchemaNodeKind folder) => folder switch
+    {
+        SchemaNodeKind.ExtensionFolder => (SchemaNodeKind.Extension,
+            """
+            SELECT e.extname || ' ' || e.extversion
+              FROM pg_extension e
+             ORDER BY e.extname
+            """),
+
+        SchemaNodeKind.RoleFolder => (SchemaNodeKind.Role,
+            """
+            SELECT r.rolname ||
+                   CASE WHEN r.rolsuper THEN ' (superuser)'
+                        WHEN NOT r.rolcanlogin THEN ' (group)'
+                        ELSE '' END
+              FROM pg_roles r
+             WHERE r.rolname NOT LIKE 'pg\_%'
+             ORDER BY r.rolname
+            """),
+
+        SchemaNodeKind.TablespaceFolder => (SchemaNodeKind.Tablespace,
+            "SELECT spcname FROM pg_tablespace ORDER BY spcname"),
+
+        SchemaNodeKind.PublicationFolder => (SchemaNodeKind.Publication,
+            "SELECT pubname FROM pg_publication ORDER BY pubname"),
+
+        SchemaNodeKind.SubscriptionFolder => (SchemaNodeKind.Subscription,
+            // A subscription is only visible to a superuser; an empty list is the honest answer for
+            // everybody else rather than an error.
+            "SELECT subname FROM pg_subscription ORDER BY subname"),
+
+        _ => null,
+    };
+
     private static async Task<IReadOnlyList<SchemaNode>> ListAsync(
         IDbSession session, CancellationToken ct, string schema, SchemaNodeKind kind, string sql)
     {
@@ -309,7 +390,8 @@ public sealed class PostgreSqlDriver : AdoDriverBase
         {
             var name = reader.GetString(0);
             nodes.Add(new SchemaNode(new SchemaNodeRef(kind, [schema, name]), name,
-                HasChildren: kind is SchemaNodeKind.Table or SchemaNodeKind.View));
+                HasChildren: kind is SchemaNodeKind.Table or SchemaNodeKind.View
+                    or SchemaNodeKind.MaterializedView));
         }
         return nodes;
     }

@@ -3,7 +3,10 @@ using Microsoft.Data.Sqlite;
 namespace WebDataStudio.Server.Services;
 
 public sealed record HistoryEntry(long Id, string ConnectionId, string Sql,
-    DateTimeOffset ExecutedAt, long? ElapsedMs, long? RowCount, string? Error);
+    DateTimeOffset ExecutedAt, long? ElapsedMs, long? RowCount, string? Error,
+    /// Whether the result was kept with the entry. The rows themselves are not in the list — a
+    /// history panel would carry every snapshot it ever took.
+    bool HasSnapshot);
 
 public sealed record SavedQuery(string Id, string Name, string? Folder, string Sql,
     string? ConnectionId, DateTimeOffset UpdatedAt);
@@ -33,7 +36,8 @@ public sealed class WorkspaceStore
                 executed_at TEXT NOT NULL,
                 elapsed_ms INTEGER NULL,
                 row_count INTEGER NULL,
-                error TEXT NULL
+                error TEXT NULL,
+                snapshot TEXT NULL
             );
             CREATE INDEX IF NOT EXISTS ix_history_time ON history(id DESC);
             CREATE TABLE IF NOT EXISTS workspace (key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -49,6 +53,32 @@ public sealed class WorkspaceStore
 
         _connectionString = prepared.ConnectionString;
         Error = prepared.Error;
+
+        // A file created before snapshots existed has the table without that column, and SQLite has
+        // no ADD COLUMN IF NOT EXISTS — so it is asked first.
+        if (prepared.Available) AddColumnIfMissing("history", "snapshot", "TEXT NULL");
+    }
+
+    private void AddColumnIfMissing(string table, string column, string definition)
+    {
+        try
+        {
+            using var db = Open();
+
+            using var check = db.CreateCommand();
+            check.CommandText = $"SELECT count(*) FROM pragma_table_info('{table}') WHERE name = $n";
+            check.Parameters.AddWithValue("$n", column);
+            if (Convert.ToInt64(check.ExecuteScalar()) > 0) return;
+
+            using var alter = db.CreateCommand();
+            alter.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definition}";
+            alter.ExecuteNonQuery();
+        }
+        catch (SqliteException)
+        {
+            // The column is what snapshots need, not what the studio needs. Everything else still
+            // works without it, so a migration that cannot run is not a reason to refuse to start.
+        }
     }
 
     private SqliteConnection Open()
@@ -60,13 +90,16 @@ public sealed class WorkspaceStore
         return db;
     }
 
-    public void AddHistory(string connectionId, string sql, long? elapsedMs, long? rowCount, string? error)
+    /// <paramref name="snapshot"/> is the result as JSON, or null for the usual case of keeping
+    /// only the statement.
+    public void AddHistory(string connectionId, string sql, long? elapsedMs, long? rowCount,
+        string? error, string? snapshot = null)
     {
         using var db = Open();
         using var cmd = db.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO history (connection_id, sql, executed_at, elapsed_ms, row_count, error)
-            VALUES ($c, $s, $t, $e, $r, $err)
+            INSERT INTO history (connection_id, sql, executed_at, elapsed_ms, row_count, error, snapshot)
+            VALUES ($c, $s, $t, $e, $r, $err, $snap)
             """;
         cmd.Parameters.AddWithValue("$c", connectionId);
         cmd.Parameters.AddWithValue("$s", sql);
@@ -74,6 +107,7 @@ public sealed class WorkspaceStore
         cmd.Parameters.AddWithValue("$e", (object?)elapsedMs ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$r", (object?)rowCount ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$err", (object?)error ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$snap", (object?)snapshot ?? DBNull.Value);
         cmd.ExecuteNonQuery();
     }
 
@@ -82,7 +116,8 @@ public sealed class WorkspaceStore
         using var db = Open();
         using var cmd = db.CreateCommand();
         cmd.CommandText = """
-            SELECT id, connection_id, sql, executed_at, elapsed_ms, row_count, error
+            SELECT id, connection_id, sql, executed_at, elapsed_ms, row_count, error,
+                   snapshot IS NOT NULL
               FROM history
              WHERE ($c IS NULL OR connection_id = $c)
                AND ($q IS NULL OR sql LIKE '%' || $q || '%')
@@ -101,8 +136,21 @@ public sealed class WorkspaceStore
                 DateTimeOffset.Parse(reader.GetString(3)),
                 reader.IsDBNull(4) ? null : reader.GetInt64(4),
                 reader.IsDBNull(5) ? null : reader.GetInt64(5),
-                reader.IsDBNull(6) ? null : reader.GetString(6)));
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.GetBoolean(7)));
         return result;
+    }
+
+    /// The kept result of one entry, or null when there is none.
+    public string? LoadSnapshot(long id)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "SELECT snapshot FROM history WHERE id = $id";
+        cmd.Parameters.AddWithValue("$id", id);
+
+        var value = cmd.ExecuteScalar();
+        return value is string text ? text : null;
     }
 
     public void SaveTabs(string json) => SetValue("tabs", json);

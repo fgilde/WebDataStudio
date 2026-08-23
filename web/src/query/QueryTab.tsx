@@ -10,6 +10,7 @@ import { ResultArea } from "./ResultArea";
 import { runQuery, type QueryRun } from "./runQuery";
 import { applyChunk, createResultState, type ResultState } from "./resultStore";
 import { addHistory, health } from "../api";
+import { preferences } from "../shell/preferences";
 import { findParameters } from "../editor/parameters";
 import { ParameterDialog } from "../editor/ParameterDialog";
 import { useUserSnippets } from "../editor/SnippetManager";
@@ -91,12 +92,25 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
       }
 
       const last = state.statements[state.statements.length - 1];
+      const prefs = preferences();
+
+      // The result is kept with the entry only when that is asked for: a snapshot is a copy of the
+      // data, and the workspace database is not where everybody wants one.
+      const snapshot = prefs.historySnapshots && last && !last.error
+        ? JSON.stringify({
+          columns: last.columns.map(column => column.name),
+          rows: last.rows.slice(0, prefs.snapshotRows),
+          truncated: last.rows.length > prefs.snapshotRows,
+        })
+        : undefined;
+
       // History is best-effort: a failed write must never swallow the result the user is reading.
       addHistory({
         connectionId, sql: text,
         elapsedMs: Math.round(performance.now() - started),
         rowCount: last?.rows.length ?? null,
         error: last?.error?.text ?? null,
+        snapshot,
       }).catch(() => {});
     }
   }, [connectionId, transactional]);

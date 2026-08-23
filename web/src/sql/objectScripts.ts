@@ -56,8 +56,3 @@ export function executeRoutine(engine: ScriptEngine, routine: string): string {
       return `CALL ${routine}();`;
   }
 }
-
-export const refreshMaterializedView = (engine: ScriptEngine, view: string) =>
-  engine === "postgresql"
-    ? `REFRESH MATERIALIZED VIEW ${view};`
-    : `-- ${engine} refreshes a materialized view its own way\n-- view: ${view}`;

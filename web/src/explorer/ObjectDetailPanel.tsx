@@ -5,8 +5,14 @@ import type { ExplorerSelection } from "./ExplorerTree";
 import {
   DependenciesTab, PrivilegesTab, SqlTab, StatisticsTab,
 } from "./ObjectTabs";
+import { PartitionsTab, PoliciesTab } from "./ObjectAdminTabs";
+import { FunctionTab } from "./FunctionTab";
 
 const DESCRIBABLE = ["Table", "View", "MaterializedView"];
+
+/// A routine has no columns, indexes or keys to describe — but it does have a source, dependencies
+/// and a run, so the panel opens on those rather than saying nothing.
+const ROUTINES = ["Function", "Procedure"];
 
 export function ObjectDetailPanel({ selection, onOpenInEditor }: {
   selection: ExplorerSelection | null;
@@ -30,34 +36,63 @@ export function ObjectDetailPanel({ selection, onOpenInEditor }: {
   }, [selection]);
 
   if (!selection) return <Text size="xs" c="dimmed" p="xs">Select an object.</Text>;
-  if (!DESCRIBABLE.includes(selection.node.kind))
+
+  const routine = ROUTINES.includes(selection.node.kind);
+
+  if (!DESCRIBABLE.includes(selection.node.kind) && !routine)
     return <Text size="xs" c="dimmed" p="xs">{selection.node.label}</Text>;
   if (error) return <Text size="xs" c="red" p="xs">{error}</Text>;
-  if (!detail) return <Loader size="xs" m="xs" />;
+  if (!detail && !routine) return <Loader size="xs" m="xs" />;
 
   return (
-    <Tabs defaultValue="columns" h="100%">
+    <Tabs defaultValue={routine ? "function" : "columns"} h="100%">
       <Tabs.List>
-        <Tabs.Tab value="columns">Columns</Tabs.Tab>
-        <Tabs.Tab value="indexes">Indexes</Tabs.Tab>
-        <Tabs.Tab value="keys">Keys</Tabs.Tab>
-        <Tabs.Tab value="statistics">Statistics</Tabs.Tab>
-        <Tabs.Tab value="privileges">Privileges</Tabs.Tab>
+        {detail && <Tabs.Tab value="columns">Columns</Tabs.Tab>}
+        {detail && <Tabs.Tab value="indexes">Indexes</Tabs.Tab>}
+        {detail && <Tabs.Tab value="keys">Keys</Tabs.Tab>}
+        {detail && <Tabs.Tab value="statistics">Statistics</Tabs.Tab>}
+        {/* Only where they mean something: a view has no partitions, and only PostgreSQL has
+            row-level security — the tabs themselves say so if opened anyway. */}
+        {selection.node.kind === "Table" && <Tabs.Tab value="policies">Policies</Tabs.Tab>}
+        {selection.node.kind === "Table" && <Tabs.Tab value="partitions">Partitions</Tabs.Tab>}
+        {(selection.node.kind === "Function" || selection.node.kind === "Procedure") &&
+          <Tabs.Tab value="function">Inspect</Tabs.Tab>}
+        {detail && <Tabs.Tab value="privileges">Privileges</Tabs.Tab>}
         <Tabs.Tab value="dependencies">Dependencies</Tabs.Tab>
         <Tabs.Tab value="sql">SQL</Tabs.Tab>
-        <Tabs.Tab value="info">Info</Tabs.Tab>
+        {detail && <Tabs.Tab value="info">Info</Tabs.Tab>}
       </Tabs.List>
 
       {/* The four tabs pgAdmin taught people to look for. Each asks the server for itself, so
           opening an object stays one request. */}
+      {detail && <>
       <Tabs.Panel value="statistics" keepMounted={false}>
         <StatisticsTab connectionId={selection.connectionId} objectRef={selection.node.ref} />
+      </Tabs.Panel>
+
+      </>}
+
+      <Tabs.Panel value="function" keepMounted={false}>
+        <FunctionTab connectionId={selection.connectionId} objectRef={selection.node.ref} />
+      </Tabs.Panel>
+
+      {detail && <>
+      <Tabs.Panel value="policies" keepMounted={false}>
+        <PoliciesTab connectionId={selection.connectionId} objectRef={selection.node.ref}
+          onScript={onOpenInEditor} />
+      </Tabs.Panel>
+
+      <Tabs.Panel value="partitions" keepMounted={false}>
+        <PartitionsTab connectionId={selection.connectionId} objectRef={selection.node.ref}
+          onScript={onOpenInEditor} />
       </Tabs.Panel>
 
       <Tabs.Panel value="privileges" keepMounted={false}>
         <PrivilegesTab connectionId={selection.connectionId} objectRef={selection.node.ref}
           onScript={onOpenInEditor} />
       </Tabs.Panel>
+
+      </>}
 
       <Tabs.Panel value="dependencies" keepMounted={false}>
         <DependenciesTab connectionId={selection.connectionId} objectRef={selection.node.ref} />
@@ -68,6 +103,7 @@ export function ObjectDetailPanel({ selection, onOpenInEditor }: {
           onOpenInEditor={onOpenInEditor} />
       </Tabs.Panel>
 
+      {detail && <>
       <Tabs.Panel value="columns">
         <ScrollArea h="calc(100vh - 160px)">
           <Table striped stickyHeader fz="xs">
@@ -130,6 +166,7 @@ export function ObjectDetailPanel({ selection, onOpenInEditor }: {
           {detail.comment}
         </Text>
       </Tabs.Panel>
+      </>}
     </Tabs>
   );
 }

@@ -42,3 +42,32 @@ Prozess auf der Maschine lesen könnte.
 
 Der Restore lädt einen Dump hoch und verlangt zuerst den Namen der Zieldatenbank. Es ist die eine
 Aktion in der Anwendung, die eine ganze Datenbank überschreibt.
+
+### Optionen
+
+Bei PostgreSQL bietet das Panel, was `pg_dump` bietet: Format (`plain`, `custom`, `tar`),
+Kompression von 0 bis 9, *No owner* und *Include DROPs (clean)*. Die Datei heißt nach dem, was sie
+ist — ein Custom-Dump heißt nie `.sql`, denn den kann niemand zweimal einspielen. *Clean* gehört zum
+Plain-Dump; die anderen Formate entscheiden das beim Restore, und die Anfrage wird dort abgelehnt
+statt still verworfen. Die übrigen Engines kennen davon nichts, ihr Dialog zeigt es deshalb nicht —
+und erreicht eine solche Option den Server trotzdem, wird sie abgelehnt statt ignoriert.
+
+### Fortschritt
+
+Ein Dump hat vorab keine Länge, das Werkzeug läuft noch, während die Bytes ankommen. Das Panel zählt
+mit und zeigt es neben dem Knopf. Scheitert das Werkzeug auf halbem Weg, sind die gesendeten Bytes
+nicht mehr zurückzuholen — ein Plain-Dump endet dann mit einem Kommentar, welches Werkzeug nach wie
+vielen Bytes und warum aufgegeben hat.
+
+## Überblick
+
+Der erste Tab beantwortet, was die anderen Tabs nur gemeinsam beantworten könnten: Verbindungen,
+Cache-Trefferquote, wartende Sitzungen, laufende Statements, das längste davon und die Größe der
+Datenbank. Jede Kachel behält die letzten Messwerte, damit eine steigende Zahl anders aussieht als
+eine bloß hohe.
+
+Darunter dieselben Zahlen als Linien über fünf, fünfzehn oder dreißig Minuten — Sitzungen und
+Durchsatz. Jede Linie ist auf ihren eigenen Bereich normiert: es geht um den Verlauf, und
+Verbindungen und eine Trefferquote haben keine gemeinsame Einheit. Gemessen wird alle fünf Sekunden,
+dieselbe Abfrage wie für die Kacheln; eine halbe Stunde wird behalten, auf dem Server nichts
+gespeichert.

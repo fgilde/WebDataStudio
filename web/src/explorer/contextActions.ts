@@ -9,7 +9,8 @@ export type ExplorerAction =
   | "script-select-column" | "script-drop-column"
   | "script-drop-index" | "script-reindex"
   | "script-drop-constraint"
-  | "script-execute" | "script-refresh-matview";
+  | "script-execute" | "script-refresh-matview" | "script-refresh-matview-live"
+  | "grant-schema";
 
 export interface ContextItem {
   action: ExplorerAction;
@@ -88,6 +89,7 @@ export function actionsFor(kind: string, caps: MenuCapabilities = {}): ContextIt
       return keepWritable([
         ...VIEW.slice(0, 4),
         { action: "script-refresh-matview", label: "Script: REFRESH" },
+        { action: "script-refresh-matview-live", label: "Script: REFRESH CONCURRENTLY" },
         ...VIEW.slice(4),
       ]);
 
@@ -138,6 +140,7 @@ export function actionsFor(kind: string, caps: MenuCapabilities = {}): ContextIt
         ...CONTAINER,
         { action: "export", label: "Export schema…" },
         { action: "new-query", label: "New query here" },
+        { action: "grant-schema", label: "Privileges on everything here…" },
         { action: "properties", label: "Properties…", divider: true },
       ]);
 
@@ -173,7 +176,8 @@ const WRITES = new Set<ExplorerAction>([
   "design", "new-table", "rename", "manage-indexes", "add-index", "import",
   "script-insert", "script-update", "script-delete", "script-truncate", "script-drop",
   "script-drop-column", "script-drop-index", "script-reindex", "script-drop-constraint",
-  "script-refresh-matview", "new-database", "drop-database",
+  "script-refresh-matview", "script-refresh-matview-live", "grant-schema",
+  "new-database", "drop-database",
 ]);
 
 /// The menu for a connection's own row, which is not a schema node.

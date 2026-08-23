@@ -21,7 +21,8 @@
     "smoke:builder": "node scripts/smoke-builder.mjs",
     "smoke:redis": "node scripts/smoke-redis.mjs",
     "smoke:admin-overview": "node scripts/smoke-admin-overview.mjs",
-    "smoke:mcp": "node scripts/smoke-mcp.mjs"
+    "smoke:mcp": "node scripts/smoke-mcp.mjs",
+    "smoke:objects": "node scripts/smoke-objects.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

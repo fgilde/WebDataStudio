@@ -43,12 +43,47 @@ every process on the machine could read.
 Restore uploads a dump and asks you to type the target database's name first. It is the one action
 in the app that overwrites a whole database.
 
+### Options
+
+On PostgreSQL the panel offers what `pg_dump` offers:
+
+| Option | What it changes |
+|---|---|
+| Format | `plain` is replayable SQL, `custom` and `tar` are for `pg_restore` and can be restored selectively |
+| Compression | 0 to 9; a compressed plain dump arrives as `.sql.gz` |
+| No owner | leaves out the `OWNER TO` lines, which is what you want when restoring as somebody else |
+| Include DROPs (clean) | prefixes the drops that make a plain dump replayable over an existing database |
+
+The file is named after what it actually is — a custom dump is never called `.sql`, because that is
+a file nobody can restore twice. "Clean" belongs to a plain dump: the other formats decide that at
+restore time, and asking for it there is refused rather than quietly dropped. The other engines have
+none of this, so their dialog does not offer it — and if an option reaches the server anyway it is
+refused instead of ignored, because a file that does not match what was asked for is worse than an
+error.
+
+### Progress
+
+A dump has no length up front: the tool is still running while the bytes arrive. The panel counts
+what has arrived and says so next to the button, and the toast stays until it finishes.
+
+If the tool fails part-way, the bytes already sent cannot be taken back — so a plain dump ends with
+a comment saying which tool failed, after how many bytes, and why. That is exactly where somebody
+restoring a truncated file will look.
+
 ## Overview
 
 The first tab answers the question the other eight could only answer between them: connections,
 cache hit ratio, how many sessions are waiting, how many statements are running, how long the
 longest has been going, and the size of the database. Each tile keeps the last five minutes of
 readings, so a number that is climbing looks different from one that is merely high.
+
+### Over time
+
+Under the tiles the same numbers are drawn as lines, over five, fifteen or thirty minutes — sessions
+(connections, running, waiting) and throughput (cache hit, transactions, rows). Each line is
+normalised to its own range: the point is the shape, and connections and a cache hit ratio share no
+unit. The readings come from the same five-second poll as the tiles, so the graphs and the numbers
+above them can never disagree. Half an hour is kept; nothing is stored on the server.
 
 Below the tiles, everything the server is working on. PostgreSQL and SQL Server report a percentage
 for a vacuum or an index build; MySQL and Oracle report the statement and its age, which is the

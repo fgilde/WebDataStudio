@@ -10,10 +10,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 # The published version, passed in by CI so the studio can show which build it is running.
 ARG WDS_BUILD=0
 ARG WDS_COMMIT=local
+# Set when the image is built from a tag: then the tag is the version, not the run number.
+ARG WDS_VERSION=
 
 WORKDIR /src
 COPY . .
-RUN dotnet publish src/WebDataStudio.Server -c Release -o /app     -p:WdsBuild=$WDS_BUILD -p:WdsCommit=$WDS_COMMIT
+RUN dotnet publish src/WebDataStudio.Server -c Release -o /app     -p:WdsBuild=$WDS_BUILD -p:WdsCommit=$WDS_COMMIT -p:WdsVersion=$WDS_VERSION
 
 # ---- runtime --------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

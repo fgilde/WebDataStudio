@@ -295,17 +295,38 @@ if ((desktop || string.Equals(Environment.GetEnvironmentVariable("WDS_OPEN_BROWS
     app.Lifetime.ApplicationStarted.Register(() =>
     {
         var url = app.Urls.FirstOrDefault() ?? "http://localhost:8080";
-        try
-        {
-            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-        }
-        catch (Exception e)
-        {
-            app.Logger.LogInformation("open {Url} in your browser ({Reason})", url, e.Message);
-        }
+
+        // A downloaded application should look like one: an installed Chromium is asked for a
+        // window without an address bar, and a plain tab is the fallback. WDS_APP_WINDOW=false asks
+        // for the tab on purpose.
+        var wantsWindow = !string.Equals(app.Configuration["WDS_APP_WINDOW"], "false",
+            StringComparison.OrdinalIgnoreCase);
+
+        var profile = Path.Combine(
+            Path.GetDirectoryName(Path.GetFullPath(app.Configuration["DB_PATH"] ?? defaultDbPath))!,
+            "app-window");
+
+        app.Logger.LogInformation("{What}", wantsWindow
+            ? AppWindow.Open(url, profile, app.Logger)
+            : OpenTab(url, app.Logger));
     });
 }
 
 app.Run();
+
+// The plain-tab path, for WDS_APP_WINDOW=false.
+static string OpenTab(string url, ILogger logger)
+{
+    try
+    {
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        return $"opened {url} in your browser";
+    }
+    catch (Exception e)
+    {
+        logger.LogDebug("{Reason}", e.Message);
+        return $"open {url} in your browser";
+    }
+}
 
 public partial class Program { } // exposed for WebApplicationFactory

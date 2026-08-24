@@ -16,6 +16,7 @@
 | `WDS_IDLE_TIMEOUT_SECONDS` | wie lange eine ungenutzte Sitzung offen bleibt, Vorgabe `300` |
 | `WDS_OPEN_BROWSER` | `true` öffnet beim Start einen Browser (Vorgabe der Desktop-Builds) |
 | `WDS_ARCHIVE_DIR`, `WDS_ARCHIVE_MAX_ROWS` | wohin behaltene Ergebnisse geschrieben werden und wie viele Zeilen eines behält — siehe [Ergebnisse](results.md) |
+| `WDS_APP_WINDOW` | `false` öffnet einen normalen Browser-Tab statt eines eigenen Fensters — siehe [Erste Schritte](getting-started.md) |
 | `DB_PATH` | Anwendungsdatenbank (SQLite), Vorgabe `/data/webdatastudio.db` |
 | `ASPNETCORE_URLS` | Listen-Adresse, Vorgabe `http://0.0.0.0:8080` |
 

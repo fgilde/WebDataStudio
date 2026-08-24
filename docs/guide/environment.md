@@ -27,7 +27,8 @@
 | `WDS_MAX_ROWS` | default fetch cap per result, default `1000` |
 | `WDS_MAX_SESSIONS` | open sessions per connection, default `8` |
 | `WDS_IDLE_TIMEOUT_SECONDS` | how long an unused session stays open, default `300` |
-| `WDS_OPEN_BROWSER` | `true` opens a browser on start (the default for desktop builds) |
+| `WDS_OPEN_BROWSER` | `true` opens the studio on start (the default for desktop builds); `false` opens nothing |
+| `WDS_APP_WINDOW` | `false` opens a plain browser tab instead of a window of its own — see [Getting started](getting-started.md#as-a-desktop-application) |
 | `DB_PATH` | application SQLite database, default `/data/webdatastudio.db` |
 | `ASPNETCORE_URLS` | listen address, default `http://0.0.0.0:8080` |
 

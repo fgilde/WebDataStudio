@@ -79,8 +79,12 @@ export function FunctionTab({ connectionId, objectRef }: {
                 label={`${argument.name} — ${argument.type}`}
                 placeholder={argument.hasDefault ? "leave empty for the default" : "NULL if empty"}
                 value={args[index] ?? ""}
-                onChange={e => setArgs(current =>
-                  current.map((value, at) => (at === index ? e.currentTarget.value : value)))} />
+                // Read before the updater runs: see DistinctValues for what reading it inside one
+                // does.
+                onChange={event => {
+                  const typed = event.currentTarget.value;
+                  setArgs(current => current.map((value, at) => (at === index ? typed : value)));
+                }} />
             ))}
           </Stack>
         )}

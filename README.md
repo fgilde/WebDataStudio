@@ -168,13 +168,19 @@ carry a badge. Connections added in the UI live in `/data` with their passwords 
 ## Desktop
 
 Prefer a local binary to a container? Each release ships a self-contained build for Windows, macOS
-and Linux that starts the same server and opens your browser:
+and Linux. It starts the same server and opens the studio in a window of its own — no address bar,
+an icon in the task bar — using a Chromium that is already installed:
 
 ```bash
-./webdatastudio            # http://localhost:8080, opens a browser tab
+./webdatastudio                        # http://localhost:8080, in its own window
+WDS_APP_WINDOW=false ./webdatastudio   # a normal browser tab instead
 ```
 
 Downloads are on the [releases page](https://github.com/fgilde/WebDataStudio/releases).
+
+A studio that is already running can also be installed straight from the browser — **Install
+WebDataStudio** in Chrome's or Edge's address bar — which gives the same window without downloading
+anything. Nothing is cached either way: the studio reads live databases.
 
 ## Develop
 

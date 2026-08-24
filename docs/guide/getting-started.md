@@ -76,8 +76,30 @@ All three land in one studio. Pass `studioName:` for a second one, or build it y
 
 Download the build for your platform from the
 [releases page](https://github.com/fgilde/WebDataStudio/releases), unpack it and start the binary.
-It serves the studio on <http://localhost:8080>, opens your browser and stores its data in a
-`data` folder beside the binary.
+It serves the studio on <http://localhost:8080> and opens it **in a window of its own** — no address
+bar, no tabs, an icon in the task bar like any other application. Its data lives in a `data` folder
+beside the binary.
+
+The window is a Chromium that is already on the machine: Edge, Chrome, Brave or Chromium, whichever
+is found first. Nothing is bundled and nothing is downloaded for it, which is why the binary stays
+one file. With none of them installed the studio opens a normal browser tab instead and says so in
+its log.
+
+| Variable | What it does |
+|---|---|
+| `WDS_APP_WINDOW=false` | open a normal browser tab instead of a window |
+| `WDS_OPEN_BROWSER=false` | open nothing at all; visit the address yourself |
+
+## Installing it from the browser
+
+A studio that is already open — the container on your network, a colleague's deployment, the desktop
+build — can be installed as an app without downloading anything: **Install WebDataStudio** in
+Chrome's or Edge's address bar, or *Install app* in the browser menu. That is the same window without
+an address bar, with its own icon, and it keeps pointing at the studio it was installed from.
+
+Nothing is cached: the studio reads live databases, and a cached answer would be a lie about what is
+in them. Installing changes how it looks, not what it knows. A studio served over plain HTTP from
+something other than `localhost` cannot be installed — browsers only offer this over HTTPS.
 
 ## First query
 

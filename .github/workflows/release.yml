@@ -40,6 +40,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # GitHub's expressions have no substring, so the tag is stripped here. Absent on a branch
+      # build, which leaves the version as the run number.
+      - name: Version from the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: echo "WDS_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -66,6 +73,7 @@ jobs:
           -p:WdsDesktop=true
           -p:WdsBuild=${{ github.run_number }}
           -p:WdsCommit=${{ github.sha }}
+          -p:WdsVersion=${{ env.WDS_VERSION }}
           -o publish/${{ matrix.runtime }}
 
       - name: Default to opening a browser
@@ -74,11 +82,20 @@ jobs:
           cat > publish/${{ matrix.runtime }}/README.txt <<'TXT'
           WebDataStudio — desktop build
 
-          Start the binary and it serves the studio on http://localhost:8080 and opens your
-          browser. Everything it stores lives next to the binary in ./data.
+          Start the binary. It serves the studio on http://localhost:8080 and opens it in a window
+          of its own, without an address bar, using a Chromium that is already installed (Edge,
+          Chrome, Brave, Chromium). With none of those it opens a normal browser tab instead.
 
-          Set WDS_OPEN_BROWSER=false to keep the browser closed, ASPNETCORE_URLS to listen
-          somewhere else, and WDS_CONN_<NAME> to attach a connection at startup.
+          Everything it stores lives next to the binary in ./data.
+
+          WDS_APP_WINDOW=false    open a normal browser tab instead of a window
+          WDS_OPEN_BROWSER=false  open nothing; visit the address yourself
+          ASPNETCORE_URLS         listen somewhere else
+          WDS_CONN_<NAME>         attach a connection at startup
+
+          The studio is also installable from any browser that has it open — "Install
+          WebDataStudio" in the address bar or the browser menu — which is the same window
+          without downloading anything.
           TXT
 
       - name: Archive (zip)

@@ -2,6 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- The ICO first, and on purpose: Windows takes a window's taskbar icon from one, and an app
+         window with only an SVG favicon ends up wearing the browser's icon instead of ours. The SVG
+         is still there for the tab, where it is the sharper one. -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Installable as an app: the browser then gives it a window of its own, without an address

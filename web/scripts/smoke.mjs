@@ -74,6 +74,14 @@ const installable = await page.evaluate(async () => {
   };
 });
 
+// The ICO is what Windows puts on a window and in the task bar; without it an app window wears the
+// browser's icon.
+const ico = await page.request.get(`${baseUrl}/favicon.ico`);
+if (!ico.ok()) {
+  console.error(`no favicon.ico: ${ico.status()}`);
+  process.exit(1);
+}
+
 if (installable.display !== "standalone" || installable.icons < 2 || installable.worker === null) {
   console.error(`not installable: ${JSON.stringify(installable)}`);
   process.exit(1);

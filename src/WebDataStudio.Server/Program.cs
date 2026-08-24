@@ -285,14 +285,6 @@ app.MapMcpEndpoints();
 app.MapMethods("/api/{**rest}", new[] { "GET", "HEAD", "POST", "PUT", "DELETE", "PATCH" }, () => Results.NotFound());
 app.MapFallbackToFile("index.html").AllowAnonymous();
 
-// The desktop build's window has no way to report that it rendered; the server can report that it
-// was read. See DesktopShell for what watches this.
-app.Use(async (context, next) =>
-{
-    FirstRequest.Seen();
-    await next();
-});
-
 // Desktop mode: the same server, started from a downloaded binary rather than a container. It shows
 // itself once it is listening. In a container there is nothing to show it in.
 var shows = (desktop || string.Equals(Environment.GetEnvironmentVariable("WDS_OPEN_BROWSER"), "true",
@@ -300,45 +292,19 @@ var shows = (desktop || string.Equals(Environment.GetEnvironmentVariable("WDS_OP
     && !string.Equals(Environment.GetEnvironmentVariable("WDS_OPEN_BROWSER"), "false",
         StringComparison.OrdinalIgnoreCase);
 
-// A window of the operating system's own is the point of downloading an application, so the desktop
-// build owns the main thread: every platform insists a window belongs to the thread that made it.
-// The server then runs alongside it and stops when the window closes.
-#if WDS_DESKTOP
-if (shows && !string.Equals(app.Configuration["WDS_APP_WINDOW"], "false",
-        StringComparison.OrdinalIgnoreCase))
-{
-    await app.StartAsync();
-
-    var address = app.Urls.FirstOrDefault() ?? "http://localhost:8080";
-    var name = app.Configuration["WDS_TITLE"] is { Length: > 0 } titled
-        ? $"WebDataStudio — {titled}"
-        : "WebDataStudio";
-
-    if (!DesktopShell.Run(address, name, app.Logger))
-    {
-        // No native window here. A browser in app mode is the next best thing, and a tab after that.
-        app.Logger.LogInformation("{What}", AppWindow.Open(address, ProfilePath(app), app.Logger));
-        await app.WaitForShutdownAsync();
-    }
-    else
-    {
-        // The window is gone; there is nothing left for the server to serve.
-        await app.StopAsync();
-    }
-
-    return;
-}
-#endif
-
+// A bundled native window was tried here — Photino, over WebView2 on Windows — and taken back out:
+// it opened a window that rendered nothing, on a headless session and on a real desktop alike, and a
+// dependency that ships native libraries for six platforms has to earn its place by working. What
+// does work is asking a browser that is already installed for a window without an address bar.
 if (shows)
 {
     app.Lifetime.ApplicationStarted.Register(() =>
     {
         var url = app.Urls.FirstOrDefault() ?? "http://localhost:8080";
 
-        // Without the bundled window — a `dotnet run` of this project, or WDS_APP_WINDOW=false — an
-        // installed Chromium is asked for a window without an address bar, and a plain tab is the
-        // fallback.
+        // An installed Chromium is asked for a window without an address bar, which is what makes a
+        // download look like an application; a plain tab is the fallback. WDS_APP_WINDOW=false asks
+        // for the tab on purpose.
         var wantsWindow = !string.Equals(app.Configuration["WDS_APP_WINDOW"], "false",
             StringComparison.OrdinalIgnoreCase);
 

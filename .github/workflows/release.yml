@@ -83,11 +83,9 @@ jobs:
           WebDataStudio — desktop build
 
           Start the binary. It serves the studio on http://localhost:8080 and opens it in a window
-          of its own, without an address bar, using the platform's web view: WebView2 on Windows,
-          WKWebView on macOS, WebKitGTK on Linux (install libwebkit2gtk if it is missing).
-
-          If that window cannot open, the studio falls back to an installed Chromium in app mode
-          and then to a normal browser tab, and says which in its log.
+          of its own, without an address bar, using a Chromium that is already installed (Edge,
+          Chrome, Brave, Chromium). With none of those it opens a normal browser tab instead, and
+          says which in its log.
 
           Everything it stores lives next to the binary in ./data.
 

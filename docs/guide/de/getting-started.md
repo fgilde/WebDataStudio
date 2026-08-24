@@ -73,15 +73,11 @@ Studio läuft dann auf <http://localhost:8080> und öffnet sich **in einem eigen
 Adressleiste, ohne Tabs, mit Icon in der Taskleiste wie jede andere Anwendung. Die Daten liegen in
 einem Ordner `data` neben der Binärdatei.
 
-Das Fenster kommt von der Plattform selbst: WebView2 unter Windows, WKWebView unter macOS,
-WebKitGTK unter Linux. Das sind Teile des Systems, nicht des Downloads — deshalb bleibt der Download
-eine Datei, und deshalb kann eines davon fehlen. Linux braucht dafür `libwebkit2gtk` aus der
-Paketverwaltung.
-
-Öffnet das Fenster nicht oder bleibt es leer, schreibt das Studio das ins Log und weicht aus: erst
-auf ein installiertes Chromium (Edge, Chrome, Brave) im App-Modus — dasselbe Fenster ohne
-Adressleiste — und dann auf einen normalen Tab. Zu sehen ist am Ende immer das Studio; nur der Rahmen
-darum wechselt. `WDS_APP_WINDOW=false` erzwingt den Tab, `WDS_OPEN_BROWSER=false` öffnet gar nichts.
+Das Fenster ist ein Chromium, das schon auf der Maschine ist — Edge, Chrome, Brave oder Chromium,
+das zuerst gefundene — im App-Modus: ein Fenster ohne Adressleiste und ohne Tab-Leiste. Mitgeliefert
+wird dafür nichts, deshalb bleibt der Download eine Datei. Ist keines davon installiert, öffnet das
+Studio einen normalen Browser-Tab und schreibt das ins Log. `WDS_APP_WINDOW=false` erzwingt den Tab,
+`WDS_OPEN_BROWSER=false` öffnet gar nichts.
 
 ## Aus dem Browser installieren
 

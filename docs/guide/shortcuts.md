@@ -48,6 +48,8 @@ back from a layout with every panel closed.
 
 ## Preferences and rebinding
 
+![Preferences, and a rebound command](../assets/screenshots/preferences-dark.png)
+
 `Ctrl+,` opens the preferences. They live in the workspace, so they survive a restart and follow you
 to another browser rather than living in one machine's local storage.
 

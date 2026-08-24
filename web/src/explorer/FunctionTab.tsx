@@ -46,9 +46,18 @@ export function FunctionTab({ connectionId, objectRef }: {
   const start = () => {
     setBusy(true);
     setError(null);
-    // An empty box means "the default", which is not the same as an empty string — so it goes as
-    // null and the function decides.
-    functionTrialRun(connectionId, objectRef, args.map(value => (value === "" ? null : value)))
+
+    const values: (string | null)[] = args.map(value => (value === "" ? null : value));
+
+    // A box left empty at the end means "use the function's own default", which is not the same as
+    // passing NULL: the argument is left out rather than handed over as nothing. A box left empty in
+    // the middle cannot be left out — a positional argument after it needs its place — so that one
+    // really does go as NULL.
+    while (values.length > 0
+      && values[values.length - 1] === null
+      && inputs[values.length - 1]?.hasDefault) values.pop();
+
+    functionTrialRun(connectionId, objectRef, values)
       .then(setRun)
       .catch(e => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setBusy(false));

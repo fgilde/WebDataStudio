@@ -66,6 +66,8 @@ Cache-Trefferquote, wartende Sitzungen, laufende Statements, das längste davon 
 Datenbank. Jede Kachel behält die letzten Messwerte, damit eine steigende Zahl anders aussieht als
 eine bloß hohe.
 
+![Das Dashboard über die Zeit](../../assets/screenshots/dashboard-dark.png)
+
 Darunter dieselben Zahlen als Linien über fünf, fünfzehn oder dreißig Minuten — Sitzungen und
 Durchsatz. Jede Linie ist auf ihren eigenen Bereich normiert: es geht um den Verlauf, und
 Verbindungen und eine Trefferquote haben keine gemeinsame Einheit. Gemessen wird alle fünf Sekunden,

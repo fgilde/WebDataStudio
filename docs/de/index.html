@@ -79,7 +79,24 @@ docker run -d -p 8080:8080 -v wds-data:/data \
       <div class="card">
         <h3>Ergebnisse, die skalieren</h3>
         <p>Ein virtualisiertes Grid für hunderttausende Zeilen, gestreamt während die Abfrage noch
-          läuft, mit Spaltenfiltern, Gruppierung, Formularansicht, transponierter Ansicht und Charts.</p>
+          läuft, mit Gruppierung, Formularansicht, transponierter Ansicht, Charts und einer Karte für
+          Geodaten.</p>
+      </div>
+      <div class="card">
+        <h3>Eine Filtersprache, kein Suchfeld</h3>
+        <p><code>^beginnt</code>, <code>$endet</code>, <code>~nicht</code>, <code>&gt;10</code>,
+          <code>NULL</code>, <code>LAST MONTH</code> — Leerzeichen ist UND, Komma ist ODER. Dazu die
+          Werte, die eine Spalte wirklich enthält, als Checkboxen mit Anzahl.</p>
+      </div>
+      <div class="card">
+        <h3>Den Daten folgen</h3>
+        <p>Eine Spalte aus der Tabelle leihen, auf die ein Fremdschlüssel zeigt — oder eine Zeile in
+          alles öffnen, was mit ihr zu tun hat, so tief wie die Frage reicht.</p>
+      </div>
+      <div class="card">
+        <h3>Archive</h3>
+        <p>Ein Ergebnis als Datei behalten, die das Studio aufbewahrt — wie die Tabelle vor der
+          Migration aussah —, später wieder als Grid öffnen und die Zeilen als Inserts ausschreiben.</p>
       </div>
       <div class="card">
         <h3>Bearbeiten mit Vorschau</h3>
@@ -105,8 +122,15 @@ docker run -d -p 8080:8080 -v wds-data:/data \
       </div>
       <div class="card">
         <h3>Administration</h3>
-        <p>Wartungsbefehle, Sitzungen samt Beenden, Datenbanken, Benutzer und Rechte, das Server-Log
-          sowie Backup und Restore über die Werkzeuge der Engine selbst.</p>
+        <p>Wartungsbefehle, Sitzungen samt Beenden, Datenbanken, Benutzer und Rechte, das Server-Log,
+          ein Dashboard, das seine Zahlen über eine halbe Stunde zeichnet, sowie Backup und Restore
+          über die Werkzeuge der Engine selbst.</p>
+      </div>
+      <div class="card">
+        <h3>Was nur PostgreSQL hat</h3>
+        <p>Row Level Security und ihre Policies, die Partitionen einer partitionierten Tabelle samt
+          Grenzen, der Quelltext einer Funktion und ein Lauf in einer zurückgerollten Transaktion —
+          dazu Extensions, Rollen, Tablespaces und Publications im Baum.</p>
       </div>
       <div class="card">
         <h3>Zum Hosten gebaut</h3>
@@ -138,6 +162,22 @@ docker run -d -p 8080:8080 -v wds-data:/data \
       <figure>
         <img src="../assets/screenshots/admin-light.png" alt="Administrationsbereich">
         <figcaption>Wartung, Sitzungen, Benutzer, Backups</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/screenshots/dashboard-dark.png" alt="Das Dashboard über die Zeit">
+        <figcaption>Was der Server tut, über eine halbe Stunde</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/screenshots/perspective-light.png" alt="Eine Perspective über verwandte Zeilen">
+        <figcaption>Eine Zeile und alles, was mit ihr zu tun hat</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/screenshots/filter-dark.png" alt="Spaltenmenü mit der Filtersprache">
+        <figcaption>Eine Filtersprache, und die Werte einer Spalte</figcaption>
+      </figure>
+      <figure>
+        <img src="../assets/screenshots/policies-light.png" alt="Row Level Security und ihre Policies">
+        <figcaption>Row Level Security, pro Tabelle</figcaption>
       </figure>
     </div>
   </div>

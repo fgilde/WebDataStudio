@@ -64,6 +64,8 @@ sortiert. Wie viele es sind, ist eine [Einstellung](shortcuts.md).
 
 ## Die Filtersprache
 
+![Das Spaltenmenü: Filterfeld und die Werte der Spalte](../../assets/screenshots/filter-dark.png)
+
 Jedes Spaltenfilter — im Abfrage-Ergebnis wie in der Tabellenansicht — liest eine kleine Sprache
 statt einer Teilzeichenkette. Ein einfaches Wort heißt weiter „enthält", was es vorher auch hieß.
 
@@ -98,6 +100,8 @@ kein zweites Filter. Eine maskierte Spalte hat keine Liste: ihre Werte sind gena
 
 ## Karte
 
+![Die Kartenansicht](../../assets/screenshots/map-dark.png)
+
 Die Ansicht **Map** zeichnet, was an Geografie im Ergebnis steckt: eine Spalte mit GeoJSON (Text oder
 Objekt), eine mit WKT (`POINT(13.4 52.5)`, `LINESTRING`, `POLYGON`, auch die `MULTI`-Formen, ein
 `SRID=`-Präfix wird ignoriert) oder ein Spaltenpaar aus Breiten- und Längengrad.
@@ -108,6 +112,8 @@ Datenbank-Studio, das von selbst einen im Internet anfragt, ist nichts, was man 
 Ansicht beantwortet „liegen die Punkte, wo ich denke, und welcher ist der Ausreißer".
 
 ## Archive
+
+![Das Archiv-Panel](../../assets/screenshots/archives-dark.png)
 
 Ein Ergebnis lässt sich behalten: **Keep** neben Export schreibt es als Datei auf die Platte des
 Studios, das Panel **Archives** listet, was da ist. Das beantwortet „wie sah das vor der Migration

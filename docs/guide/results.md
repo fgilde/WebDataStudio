@@ -30,6 +30,8 @@ A switch above the grid picks how to read the same result:
 
 ## The filter language
 
+![The column menu: the filter box and the values the column holds](../assets/screenshots/filter-dark.png)
+
 Every per-column filter box — in a query result and in a table browse — reads a small language
 rather than a substring. A plain word still means "contains", which is what it meant before and what
 most people type.
@@ -72,6 +74,8 @@ as `=a,=b`, so it is a way of typing rather than a second kind of filter, and it
 afterwards. A masked column has no list: the distinct values of a column of secrets are the secrets.
 
 ## Geography
+
+![The map view](../assets/screenshots/map-dark.png)
 
 The **Map** view draws whatever geography is in the result:
 
@@ -176,6 +180,8 @@ A link is a **snapshot**, and that is the whole design:
 URL. Off, a link still needs an account on the studio.
 
 ## Archives
+
+![The archive panel](../assets/screenshots/archives-dark.png)
 
 A result can be kept: **Keep** next to Export writes it to a file on the studio's own disk, and the
 **Archives** panel lists what has been kept. It answers "what did this look like before the

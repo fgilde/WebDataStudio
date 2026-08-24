@@ -106,6 +106,8 @@ statement opens in a query tab, where it goes through the same preview as any ot
 `DROP`. On an engine with no dependency catalogue (SQLite) the answer is a search of the other
 objects' definitions, and the tab says as much.
 
+![Row-level security and its policies](../assets/screenshots/policies-dark.png)
+
 **Policies** — on a table, whether row-level security is on, whether it is forced for the owner
 too, and every policy with what it applies to and the expression behind it. The field below builds a
 `CREATE POLICY`, the bin a `DROP POLICY`. Security that is on with no policy means "nobody but the
@@ -113,11 +115,15 @@ owner sees anything", and the tab says so rather than letting it look like an em
 PostgreSQL only — it is a PostgreSQL feature, and the other engines say that instead of showing
 nothing.
 
+![The partitions of a partitioned table](../assets/screenshots/partitions-dark.png)
+
 **Partitions** — on a partitioned table, how it is cut up (`RANGE`, `LIST`, `HASH` and the key),
 with every partition, its bound, its size and its row estimate. Detaching leaves the data behind as
 a table of its own; attaching takes an existing table in and needs the bound spelled out. Both are
 statements, and "detach concurrently" is offered because it does not block readers — and cannot run
 inside a transaction.
+
+![A function, and what its run raised](../assets/screenshots/inspect-dark.png)
 
 **Inspect** — on a function or procedure: its language, what it returns, its declared parameters,
 its source, and a **run that is rolled back**. Fill in the arguments, press the button, and the
@@ -134,6 +140,8 @@ the original text hand that over; for the rest the studio generates it from the 
 
 ## A column from the other side of a key
 
+![A borrowed column](../assets/screenshots/borrowed-dark.png)
+
 The column menu of a table browse offers the columns of the table a foreign key points at: pick one
 and it appears next to the id, marked **borrowed**. The join happens on the server, so sorting and
 filtering still work on the table's own columns, and the borrowed column is read-only — an edit there
@@ -143,6 +151,8 @@ Only single-column keys are offered. A composite key cannot be followed by compa
 showing the wrong row would be worse than not offering it.
 
 ## Perspective — a row and everything related to it
+
+![A perspective over related rows](../assets/screenshots/perspective-dark.png)
 
 The **Perspective** panel starts from one table and lets a row be opened: what it points at, and
 what points back at it, each as a nested list, as deep as you care to open. It reads the same

@@ -54,6 +54,8 @@ Größe und Scan-Zahl), **Rechte** (wer was darf, samt `GRANT`/`REVOKE` als Stat
 **Abhängigkeiten** (was zerbricht, wenn sich das hier ändert) und **SQL** (das Objekt als
 `CREATE`-Statement).
 
+![Row Level Security und ihre Policies](../../assets/screenshots/policies-dark.png)
+
 **Policies** — bei einer Tabelle: ob Row Level Security an ist, ob sie auch für den Eigentümer
 erzwungen wird, und jede Policy mit ihrem Ausdruck. Das Feld darunter baut ein `CREATE POLICY`, der
 Mülleimer ein `DROP POLICY`. Security an ohne Policy heißt „außer dem Eigentümer sieht niemand
@@ -65,6 +67,8 @@ Schlüssel, jede Partition mit Grenze, Größe und Zeilenschätzung. `DETACH` l�
 Tabelle zurück, `ATTACH` nimmt eine bestehende Tabelle auf und braucht die Grenze ausgeschrieben.
 Beides sind Statements; *detach concurrently* blockiert keine Leser und läuft dafür nicht in einer
 Transaktion.
+
+![Eine Funktion und was ihr Lauf gemeldet hat](../../assets/screenshots/inspect-dark.png)
 
 **Inspect** — bei einer Funktion oder Prozedur: Sprache, Rückgabetyp, deklarierte Parameter, der
 Quelltext und ein **Lauf, der zurückgerollt wird**. Argumente eintragen, Knopf drücken: die Funktion
@@ -79,6 +83,8 @@ als machte das Rollback ihn sicher.
 
 ## Eine Spalte von der anderen Seite des Schlüssels
 
+![Eine geliehene Spalte](../../assets/screenshots/borrowed-dark.png)
+
 Das Spaltenmenü der Tabellenansicht bietet die Spalten der Tabelle an, auf die ein Fremdschlüssel
 zeigt: eine auswählen, und sie steht neben der Id, markiert als **borrowed**. Der Join passiert auf
 dem Server, Sortieren und Filtern gelten weiter für die eigenen Spalten, und die geliehene Spalte ist
@@ -87,6 +93,8 @@ schreibgeschützt — eine Änderung dort wäre ein Update auf eine Zeile, die d
 Nur einspaltige Schlüssel: einem zusammengesetzten Schlüssel kann ein einzelner Wert nicht folgen.
 
 ## Perspective — eine Zeile und alles, was mit ihr zu tun hat
+
+![Eine Perspective über verwandte Zeilen](../../assets/screenshots/perspective-dark.png)
 
 Das Panel **Perspective** beginnt bei einer Tabelle und lässt eine Zeile aufklappen: worauf sie
 zeigt, und was auf sie zeigt, jeweils verschachtelt, so tief wie man öffnet. Es liest denselben

@@ -1,5 +1,9 @@
 // Captures the screenshots the documentation and the site use, in a dark and a light theme.
-// Needs a running server with a demo connection (BASE_URL defaults to :5005).
+//
+// Needs a running server with the demo connections seeded from scripts/demo-data (see
+// docs/guide/development.md). BASE_URL defaults to :5005. The shots of what only PostgreSQL has —
+// policies, partitions, a function's trial run, the dashboard graphs — are taken when a PostgreSQL
+// connection is there and skipped when it is not, so the script still finishes on SQLite alone.
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
 
@@ -8,6 +12,16 @@ const out = process.env.OUT ?? "../docs/assets/screenshots";
 await mkdir(out, { recursive: true });
 
 const browser = await chromium.launch();
+
+// Whether this studio has a server-based connection: the shots that need one say so and are
+// skipped otherwise.
+const probe = await browser.newContext();
+const connections = await probe.request.get(`${baseUrl}/api/connections`)
+  .then(r => r.json()).catch(() => []);
+await probe.close();
+
+const postgres = connections.find(connection => connection.engine === "postgresql");
+const demo = connections.find(connection => connection.name === "DEMO") ?? connections[0];
 
 // The theme id is what the app stores; these two are the light and dark ends of the set.
 for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
@@ -33,7 +47,7 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
   await page.getByRole("button", { name: "New query" }).click();
   await page.locator(".monaco-editor").first().waitFor({ timeout: 20000 });
   await page.locator(".monaco-editor").first().click();
-  await page.keyboard.type("SELECT p.id, p.name, p.city, count(o.id) AS orders\n"
+  await page.keyboard.insertText("SELECT p.id, p.name, p.city, count(o.id) AS orders\n"
     + "  FROM people p\n  LEFT JOIN orders o ON o.person_id = p.id\n"
     + " GROUP BY p.id, p.name, p.city\n ORDER BY orders DESC");
   await page.keyboard.press("F5");
@@ -88,6 +102,190 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
   await page.getByText("Design table…").click();
   await page.getByText(/columns?/i).first().waitFor({ timeout: 20000 });
   await shot("designer");
+
+  // --- the data tab: the filter language and the values a column holds -----------------------
+  // Six panels deep the grid would be a sliver, and a shot of a sliver teaches nothing. Back to the
+  // default arrangement, which is also what a reader of the docs is looking at.
+  await page.keyboard.press("Control+l");
+  await page.keyboard.press("0");
+  await page.waitForTimeout(1500);
+
+  await page.getByText("DEMO", { exact: true }).first().click();
+  const tables = page.locator(".mantine-UnstyledButton-root").filter({ hasText: /^Tables$/ }).first();
+  await tables.waitFor({ timeout: 20000 });
+  await tables.click();
+
+  const orders = page.locator(".mantine-UnstyledButton-root").filter({ hasText: /^orders$/ }).first();
+  await orders.waitFor({ timeout: 20000 });
+  await orders.dblclick();
+  await page.getByRole("button", { name: "Insert row" }).waitFor({ timeout: 20000 });
+
+  const dataPanel = page.locator(".dv-groupview")
+    .filter({ has: page.getByRole("button", { name: "Insert row" }) }).first();
+
+  // The column menu holds both: the filter box with its syntax, and the values with their counts.
+  await dataPanel.locator("thead").getByText("status", { exact: true }).first().click();
+  await page.getByText("hover for all", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: `${out}/filter-${suffix}.png` });
+  await page.keyboard.press("Escape");
+
+  // A column borrowed from the table the key points at.
+  await dataPanel.locator("thead").getByText("person_id", { exact: true }).first().click();
+  await page.getByText("from people").waitFor({ timeout: 15000 });
+  await page.getByRole("menuitem", { name: "name" }).first().click();
+  await page.getByText("borrowed").waitFor({ timeout: 15000 });
+  await shot("borrowed");
+
+  // --- perspective ----------------------------------------------------------------------------
+  await page.getByRole("button", { name: "Perspective" }).click();
+  const start = page.getByPlaceholder("Start from");
+  await start.waitFor({ timeout: 20000 });
+  await start.click();
+  await page.getByRole("option", { name: /people$/ }).first().click();
+
+  const firstRow = page.getByText("name=Ada Lovelace", { exact: false }).first();
+  await firstRow.waitFor({ timeout: 20000 });
+  await firstRow.click();
+  const branch = page.getByText("orders (person_id)").first();
+  await branch.waitFor({ timeout: 15000 });
+  await branch.click();
+  await page.getByText("total=", { exact: false }).first().waitFor({ timeout: 20000 });
+  await shot("perspective");
+
+  // --- the map ---------------------------------------------------------------------------------
+  // Back to the demo connection first: a new tab opens on whatever is selected, and `places` is
+  // only in this one.
+  await page.getByText("DEMO", { exact: true }).first().click();
+  await page.waitForTimeout(500);
+
+  await page.getByRole("button", { name: "New query" }).click();
+  // Only the active tab's editor is visible; the ones behind it are still in the DOM.
+  const editor = page.locator(".monaco-editor:visible").first();
+  await editor.waitFor({ timeout: 20000 });
+  await editor.click();
+  await page.keyboard.insertText("SELECT name, lat, lon FROM places ORDER BY name");
+  await page.keyboard.press("F5");
+  await page.getByText("Reykjavik", { exact: true }).first().waitFor({ timeout: 20000 });
+  await page.getByText("Map", { exact: true }).first().click();
+  await page.getByRole("img", { name: "the result's geography" }).waitFor({ timeout: 15000 });
+  await shot("map");
+
+  // --- archives ---------------------------------------------------------------------------------
+  const kept = await page.request.post(`${baseUrl}/api/archives/people-before-the-migration`, {
+    data: { connectionId: demo?.id, sql: "SELECT id, name, city, signed_up FROM people" },
+  });
+
+  // A shot of an empty panel would be worse than no shot: say why instead.
+  if (!kept.ok()) throw new Error(`could not keep an archive: ${await kept.text()}`);
+
+  await page.getByRole("button", { name: "Archives" }).click();
+  const archive = page.getByText("people-before-the-migration").first();
+  await archive.waitFor({ timeout: 20000 });
+  await archive.click();
+  await page.getByText("rows", { exact: false }).first().waitFor({ timeout: 20000 });
+  await shot("archives");
+
+  // --- preferences ------------------------------------------------------------------------------
+  await page.keyboard.press("Control+Comma");
+  await page.getByText("Rows per page in the data tab").waitFor({ timeout: 15000 });
+  await page.getByRole("tab", { name: "Keyboard" }).click();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${out}/preferences-${suffix}.png` });
+  await page.keyboard.press("Escape");
+
+  // --- what only PostgreSQL has ------------------------------------------------------------------
+  if (postgres) {
+    // Back to the default arrangement: by now nine panels are open and everything is a narrow
+    // column, which is not what any of this looks like when it is used.
+    await page.keyboard.press("Control+l");
+    await page.keyboard.press("0");
+    await page.waitForTimeout(1500);
+
+    // The structure tabs hold tables of their own; maximised, they are readable in a shot.
+    const maximize = async () => {
+      await page.getByRole("tab", { name: "Structure" }).click({ button: "right" });
+      await page.getByText("Maximize", { exact: true }).click();
+      await page.waitForTimeout(600);
+    };
+
+    const restore = async () => {
+      await page.getByRole("tab", { name: "Structure" }).click({ button: "right" });
+      await page.getByText("Restore", { exact: true }).click();
+      await page.waitForTimeout(600);
+    };
+
+    await page.getByText(postgres.name, { exact: true }).first().click();
+    await page.getByText("public", { exact: true }).first().click();
+    await page.getByText("Tables", { exact: true }).first().click();
+
+    // Row-level security and its policies.
+    await page.getByText("tenants", { exact: true }).first().click();
+    await page.getByRole("tab", { name: "Policies" }).click();
+    await page.getByText("row security on").waitFor({ timeout: 20000 });
+    await maximize();
+    await shot("policies");
+    await restore();
+
+    // The partitions of a partitioned table.
+    await page.getByText("events", { exact: true }).first().click();
+    await page.getByRole("tab", { name: "Partitions" }).click();
+    await page.getByText("RANGE", { exact: true }).waitFor({ timeout: 20000 });
+    await maximize();
+    await shot("partitions");
+    await restore();
+
+    // A function, and what its run raised.
+    await page.getByText("Functions", { exact: true }).first().click();
+    await page.getByText("spent_by", { exact: true }).first().click();
+    await page.getByRole("tab", { name: "Inspect" }).click();
+    await page.getByText("plpgsql", { exact: true }).waitFor({ timeout: 20000 });
+    // Run first, then maximise: maximising re-lays out the panel, and a click that lands while it
+    // moves lands nowhere. The result stays on screen either way.
+    const runIt = page.getByRole("button", { name: "Run and roll back" });
+    await runIt.waitFor({ timeout: 20000 });
+    await runIt.click();
+
+    // The argument is left empty on purpose: the function's own default applies, and the notice says
+    // which one it used. Waiting for the heading rather than the text: the same phrase is in the
+    // source right below it, and two matches are not a wait.
+    await page.getByText("Raised", { exact: true }).waitFor({ timeout: 25000 });
+    await maximize();
+    await shot("inspect");
+    await restore();
+
+    // The dashboard, which needs a server to have numbers about. Back to the default arrangement
+    // first: the structure panel from the shots above is not part of this one.
+    await page.keyboard.press("Control+l");
+    await page.keyboard.press("0");
+    await page.waitForTimeout(1500);
+    await page.getByText(postgres.name, { exact: true }).first().click();
+
+    await page.getByRole("button", { name: "Administration" }).click();
+    await page.getByRole("tab", { name: "Overview" }).click();
+    await page.getByText("Over time").waitFor({ timeout: 25000 });
+
+    // A line needs more than one reading, and an idle server draws a flat one. The tiles poll every
+    // five seconds; this keeps the server busy across four of them.
+    for (let round = 0; round < 8; round++) {
+      // Not awaited, and deliberately slow: a query that finishes in a millisecond is never
+      // running when the poll looks, and the lines stay flat.
+      for (let n = 0; n < 3; n++)
+        void page.request.post(`${baseUrl}/api/query/execute`, {
+          data: {
+            connectionId: postgres.id,
+            sql: "SELECT pg_sleep(2), count(*) FROM events e JOIN customers c ON true",
+            maxRows: 1,
+          },
+        }).catch(() => {});
+
+      await page.waitForTimeout(2600);
+    }
+
+    await shot("dashboard");
+  } else {
+    console.log("skipped the PostgreSQL shots: no such connection");
+  }
 
   // --- command palette -----------------------------------------------------------------------
   await page.keyboard.press("Control+k");

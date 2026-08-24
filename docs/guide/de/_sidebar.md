@@ -5,6 +5,7 @@
 - [Umgebungsvariablen](/de/environment.md)
 - [Verbindungen](/de/connections.md)
 - [Abfrage-Editor](/de/editor.md)
+- [Query-Builder](/de/query-builder.md)
 - [Ergebnisse und Export](/de/results.md)
 - [Daten bearbeiten](/de/editing.md)
 - [Schema bearbeiten](/de/schema.md)

@@ -39,6 +39,8 @@ auch die ohne Kürzel.
 
 ## Einstellungen und eigene Kürzel
 
+![Einstellungen und ein neu gebundener Befehl](../../assets/screenshots/preferences-dark.png)
+
 `Strg+,` öffnet die Einstellungen. Sie liegen im Workspace, überleben also einen Neustart und
 begleiten dich in einen anderen Browser, statt in einem Local Storage zu wohnen: Zeilen pro Seite im
 Daten-Tab, ob ein Verlaufseintrag sein Ergebnis behält, und wie viele Zeilen davon.

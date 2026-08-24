@@ -77,7 +77,23 @@ docker run -d -p 8080:8080 -v wds-data:/data \
       <div class="card">
         <h3>Results that scale</h3>
         <p>A virtualised grid for hundreds of thousands of rows, streamed while the query is still
-          running, with per-column filters, grouping, a form view, a transposed view and charts.</p>
+          running, with grouping, a form view, a transposed view, charts and a map for geography.</p>
+      </div>
+      <div class="card">
+        <h3>A filter language, not a search box</h3>
+        <p><code>^starts</code>, <code>$ends</code>, <code>~hasn't</code>, <code>&gt;10</code>,
+          <code>NULL</code>, <code>LAST MONTH</code> — a space for AND, a comma for OR. Plus the
+          values a column actually holds, as checkboxes with their counts.</p>
+      </div>
+      <div class="card">
+        <h3>Following the data</h3>
+        <p>Borrow a column from the table a foreign key points at, or open one row into everything
+          related to it and keep going as deep as the question does.</p>
+      </div>
+      <div class="card">
+        <h3>Archives</h3>
+        <p>Keep a result as a file the studio holds on to — what the table looked like before the
+          migration — reopen it as a grid later, and script the rows back out as inserts.</p>
       </div>
       <div class="card">
         <h3>Editing with a preview</h3>
@@ -102,7 +118,14 @@ docker run -d -p 8080:8080 -v wds-data:/data \
       <div class="card">
         <h3>Administration</h3>
         <p>Maintenance commands, sessions and kill, databases, users and privileges, the server log,
-          and backup and restore through the engines' own tools.</p>
+          a dashboard that draws its numbers over half an hour, and backup and restore through the
+          engines' own tools.</p>
+      </div>
+      <div class="card">
+        <h3>What only PostgreSQL has</h3>
+        <p>Row-level security and its policies, the partitions of a partitioned table with their
+          bounds, a function's source and a run inside a transaction that is rolled back — and
+          extensions, roles, tablespaces and publications in the tree.</p>
       </div>
       <div class="card">
         <h3>Made to be hosted</h3>
@@ -134,6 +157,22 @@ docker run -d -p 8080:8080 -v wds-data:/data \
       <figure>
         <img src="assets/screenshots/admin-light.png" alt="Administration panel">
         <figcaption>Maintenance, sessions, users, backups</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshots/dashboard-dark.png" alt="The dashboard over time">
+        <figcaption>What the server is doing, over half an hour</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshots/perspective-light.png" alt="A perspective over related rows">
+        <figcaption>One row, and everything related to it</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshots/filter-dark.png" alt="The column menu with its filter language">
+        <figcaption>A filter language, and the values a column holds</figcaption>
+      </figure>
+      <figure>
+        <img src="assets/screenshots/policies-light.png" alt="Row-level security and its policies">
+        <figcaption>Row-level security, per table</figcaption>
       </figure>
     </div>
   </div>

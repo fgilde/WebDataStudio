@@ -79,6 +79,8 @@ readings, so a number that is climbing looks different from one that is merely h
 
 ### Over time
 
+![The dashboard over time](../assets/screenshots/dashboard-dark.png)
+
 Under the tiles the same numbers are drawn as lines, over five, fifteen or thirty minutes — sessions
 (connections, running, waiting) and throughput (cache hit, transactions, rows). Each line is
 normalised to its own range: the point is the shape, and connections and a cache hit ratio share no

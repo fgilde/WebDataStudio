@@ -62,26 +62,40 @@ offering a button that fails.
 - **Query editor** — Monaco with dialect-aware highlighting, schema-aware completion, formatting,
   the statement under the cursor highlighted, run selection with F5, bind parameters, snippets,
   saved queries with folders, and history that survives a restart.
-- **Results** — a virtualised grid for hundreds of thousands of rows, per-column filters, grouping,
-  a form view, a transposed view, charts, and a comparison between two results.
+- **Results** — a virtualised grid for hundreds of thousands of rows, grouping, a form view, a
+  transposed view, charts, a map for geography, and a comparison between two results. Every
+  per-column filter reads a small language: `^starts`, `$ends`, `~hasn't`, `>10`, `NULL`,
+  `LAST MONTH`, a space for AND and a comma for OR.
+- **Archives** — a result kept as a file the studio holds on to, reopened as a grid later, and
+  scripted back out as inserts. NDJSON, so anything can read it.
 - **Editing** — spreadsheet-style cell editing with a change-script preview before anything runs,
-  foreign-key lookups, bulk updates, insert and delete.
+  foreign-key lookups, bulk updates, insert and delete, one step of undo, and generated test rows
+  that respect the columns' types and foreign keys.
 - **Export and import** — CSV, TSV, Excel, JSON, NDJSON, XML, YAML, Markdown, HTML, SQL inserts,
   SQL schema and Parquet, streamed rather than buffered; import from CSV, Excel, JSON and SQL with
   a column mapping; table-to-table copy across engines.
 - **Schema** — a table designer, index and constraint management, view, procedure and trigger
-  editing, and a migration script preview for every change.
+  editing, and a migration script preview for every change. Per object: statistics, privileges,
+  dependencies, its `CREATE` statement, row-level security policies, and the partitions of a
+  partitioned table.
+- **Following the data** — a column borrowed from the table a foreign key points at, shown next to
+  the id; and a perspective panel that opens one row into everything related to it, as deep as you
+  care to look.
 - **Analysis** — estimated and actual execution plans with a cost heat map, an index advisor that
   writes the `CREATE INDEX` for you, a deep analyze for missing, unused and duplicate indexes,
   table statistics, slow queries and server metrics.
 - **Comparison** — schema and data diffs between two connections, with a sync script in a diff
   editor.
 - **Administration** — maintenance commands, sessions, databases, users and privileges, server
-  logs, and backup and restore through the engines' own tools.
+  logs, a dashboard that draws its numbers over half an hour rather than only the last reading, and
+  backup and restore through the engines' own tools with the format and flags they offer.
 - **Diagrams** — an ER diagram per schema with automatic layout, a table picker, and PNG and SVG
   export.
-- **The shell** — a command palette on Ctrl+K, keyboard shortcuts with a help overlay, dockable
-  panels, saved layout presets, deep links to an object, and 21 themes.
+- **The shell** — a command palette on Ctrl+K, keyboard shortcuts with a help overlay and a new
+  binding for any command, preferences that live in the workspace, dockable panels, saved layout
+  presets, deep links to an object, and 21 themes.
+- **For agents** — an optional assistant, and the studio itself as an MCP server with the same rules
+  a person gets.
 
 [`docs/features.md`](docs/features.md) lists every feature with its status and the engines it
 applies to; a test fails the build if that list falls behind.
@@ -104,6 +118,25 @@ applies to; a test fails the build if that list falls behind.
 | `WDS_IDLE_TIMEOUT_SECONDS` | how long an unused session stays open, default 300 |
 | `WDS_READONLY` | when `true`, every connection is read-only regardless of its own flag |
 | `ASPNETCORE_URLS` | listen address, default `http://0.0.0.0:8080` |
+
+Everything optional is off until it is configured, one group at a time:
+
+| Variables | What they turn on |
+|---|---|
+| `WDS_USERS` | several accounts, each with a role and the connections it may see |
+| `WDS_MASK_EXTRA`, `WDS_MASK_NEVER`, `WDS_MASK_DEFAULT` | which columns are masked before they leave the server |
+| `WDS_ASSIST_ENDPOINT`, `WDS_ASSIST_KEY`, `WDS_ASSIST_MODEL`, `WDS_ASSIST_TOOLS` | the optional assistant |
+| `WDS_MCP_ENABLED`, `WDS_MCP_PATH`, `WDS_MCP_KEY`, `WDS_MCP_ALLOW_WRITE`, `WDS_MCP_TOOLS` | the studio as an MCP server |
+| `WDS_SHARE_ENABLED`, `WDS_SHARE_PUBLIC`, `WDS_SHARE_TTL_HOURS`, `WDS_SHARE_MAX_ROWS` | a result shared as a link |
+| `WDS_ARCHIVE_DIR`, `WDS_ARCHIVE_MAX_ROWS` | where kept results are written, and how big one gets |
+| `WDS_SCHEDULE_FILE`, `WDS_SCHEDULE_OUTPUT_DIR` | queries the studio runs on a schedule and writes as files |
+| `WDS_SAVED_QUERIES_DIR`, `WDS_SEED_SQL` | queries and data that ship with the stack |
+| `WDS_SCHEMA_SNAPSHOT_DIR` | schema snapshots on start, and the drift since the last one |
+| `WDS_ALERT_WEBHOOK`, `WDS_ALERT_INTERVAL_MINUTES`, `WDS_ALERT_MIN_SEVERITY`, `WDS_ALERT_CONNECTIONS` | new health findings posted to a webhook |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` | the studio's own traces and metrics |
+
+[`docs/guide/environment.md`](docs/guide/environment.md) is the complete table, with what each one
+does and what happens when it is absent.
 
 `WDS_CONNECTIONS` entry shape:
 

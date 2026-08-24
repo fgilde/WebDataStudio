@@ -80,10 +80,15 @@ It serves the studio on <http://localhost:8080> and opens it **in a window of it
 bar, no tabs, an icon in the task bar like any other application. Its data lives in a `data` folder
 beside the binary.
 
-The window is a Chromium that is already on the machine: Edge, Chrome, Brave or Chromium, whichever
-is found first. Nothing is bundled and nothing is downloaded for it, which is why the binary stays
-one file. With none of them installed the studio opens a normal browser tab instead and says so in
-its log.
+The window comes from the platform's own web view: WebView2 on Windows, WKWebView on macOS,
+WebKitGTK on Linux. Those are parts of the system rather than of the download, which is why the
+binary stays one file — and why one of them can be missing. Linux in particular needs
+`libwebkit2gtk` from its package manager.
+
+When the window cannot open, or opens and shows nothing, the studio says so in its log and falls
+back — first to a Chromium that is already installed (Edge, Chrome, Brave) in its app mode, which is
+the same window without an address bar, and then to a plain browser tab. You always end up looking at
+the studio; only the frame around it changes.
 
 | Variable | What it does |
 |---|---|

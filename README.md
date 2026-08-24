@@ -168,8 +168,9 @@ carry a badge. Connections added in the UI live in `/data` with their passwords 
 ## Desktop
 
 Prefer a local binary to a container? Each release ships a self-contained build for Windows, macOS
-and Linux. It starts the same server and opens the studio in a window of its own — no address bar,
-an icon in the task bar — using a Chromium that is already installed:
+and Linux. It starts the same server and opens the studio in a window of its own — no address bar, an
+icon in the task bar — using the platform's web view (WebView2, WKWebView, WebKitGTK), and falling
+back to an installed Chromium in app mode and then to a browser tab if that is not available:
 
 ```bash
 ./webdatastudio                        # http://localhost:8080, in its own window

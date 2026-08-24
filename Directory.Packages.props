@@ -39,6 +39,8 @@
     <PackageVersion Include="Testcontainers.MySql" Version="4.14.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" />
     <PackageVersion Include="xunit.v3" Version="4.0.0" />
-  </ItemGroup>
+      <!-- The native window the desktop download opens in; not referenced by the container build. -->
+    <PackageVersion Include="Photino.NET" Version="4.0.16" />
+</ItemGroup>
 
 </Project>

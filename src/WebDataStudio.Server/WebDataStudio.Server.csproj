@@ -10,7 +10,15 @@
        opens a browser on start; the container build does neither. -->
   <ItemGroup Condition="'$(WdsDesktop)' == 'true'">
     <RuntimeHostConfigurationOption Include="Wds.Desktop" Value="true" />
+
+    <!-- The window the desktop build shows itself in. Only here: the container has no display, and
+         this package carries native libraries per platform that an image should not be paying for. -->
+    <PackageReference Include="Photino.NET" />
   </ItemGroup>
+
+  <PropertyGroup Condition="'$(WdsDesktop)' == 'true'">
+    <DefineConstants>$(DefineConstants);WDS_DESKTOP</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />

@@ -83,7 +83,15 @@ public static partial class DataGenerator
             return "decimal";
         if (type.Contains("int") || type.Contains("serial")) return "int";
 
-        return "sentence";
+        // A sentence is right for text, and wrong for everything else. An enum, a geometry, an
+        // interval, a composite: a made-up string is refused by the engine — and rightly. Leaving
+        // the column out lets its default or its NULL apply, which is an answer rather than an
+        // error.
+        if (type.Contains("char") || type.Contains("text") || type.Contains("clob")
+            || type.Contains("json") || type.Contains("xml") || type.Length == 0)
+            return "sentence";
+
+        return column.Nullable || column.Default is not null ? "skip" : "sentence";
     }
 
     /// The rows to insert, as the same change objects the grid's editor produces — so generated

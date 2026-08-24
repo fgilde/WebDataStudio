@@ -130,11 +130,20 @@ public sealed class PostgreSqlDriver : AdoDriverBase
         var columns = new List<ColumnInfo>();
         await using (var cmd = Command(session,
             """
-            SELECT c.column_name, c.data_type, c.is_nullable = 'YES', c.column_default,
+            SELECT c.column_name,
+                   -- information_schema says "USER-DEFINED" for an enum, a domain and a composite,
+                   -- which is a category rather than a type: it cannot be cast to, and it tells a
+                   -- reader nothing. format_type gives what the column actually is — "mood",
+                   -- "numeric(10,2)", "integer[]".
+                   COALESCE(format_type(a.atttypid, a.atttypmod), c.data_type),
+                   c.is_nullable = 'YES', c.column_default,
                    COALESCE(pk.is_pk, false), c.is_identity = 'YES',
                    col_description(format('%I.%I', c.table_schema, c.table_name)::regclass, c.ordinal_position),
                    c.ordinal_position
               FROM information_schema.columns c
+              LEFT JOIN pg_attribute a
+                     ON a.attrelid = format('%I.%I', c.table_schema, c.table_name)::regclass
+                    AND a.attnum = c.ordinal_position
               LEFT JOIN (
                    SELECT kcu.column_name, true AS is_pk
                      FROM information_schema.table_constraints tc

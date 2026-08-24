@@ -129,6 +129,111 @@ public class ChangeScriptBuilderTests
         Assert.Equal(1, statement.Parameters["k0"]);
     }
 
+    /// A table with the types a string is not: this is where "column is of type date but expression
+    /// is of type text" came from.
+    private static readonly ObjectDetail Typed = new(
+        new SchemaNodeRef(SchemaNodeKind.Table, ["public", "members"]),
+        [new ColumnInfo("id", "uuid", false, null, true, false, null, 1),
+         new ColumnInfo("signed_up", "date", true, null, false, false, null, 2),
+         new ColumnInfo("balance", "numeric", true, null, false, false, null, 3),
+         new ColumnInfo("note", "text", true, null, false, false, null, 4),
+         new ColumnInfo("mood", "mood", true, null, false, false, null, 5),
+         new ColumnInfo("avatar", "bytea", true, null, false, false, null, 6)],
+        [], [], [], null, null, null, null);
+
+    private static ChangeScript BuildTyped(SqlDialect dialect, RowChange change) =>
+        ChangeScriptBuilder.Build(new ChangeSet("c1", "Table:public/members", [change]), Typed, dialect);
+
+    [Fact]
+    public void A_string_going_into_a_typed_column_says_what_it_is()
+    {
+        // A parameter reaches the engine as a string, and PostgreSQL refuses `date = text` rather
+        // than guessing — so the statement says it.
+        var sql = BuildTyped(new PostgreSqlDialect(), new RowChange("insert",
+            new Dictionary<string, object?>(),
+            new Dictionary<string, object?>
+            {
+                ["signed_up"] = "2026-01-01",
+                ["balance"] = "10.50",
+                ["note"] = "nothing to see",
+                ["mood"] = "ok",
+            })).Statements[0].Sql;
+
+        Assert.Contains("CAST(@p0 AS timestamp)", sql);
+        Assert.Contains("CAST(@p1 AS numeric)", sql);
+        // Text into a text column needs nothing said about it.
+        Assert.Contains("@p2,", sql);
+        Assert.DoesNotContain("CAST(@p2", sql);
+        // An enum is cast to its own declared type, which came out of the catalogue.
+        Assert.Contains("CAST(@p3 AS mood)", sql);
+    }
+
+    [Fact]
+    public void A_value_that_is_already_typed_is_left_alone()
+    {
+        var sql = BuildTyped(new PostgreSqlDialect(), new RowChange("insert",
+            new Dictionary<string, object?>(),
+            new Dictionary<string, object?>
+            {
+                ["balance"] = 10.5,
+                ["signed_up"] = null,
+            })).Statements[0].Sql;
+
+        Assert.DoesNotContain("CAST", sql);
+    }
+
+    [Fact]
+    public void Binary_is_not_text_that_looks_odd_and_is_not_cast()
+    {
+        // Casting a string into a binary column would write nonsense; an error is more honest.
+        var sql = BuildTyped(new PostgreSqlDialect(), new RowChange("insert",
+            new Dictionary<string, object?>(),
+            new Dictionary<string, object?> { ["avatar"] = "not really an image" })).Statements[0].Sql;
+
+        Assert.DoesNotContain("CAST", sql);
+    }
+
+    [Fact]
+    public void A_key_in_the_where_clause_is_typed_as_well()
+    {
+        // `WHERE id = $1` on a uuid column fails exactly the way an inserted date does.
+        var update = BuildTyped(new PostgreSqlDialect(), new RowChange("update",
+            new Dictionary<string, object?> { ["id"] = "8f14e45f-ceea-467a-9a36-dedd4bea2543" },
+            new Dictionary<string, object?> { ["note"] = "changed" })).Statements[0].Sql;
+
+        Assert.Contains("WHERE \"id\" = CAST(@k0 AS uuid)", update);
+
+        var delete = BuildTyped(new PostgreSqlDialect(), new RowChange("delete",
+            new Dictionary<string, object?> { ["id"] = "8f14e45f-ceea-467a-9a36-dedd4bea2543" },
+            new Dictionary<string, object?>())).Statements[0].Sql;
+
+        Assert.Contains("CAST(@k0 AS uuid)", delete);
+    }
+
+    [Fact]
+    public void Each_engine_casts_the_way_it_spells_it()
+    {
+        var change = new RowChange("insert", new Dictionary<string, object?>(),
+            new Dictionary<string, object?> { ["signed_up"] = "2026-01-01" });
+
+        Assert.Contains("CAST(@p0 AS DATETIME)", BuildTyped(new MySqlDialect(), change).Statements[0].Sql);
+        Assert.Contains("CAST(@p0 AS DATETIME2)",
+            BuildTyped(new SqlServerDialect(), change).Statements[0].Sql);
+        // SQLite has no types to speak of, and casting a date there would read it as a number.
+        Assert.DoesNotContain("CAST", BuildTyped(new WebDataStudio.Server.Drivers.Sqlite.SqliteDialect(), change).Statements[0].Sql);
+    }
+
+    [Fact]
+    public void The_preview_shows_the_cast_that_will_run()
+    {
+        var script = BuildTyped(new PostgreSqlDialect(), new RowChange("insert",
+            new Dictionary<string, object?>(),
+            new Dictionary<string, object?> { ["signed_up"] = "2026-01-01" }));
+
+        // What is approved has to be what executes, casts included.
+        Assert.Contains("CAST('2026-01-01' AS timestamp)", script.Text);
+    }
+
     [Fact]
     public void Quotes_identifiers_per_dialect()
     {

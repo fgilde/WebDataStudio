@@ -43,5 +43,20 @@ email column gets addresses, a `varchar(6)` gets something that fits in six char
   or a SQLite rowid alias.
 - **The same seed gives the same rows**, today and tomorrow — which is what makes a generated
   dataset something two people can talk about.
+- **A type the generator does not know is left to the database** rather than filled with a
+  sentence. An enum, a geometry, an interval: a made-up string is refused by the engine, and rightly,
+  so the column is skipped where it allows a null or has a default. Pick a strategy for it in the
+  dialog to override that.
 - The rows are ordinary inserts: the script is shown first and applied through the same handshake
   as a hand edit.
+
+### Values and their types
+
+Every value in an edit or a generated row travels to the engine as a parameter, and a parameter
+travels as a string. A string is not a date, so the statement says what it is: `CAST($1 AS date)`,
+using the column's own declared type. PostgreSQL is the strict one here — it refuses
+`date = text` rather than guessing, which is the right call and the reason a generated date used to
+come back as *"column signed_up is of type date but expression is of type text"*.
+
+The cast is visible in the preview, because what is approved has to be what runs. Binary columns are
+left alone: casting a string into one would write nonsense where an error is more honest.

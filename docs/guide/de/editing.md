@@ -28,3 +28,29 @@ Statement arbeiten.
 
 Zellen markieren, und **Bulk update** wendet einen Wert oder einen kleinen Ausdruck auf die
 Markierung an — die spaltenweite Änderung, die sonst ein handgeschriebenes `UPDATE` wäre.
+
+## Generierte Testzeilen
+
+Der Zauberstab in der Werkzeugleiste des Daten-Tabs füllt eine Tabelle mit plausiblen Zeilen: eine
+Spalte namens `name` bekommt Namen, eine E-Mail-Spalte Adressen, ein `varchar(6)` etwas, das in sechs
+Zeichen passt. Die Strategie pro Spalte wird aus Name und Typ geraten und lässt sich im Dialog
+korrigieren; derselbe Seed liefert dieselben Zeilen.
+
+- **Fremdschlüssel zeigen auf existierende Zeilen** — bis zu 200 Schlüssel der Elterntabelle werden
+  gelesen und daraus gewählt.
+- **Was die Datenbank selbst füllt, wird übersprungen**: Identity, Serial, `AUTO_INCREMENT`, rowid.
+- **Einen Typ, den der Generator nicht kennt, überlässt er der Datenbank**, statt einen Satz
+  hineinzuschreiben. Ein Enum, eine Geometrie, ein Intervall: eine erfundene Zeichenkette lehnt die
+  Engine ab, zu Recht — die Spalte wird also übersprungen, wenn sie NULL erlaubt oder einen
+  Vorgabewert hat. Im Dialog lässt sich trotzdem eine Strategie wählen.
+
+### Werte und ihre Typen
+
+Jeder Wert einer Änderung oder generierten Zeile reist als Parameter, und ein Parameter reist als
+Zeichenkette. Eine Zeichenkette ist kein Datum — deshalb sagt das Statement, was sie ist:
+`CAST($1 AS date)`, mit dem deklarierten Typ der Spalte. PostgreSQL ist hier das strenge Gegenüber:
+es lehnt `date = text` ab, statt zu raten. Das war der Grund für *„column signed_up is of type date
+but expression is of type text"* bei einem generierten Datum.
+
+Der Cast steht in der Vorschau, denn was man freigibt, muss das sein, was läuft. Binärspalten bleiben
+unangetastet: eine Zeichenkette dort hineinzucasten schriebe Unsinn, wo ein Fehler ehrlicher ist.

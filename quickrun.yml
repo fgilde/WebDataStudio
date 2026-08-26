@@ -1,17 +1,31 @@
 # yaml-language-server: $schema=https://fgilde.github.io/QuickRun/quickrun.schema.json
 name: WebDataStudio
-description: "The server that hosts the studio UI and its APIs."
+description: "Server plus studio UI, the way the README develops it: the API on 5000 and the Vite front end on 5173, which proxies /api to it. A plain dotnet run builds Debug, and the SPA is only built in Release, so it would serve an empty 404."
 
 requires:
   - tool: dotnet
     version: ">=10.0"
     install: https://dotnet.microsoft.com/download
+  - tool: node
+    version: ">=20.0"
+    install: https://nodejs.org
+
+env:
+  # Program.cs defaults to /data/webdatastudio.db, which is C:\data\... on Windows.
+  DB_PATH: ${workspace}/wds.db
 
 setup:
   - run: dotnet restore
+  - run: npm ci
+    cwd: web
 
 tasks:
-  - name: app
-    run: dotnet run --project src/WebDataStudio.Server --urls http://localhost:5080
-    readyWhen: {http: "http://localhost:5080"}
+  - name: api
+    run: dotnet run --project src/WebDataStudio.Server --urls http://localhost:5000
+    readyWhen: {port: 5000}
+  - name: web
+    run: npm run dev
+    cwd: web
+    dependsOn: [api]
+    readyWhen: {http: "http://localhost:5173"}
     open: true

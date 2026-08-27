@@ -1,3 +1,4 @@
+using WebDataStudio.Server.Services;
 using WebDataStudio.Server.Storage;
 
 namespace WebDataStudio.Server.Tests.Storage;
@@ -117,4 +118,24 @@ public class StorageUrlTests
     [Fact]
     public void An_azure_url_without_an_account_or_a_connection_string_is_refused() =>
         Assert.Throws<FormatException>(() => StorageUrl.Parse("azblob:///exports"));
+
+    [Fact]
+    public void An_aspire_style_url_survives_the_connection_registry()
+    {
+        // What WithBlobStorage writes into WDS_CONN_EXPORTS. It passes through Uri parsing twice —
+        // once to work out the engine, once in the driver — and the account key must come out the
+        // other side unchanged.
+        const string url =
+            "azblob:///exports?connectionstring=DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=k+/=";
+
+        var uri = new Uri(url);
+
+        Assert.Equal("storage", ConnectionUrl.EngineFromScheme(uri.Scheme));
+
+        var target = StorageUrl.Parse(ConnectionUrl.ToAdoConnectionString("storage", uri));
+
+        Assert.Equal("exports", target.Container);
+        Assert.Equal("DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=k+/=",
+            target.Option("connectionstring"));
+    }
 }

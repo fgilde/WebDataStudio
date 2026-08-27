@@ -52,7 +52,7 @@ Both databases land in one studio; a second `studioName` gives you a second stud
 ## Engines
 
 PostgreSQL · MySQL and MariaDB · Microsoft SQL Server · SQLite · Oracle · DuckDB · ClickHouse ·
-MongoDB · Redis
+MongoDB · Redis · object storage (S3-compatible, Azure Blob, Google Cloud Storage, a folder)
 
 Each driver declares what it can do, and the UI hides what an engine does not support instead of
 offering a button that fails.
@@ -152,7 +152,8 @@ does and what happens when it is absent.
 ```
 
 URL schemes map to engines: `postgres`, `postgresql`, `mysql`, `mariadb`, `sqlserver`, `mssql`,
-`sqlite`, `oracle`, `duckdb`, `clickhouse`, `mongodb`, `redis`.
+`sqlite`, `oracle`, `duckdb`, `clickhouse`, `mongodb`, `redis`, and `s3`, `azblob`, `gs`, `file`
+for object storage.
 
 A `WDS_CONN_<NAME>` may also carry the provider's own connection string — the form an orchestrator
 already has. Say which engine it is:

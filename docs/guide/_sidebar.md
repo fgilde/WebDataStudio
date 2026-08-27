@@ -20,6 +20,7 @@
 - [MCP for AI agents](mcp.md)
 - [Diagrams](diagrams.md)
 - [Redis](redis.md)
+- [Object storage](storage.md)
 - [Engine capabilities](engines.md)
 - [Keyboard shortcuts](shortcuts.md)
 - [Development](development.md)

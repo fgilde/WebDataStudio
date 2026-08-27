@@ -21,6 +21,9 @@ Destructive statements are written into a query tab instead of running from the 
 database, creating a table and changing an index are the exceptions — they have their own dialog,
 and every schema change still shows its SQL before it runs.
 
+A bucket is a connection too: `s3://`, `azblob://`, `gs://` and `file://` open object storage in
+the same tree, where a file can be queried as a table — see [Object storage](storage.md).
+
 ## Properties
 
 **Properties…** on a connection, its database or a schema opens what that connection is: the name,

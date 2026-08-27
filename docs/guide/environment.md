@@ -25,6 +25,9 @@
 | `WDS_MCP_ENABLED`, `WDS_MCP_PATH`, `WDS_MCP_KEY`, `WDS_MCP_ALLOW_WRITE`, `WDS_MCP_TOOLS` | serve the studio as an MCP server for AI agents — see [MCP for AI agents](mcp.md). A studio with accounts requires the key |
 | `WDS_QUERY_TIMEOUT_SECONDS` | default statement timeout, default `300` |
 | `WDS_MAX_ROWS` | default fetch cap per result, default `1000` |
+| `WDS_STORAGE_PREVIEW_BYTES` | how much of an object the preview reads, default `65536` — see [Object storage](storage.md) |
+| `WDS_STORAGE_MAX_UPLOAD_BYTES` | largest upload into a bucket, default `67108864` |
+| `WDS_DUCKDB_EXTENSION_DIR` | where DuckDB's storage extensions are staged, `/opt/duckdb/extensions` in the image |
 | `WDS_MAX_SESSIONS` | open sessions per connection, default `8` |
 | `WDS_IDLE_TIMEOUT_SECONDS` | how long an unused session stays open, default `300` |
 | `WDS_OPEN_BROWSER` | `true` opens the studio on start (the default for desktop builds); `false` opens nothing |

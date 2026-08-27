@@ -481,6 +481,14 @@ it works for every engine whose capability set claims support for it.
 | F27.5 | A result kept as a file, listed, reopened, and scripted back as INSERTs |
 | F27.6 | Geography in a result drawn as a shape rather than read as coordinates |
 | F27.7 | "there is no row over there" as a condition in the query builder |
+| F28.1 | Object storage as a connection: S3-compatible, Azure Blob, Google Cloud Storage, a folder |
+| F28.2 | Containers, prefixes and objects in the tree, paged rather than walked |
+| F28.3 | An object's details and a preview: text, JSON, CSV, an image, a Parquet schema |
+| F28.4 | A file or a whole prefix queried as a table, through DuckDB, with the studio's own grid |
+| F28.5 | Upload, delete and copy behind a confirmation, refused on a read-only or production connection |
+| F28.6 | The machine's own identity as credentials, or explicit keys stored encrypted |
+| F28.7 | The storage extensions bundled into the image, so a private network needs no download |
+| F28.8 | A storage connection attached from an Aspire app host |
 
 ## 10. Safety behaviour
 

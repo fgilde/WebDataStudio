@@ -21,6 +21,7 @@ const connections = await probe.request.get(`${baseUrl}/api/connections`)
 await probe.close();
 
 const postgres = connections.find(connection => connection.engine === "postgresql");
+const lake = connections.find(connection => connection.engine === "storage");
 const demo = connections.find(connection => connection.name === "DEMO") ?? connections[0];
 
 // The theme id is what the app stores; these two are the light and dark ends of the set.
@@ -285,6 +286,46 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
     await shot("dashboard");
   } else {
     console.log("skipped the PostgreSQL shots: no such connection");
+  }
+
+  // --- object storage: the tree, the preview, a file as a table ------------------------------
+  if (lake) {
+    // The panels from the shots above would fill the middle of this one; a clean layout puts the
+    // tree, the object and its rows in the frame instead.
+    await page.request.put(`${baseUrl}/api/workspace/tabs`, { data: [] });
+    await page.goto(baseUrl, { waitUntil: "networkidle" });
+
+    const container = (await (await page.request.get(`${baseUrl}/api/schema/${lake.id}`)).json())[0];
+    const path = container.ref.slice("Container:".length);
+
+    // Put something there through the studio's own upload, so the shot has content whichever
+    // provider this connection points at.
+    const upload = (ref, name, body, type) => page.request.post(
+      `${baseUrl}/api/storage/${lake.id}/upload?ref=${encodeURIComponent(ref)}&name=${name}`,
+      { headers: { "content-type": type }, data: body });
+
+    await upload(`Prefix:${path}/exports`, "people.csv",
+      "name,city,orders\nada,london,7\ngrace,new york,4\nalan,manchester,9\n",
+      "text/csv");
+    await upload(`Prefix:${path}/exports`, "readme.txt",
+      "what lands here, and when\n", "text/plain");
+
+    await page.getByText(lake.name, { exact: true }).first().click();
+    await page.getByText(container.label, { exact: true }).first().click();
+    await page.getByText("exports", { exact: true }).first().click();
+    await page.getByText("people.csv", { exact: true }).first().click();
+    await page.getByText("name,city,orders").first().waitFor({ timeout: 20000 });
+    await shot("storage");
+
+    await page.getByText("people.csv", { exact: true }).first().dblclick();
+    await page.getByText("manchester", { exact: true }).first().waitFor({ timeout: 20000 });
+    await shot("storage-query");
+
+    for (const name of ["people.csv", "readme.txt"])
+      await page.request.delete(
+        `${baseUrl}/api/storage/${lake.id}?ref=${encodeURIComponent(`StorageObject:${path}/exports/${name}`)}`);
+  } else {
+    console.log("skipped the storage shots: no connection whose engine is storage");
   }
 
   // --- command palette -----------------------------------------------------------------------

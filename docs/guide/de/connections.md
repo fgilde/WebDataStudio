@@ -22,6 +22,10 @@ Destruktive Statements landen im Abfrage-Tab statt im Menü zu laufen. Ausnahmen
 anlegen, Tabelle anlegen und Index ändern — die haben ihren eigenen Dialog, und jede
 Schema-Änderung zeigt ihr SQL trotzdem vor der Ausführung.
 
+Ein Bucket ist auch eine Verbindung: `s3://`, `azblob://`, `gs://` und `file://` öffnen
+Objektspeicher im gleichen Baum, wo eine Datei als Tabelle abgefragt werden kann — siehe
+[Objektspeicher](storage.md).
+
 ## Eigenschaften
 
 **Properties…** auf einer Verbindung, ihrer Datenbank oder einem Schema zeigt, was diese Verbindung

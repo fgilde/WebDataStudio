@@ -49,14 +49,24 @@ public sealed class StorageDriver : AdoDriverBase
             // The connection is scoped to one container, and to a prefix inside it where the URL
             // said so. That scope is the root of the tree; nothing above it is reachable.
             var target = store.Target;
-            var label = target.Prefix.Length == 0
+
+            // A folder's "container" is its whole path, and a tree row is not the place for it: the
+            // folder's own name reads as a name, and the path belongs in the line underneath.
+            var name = target.Provider == StorageProvider.Local
+                ? Path.GetFileName(target.Container.TrimEnd('/', '\\')) is { Length: > 0 } folder
+                    ? folder
+                    : target.Container
+                : target.Container;
+
+            var label = target.Prefix.Length == 0 ? name : $"{name}/{target.Prefix}";
+            var detail = target.Provider == StorageProvider.Local
                 ? target.Container
-                : $"{target.Container}/{target.Prefix}";
+                : target.Provider.ToString();
 
             return
             [
                 new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Container, [target.Container]), label,
-                    true, Detail: target.Provider.ToString()),
+                    true, Detail: detail),
             ];
         }
 

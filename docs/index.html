@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WebDataStudio — a database studio in your browser</title>
-<meta name="description" content="A web database studio for PostgreSQL, MySQL, SQL Server, SQLite, Oracle, DuckDB, ClickHouse, MongoDB and Redis. One container, no install, free and open source.">
+<meta name="description" content="A web database studio for PostgreSQL, MySQL, SQL Server, SQLite, Oracle, DuckDB, ClickHouse, MongoDB Redis and object storage. One container, no install, free and open source.">
 <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
 <link rel="stylesheet" href="assets/site.css">
 </head>
@@ -60,6 +60,7 @@ docker run -d -p 8080:8080 -v wds-data:/data \
     <div class="engine"><img src="assets/db/clickhouse.svg" alt=""><span>ClickHouse</span></div>
     <div class="engine"><img src="assets/db/mongodb.svg" alt=""><span>MongoDB</span></div>
     <div class="engine"><img src="assets/db/redis.svg" alt=""><span>Redis</span></div>
+    <div class="engine"><img src="assets/db/storage.svg" alt=""><span>S3 · Blob · GCS</span></div>
   </div>
 </div>
 
@@ -241,6 +242,11 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
         <td>MySQL/MariaDB</td>
         <td>PostgreSQL</td>
         <td>Many, through JDBC</td>
+      </tr>
+      <tr>
+        <td>Buckets and files as a connection, queried as tables</td>
+        <td class="yes">S3, Azure Blob, GCS, a folder</td><td class="no">no</td><td class="no">no</td>
+        <td class="no">no</td><td class="no">no</td><td class="part">files, not buckets</td>
       </tr>
       <tr>
         <td>MongoDB and Redis</td>

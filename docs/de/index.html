@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WebDataStudio — Datenbank-Studio im Browser</title>
-<meta name="description" content="Ein Web-Datenbank-Studio für PostgreSQL, MySQL, SQL Server, SQLite, Oracle, DuckDB, ClickHouse, MongoDB und Redis. Ein Container, keine Installation, frei und quelloffen.">
+<meta name="description" content="Ein Web-Datenbank-Studio für PostgreSQL, MySQL, SQL Server, SQLite, Oracle, DuckDB, ClickHouse, MongoDB, Redis und Objektspeicher. Ein Container, keine Installation, frei und quelloffen.">
 <link rel="icon" type="image/svg+xml" href="../assets/icon.svg">
 <link rel="stylesheet" href="../assets/site.css">
 </head>
@@ -61,6 +61,7 @@ docker run -d -p 8080:8080 -v wds-data:/data \
     <div class="engine"><img src="../assets/db/clickhouse.svg" alt=""><span>ClickHouse</span></div>
     <div class="engine"><img src="../assets/db/mongodb.svg" alt=""><span>MongoDB</span></div>
     <div class="engine"><img src="../assets/db/redis.svg" alt=""><span>Redis</span></div>
+    <div class="engine"><img src="../assets/db/storage.svg" alt=""><span>S3 · Blob · GCS</span></div>
   </div>
 </div>
 
@@ -247,6 +248,11 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
         <td>MySQL/MariaDB</td>
         <td>PostgreSQL</td>
         <td>viele, über JDBC</td>
+      </tr>
+      <tr>
+        <td>Buckets und Dateien als Verbindung, als Tabellen abfragbar</td>
+        <td class="yes">S3, Azure Blob, GCS, ein Ordner</td><td class="no">nein</td><td class="no">nein</td>
+        <td class="no">nein</td><td class="no">nein</td><td class="part">Dateien, keine Buckets</td>
       </tr>
       <tr>
         <td>MongoDB und Redis</td>

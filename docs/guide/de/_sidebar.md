@@ -13,6 +13,7 @@
 - [Vergleich](/de/comparison.md)
 - [Administration](/de/administration.md)
 - [Diagramme](/de/diagrams.md)
+- [Objektspeicher](/de/storage.md)
 - [Engine-Funktionsumfang](/de/engines.md)
 - [Tastenkürzel](/de/shortcuts.md)
 - [Entwicklung](/de/development.md)

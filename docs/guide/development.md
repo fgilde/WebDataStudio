@@ -56,7 +56,13 @@ cd web && npm run smoke:p9       # palette, saved queries, builder, charts, para
 cd web && npm run smoke:mcp      # the MCP endpoint and its dialog (needs WDS_MCP_ENABLED=true)
 cd web && npm run smoke:objects  # policies, partitions, a function run, preferences, snapshots
 cd web && npm run smoke:dbgate   # the filter language, archives, perspective, the map
+cd web && npm run smoke:storage  # a bucket: the tree, an object, a file queried as a table
 ```
+
+The storage smoke needs a connection whose engine is `storage`, and a folder is enough:
+`WDS_CONN_LAKE=file:///tmp/wds/lake`. The screenshots take the storage shots when such a connection
+is there and skip them when it is not. The server-side storage tests start MinIO and Azurite in
+containers; the four providers share one contract suite, so a fifth would inherit it.
 
 The server suite runs one behaviour suite against every engine fixture, so a driver that is added
 inherits the whole contract. A separate test asserts capability honesty: whatever a driver declares

@@ -23,7 +23,8 @@
     "smoke:admin-overview": "node scripts/smoke-admin-overview.mjs",
     "smoke:mcp": "node scripts/smoke-mcp.mjs",
     "smoke:objects": "node scripts/smoke-objects.mjs",
-    "smoke:dbgate": "node scripts/smoke-dbgate.mjs"
+    "smoke:dbgate": "node scripts/smoke-dbgate.mjs",
+    "smoke:storage": "node scripts/smoke-storage.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

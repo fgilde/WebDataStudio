@@ -66,7 +66,7 @@ export function StoragePreview({ connectionId, objectRef, onOpenData }: {
         <Table withRowBorders={false} verticalSpacing={2}>
           <Table.Tbody>
             <Fact label="Key" value={preview.key} />
-            <Fact label="Modified" value={preview.modified ?? "—"} />
+            <Fact label="Modified" value={when(preview.modified)} />
             <Fact label="ETag" value={preview.etag ?? "—"} />
             {detail?.rowCount != null && <Fact label="Rows" value={String(detail.rowCount)} />}
           </Table.Tbody>
@@ -119,6 +119,15 @@ function Fact({ label, value }: { label: string; value: string }) {
       <Table.Td><Text size="xs" style={{ wordBreak: "break-all" }}>{value}</Text></Table.Td>
     </Table.Tr>
   );
+}
+
+/// A timestamp a person reads. The wire carries full precision and an offset, which is right for a
+/// machine and noise in a detail line.
+function when(value: string | null) {
+  if (!value) return "—";
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.valueOf()) ? value : parsed.toISOString().replace("T", " ").slice(0, 19);
 }
 
 function size(bytes: number) {

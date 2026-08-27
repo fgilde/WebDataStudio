@@ -12,6 +12,9 @@
 | `WDS_READONLY` | bei `true` ist jede Verbindung nur lesend, unabhängig von ihrem eigenen Flag |
 | `WDS_QUERY_TIMEOUT_SECONDS` | Standard-Timeout je Statement, Vorgabe `300` |
 | `WDS_MAX_ROWS` | Standard-Zeilenlimit je Ergebnis, Vorgabe `1000` |
+| `WDS_STORAGE_PREVIEW_BYTES` | wie viel von einem Objekt die Vorschau liest, Vorgabe `65536` — siehe [Objektspeicher](storage.md) |
+| `WDS_STORAGE_MAX_UPLOAD_BYTES` | größter Upload in einen Bucket, Vorgabe `67108864` |
+| `WDS_DUCKDB_EXTENSION_DIR` | wo DuckDBs Speicher-Erweiterungen liegen, im Image `/opt/duckdb/extensions` |
 | `WDS_MAX_SESSIONS` | offene Sitzungen je Verbindung, Vorgabe `8` |
 | `WDS_IDLE_TIMEOUT_SECONDS` | wie lange eine ungenutzte Sitzung offen bleibt, Vorgabe `300` |
 | `WDS_OPEN_BROWSER` | `true` öffnet beim Start einen Browser (Vorgabe der Desktop-Builds) |

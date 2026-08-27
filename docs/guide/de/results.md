@@ -39,6 +39,35 @@ du.
 Exporte streamen: der Server baut die Datei nie komplett im Speicher, eine CSV mit einer Million
 Zeilen kostet also so viel Speicher wie eine mit tausend.
 
+### Eigene Templates
+
+**Templates…** im Export-Dialog schreibt ein eigenes Exportformat: eine Id, ein Name, eine
+Dateiendung, ein Content-Type und bis zu drei Textstücke.
+
+| Platzhalter | Ist |
+|---|---|
+| `{{table}}` | die Tabelle bzw. der Name des Exports |
+| `{{columns}}` | die Spaltennamen, verbunden |
+| `{{values}}` | die Werte der Zeile, verbunden |
+| `{{col.name}}` | eine Spalte nach Namen |
+| `{{index}}` | die Zeilennummer, ab eins |
+| `{{comma}}` | ein Komma in jeder Zeile außer der letzten |
+
+Jeder nimmt einen Filter für die Maskierung, die das Format braucht: `{{values|sql}}` sowie `json`,
+`csv`, `html`, `upper`, `lower`. Ein `INSERT`-Schreiber sind damit drei Zeilen:
+
+```
+header: INSERT INTO {{table}} ({{columns}}) VALUES
+row:      ({{values|sql}}){{comma}}
+footer: ;
+```
+
+DataGrip nennt das Extractors und schreibt sie in Groovy — damit ist ein Exportformat ein Programm,
+das das Studio ausführen müsste. Hier ist es Text, und darin gibt es nichts auszuführen. Ein hier
+gespeichertes Template gehört diesem Studio; `WDS_EXPORT_TEMPLATES_DIR` bindet einen Ordner davon für
+eine Bereitstellung ein, und die sind in der Oberfläche nur lesbar — eine Kopie unter anderer Id ist
+der Weg, eines zu ändern.
+
 ## Kopieren
 
 Das Menü **Copy** legt das Ergebnis als CSV, JSON oder Markdown-Tabelle in die Zwischenablage — und

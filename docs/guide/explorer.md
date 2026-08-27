@@ -21,6 +21,36 @@ The list comes from the same cached walk the editor's completion and `Ctrl+Shift
 first search on a connection costs one pass over its schema and later ones are instant. The refresh
 button drops that cache, which is what to press after somebody else changed the schema.
 
+## Finding a value rather than a table
+
+The filter box finds objects. **Find data** — the magnifier in the explorer's toolbar — finds a
+value: "which table has 4711 in it", answered on the server, one query per table and therefore one
+scan each.
+
+![Find data](../assets/screenshots/datasearch-dark.png)
+
+It is type-aware, which is what keeps it quick: a number is compared against numeric columns as a
+number and looked for inside text, a date against dates, and a column that could not hold the value at
+all — a `bytea`, a geometry, an image — is never cast to text. Text is matched without case on every
+engine, so the same search finds the same rows whichever connection it runs on.
+
+The result says where the value is, in which column, and how many rows carry it, with the most
+matches first. Clicking a hit opens that table already filtered on the column that matched. The answer
+also says how many tables were searched, how many were skipped and why, and whether it stopped at the
+table limit — a search that quietly gave up would be worse than one that says so.
+
+## Only the schemas you work in
+
+A server with five thousand tables makes every studio pay for all of them: the tree's first level, the
+completion cache, the object search and the schema snapshot each walk what they are given.
+**Properties…** on a connection has a **Schemas read** picker for that — name two, and nothing else is
+read. Empty means everything, which stays the default.
+
+A deployment can fix it instead with `WDS_CONN_<NAME>_SCHEMAS=public,sales`; the picker then reports
+that rather than pretending to be editable. Only schemas and databases are filtered — a bucket, a key
+space or a server-level folder passes through, because a schema scope that emptied the tree on another
+engine would be a bug.
+
 ## What the tree shows
 
 Under a connection PostgreSQL keeps more than its schemas, and the tree lists that next to them:

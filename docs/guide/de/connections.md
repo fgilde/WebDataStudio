@@ -22,9 +22,56 @@ Destruktive Statements landen im Abfrage-Tab statt im Menü zu laufen. Ausnahmen
 anlegen, Tabelle anlegen und Index ändern — die haben ihren eigenen Dialog, und jede
 Schema-Änderung zeigt ihr SQL trotzdem vor der Ausführung.
 
+### Azure SQL, Synapse und Fabric
+
+Die Liste **Start from** im Formular trägt die Connection-Strings, die sich niemand merkt: Azure SQL
+mit Managed Identity, mit dem eigenen Konto oder mit Entra-Passwort; ein Synapse-Pool, serverless oder
+dediziert; ein Fabric-Warehouse; die Azure-Datenbankdienste. Ein Preset füllt den Connection-String,
+danach ist er wie jeder andere editierbar.
+
+Sagt die Verbindung, dass sich eine Person anmeldet — `Authentication="Active Directory Device Code
+Flow"` oder `Interactive` —, versucht das Studio nicht, im Container einen Browser zu öffnen. Es führt
+den Device-Code-Flow selbst: die Verbindungsliste markiert sie mit **sign-in**, das Schlüsselsymbol
+öffnet einen Dialog mit einem Code, und den gibt man auf einem Gerät mit Browser ein. Das Token bleibt
+danach im Speicher des Servers — nie auf Platte, nie im Browser — und die Verbindung öffnet damit, bis
+es abläuft.
+
+Eine Managed Identity braucht davon nichts und bleibt überall die bessere Antwort.
+
 Ein Bucket ist auch eine Verbindung: `s3://`, `azblob://`, `gs://` und `file://` öffnen
 Objektspeicher im gleichen Baum, wo eine Datei als Tabelle abgefragt werden kann — siehe
 [Objektspeicher](storage.md).
+
+## Einen Wert finden statt einer Tabelle
+
+Das Filterfeld findet Objekte. **Find data** — die Lupe in der Werkzeugleiste des Explorers — findet
+einen Wert: „welche Tabelle hat 4711 drin?“, serverseitig beantwortet, eine Abfrage je Tabelle und
+damit je ein Scan.
+
+Es ist typbewusst, und das hält es schnell: eine Zahl wird gegen numerische Spalten als Zahl
+verglichen und in Text gesucht, ein Datum gegen Datumsspalten, und eine Spalte, die den Wert gar nicht
+halten kann — `bytea`, Geometrie, ein Bild — wird nie nach Text gecastet. Text wird auf jeder Engine
+ohne Groß- und Kleinschreibung verglichen, damit dieselbe Suche auf jeder Verbindung dieselben Zeilen
+findet.
+
+![Find data](../../assets/screenshots/datasearch-dark.png)
+
+Das Ergebnis sagt, wo der Wert steht, in welcher Spalte und wie viele Zeilen ihn tragen — die meisten
+Treffer zuerst. Ein Klick öffnet diese Tabelle, schon auf die passende Spalte gefiltert. Außerdem
+sagt die Antwort, wie viele Tabellen durchsucht, wie viele übersprungen wurden und warum, und ob sie
+am Tabellenlimit aufgehört hat.
+
+## Nur die Schemas, in denen gearbeitet wird
+
+Ein Server mit fünftausend Tabellen lässt jedes Studio für alle bezahlen: die erste Ebene des Baums,
+der Vervollständigungs-Cache, die Objektsuche und der Schema-Snapshot laufen jeweils ab, was sie
+bekommen. **Eigenschaften…** einer Verbindung hat dafür die Auswahl **Schemas read** — zwei benennen,
+und mehr wird nicht gelesen. Leer heißt alles, und das bleibt die Vorgabe.
+
+Eine Bereitstellung kann es stattdessen festlegen: `WDS_CONN_<NAME>_SCHEMAS=public,sales`; die Auswahl
+berichtet das dann, statt Bearbeitbarkeit vorzutäuschen. Gefiltert werden nur Schemas und Datenbanken —
+ein Bucket, ein Keyspace oder ein Server-Ordner geht durch, denn ein Schema-Filter, der auf einer
+anderen Engine den Baum leert, wäre ein Fehler.
 
 ## Eigenschaften
 

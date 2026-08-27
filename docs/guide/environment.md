@@ -28,6 +28,8 @@
 | `WDS_STORAGE_PREVIEW_BYTES` | how much of an object the preview reads, default `65536` — see [Object storage](storage.md) |
 | `WDS_STORAGE_MAX_UPLOAD_BYTES` | largest upload into a bucket, default `67108864` |
 | `WDS_DUCKDB_EXTENSION_DIR` | where DuckDB's storage extensions are staged, `/opt/duckdb/extensions` in the image |
+| `WDS_CONN_<NAME>_SCHEMAS` | read only these schemas on that connection — see [Explorer and panels](explorer.md) |
+| `WDS_EXPORT_TEMPLATES_DIR` | folder of export templates the deployment ships — see [Results and export](results.md) |
 | `WDS_MAX_SESSIONS` | open sessions per connection, default `8` |
 | `WDS_IDLE_TIMEOUT_SECONDS` | how long an unused session stays open, default `300` |
 | `WDS_OPEN_BROWSER` | `true` opens the studio on start (the default for desktop builds); `false` opens nothing |

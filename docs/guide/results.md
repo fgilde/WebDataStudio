@@ -101,6 +101,34 @@ encoding, quoting, header row, `NULL` representation and date format are all you
 Exports stream: the server never builds the whole file in memory, so a million-row CSV costs the
 same memory as a thousand-row one.
 
+### Templates of your own
+
+**Templates…** in the export dialog writes an export format: an id, a name, a file extension, a
+content type, and up to three pieces of text.
+
+| Placeholder | Is |
+|---|---|
+| `{{table}}` | the table or the export's name |
+| `{{columns}}` | the column names, joined |
+| `{{values}}` | the row's values, joined |
+| `{{col.name}}` | one column by name |
+| `{{index}}` | the row number, from one |
+| `{{comma}}` | a comma on every row but the last |
+
+Each takes a filter for the escaping that format needs: `{{values|sql}}`, and `json`, `csv`, `html`,
+`upper`, `lower`. So an `INSERT` writer is three lines:
+
+```
+header: INSERT INTO {{table}} ({{columns}}) VALUES
+row:      ({{values|sql}}){{comma}}
+footer: ;
+```
+
+DataGrip calls these extractors and writes them in Groovy, which makes an export format a program the
+studio would have to run. These are text, and there is nothing in them to execute. A template saved
+here belongs to this studio; `WDS_EXPORT_TEMPLATES_DIR` mounts a folder of them for a deployment, and
+those are read-only in the UI — a copy under another id is the way to change one.
+
 ## Copy
 
 The **Copy** menu puts the result on the clipboard as CSV, JSON or a Markdown table, and a

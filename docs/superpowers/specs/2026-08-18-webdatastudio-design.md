@@ -489,6 +489,15 @@ it works for every engine whose capability set claims support for it.
 | F28.6 | The machine's own identity as credentials, or explicit keys stored encrypted |
 | F28.7 | The storage extensions bundled into the image, so a private network needs no download |
 | F28.8 | A storage connection attached from an Aspire app host |
+| F29.1 | What the server runs on a schedule, with its history |
+| F29.2 | A job enabled, disabled or started as a statement |
+| F29.3 | An interactive Entra sign-in, for a person rather than a machine |
+| F29.4 | Presets for the connection strings nobody remembers |
+| F29.5 | What ran in the next minute, sampled |
+| F29.6 | A read of the statement before it runs, which warns and never refuses |
+| F29.7 | Find a value in any table |
+| F29.8 | Read only the schemas somebody works in |
+| F29.9 | Export formats written as text rather than as code |
 
 ## 10. Safety behaviour
 

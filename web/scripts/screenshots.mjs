@@ -288,6 +288,20 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
     console.log("skipped the PostgreSQL shots: no such connection");
   }
 
+  // --- finding a value rather than a table ----------------------------------------------------
+  // A clean layout: the panels from the shots above would fill the frame around this one.
+  await page.request.put(`${baseUrl}/api/workspace/tabs`, { data: [] });
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+
+  // The tool opens on the active connection, and after a reload that is whichever came first: the
+  // demo database is the one with tables to find something in.
+  await page.getByText("DEMO", { exact: true }).click();
+  await page.getByLabel("Find data").click();
+  await page.getByLabel("Find this value").fill("london");
+  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByText(/tables searched/).waitFor({ timeout: 30000 });
+  await shot("datasearch");
+
   // --- object storage: the tree, the preview, a file as a table ------------------------------
   if (lake) {
     // The panels from the shots above would fill the middle of this one; a clean layout puts the

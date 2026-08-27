@@ -244,6 +244,17 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
         <td>Many, through JDBC</td>
       </tr>
       <tr>
+        <td>Find a value in any table, server-side</td>
+        <td class="yes">yes</td><td class="no">no</td><td class="no">no</td>
+        <td class="no">no</td><td class="no">no</td><td class="yes">yes</td>
+      </tr>
+      <tr>
+        <td>Scheduled jobs: Agent, pg_cron, events</td>
+        <td class="yes">read, and changes as statements</td><td class="no">no</td>
+        <td class="part">Agent only</td><td class="part">events only</td>
+        <td class="no">no</td><td class="yes">yes</td>
+      </tr>
+      <tr>
         <td>Buckets and files as a connection, queried as tables</td>
         <td class="yes">S3, Azure Blob, GCS, a folder</td><td class="no">no</td><td class="no">no</td>
         <td class="no">no</td><td class="no">no</td><td class="part">files, not buckets</td>

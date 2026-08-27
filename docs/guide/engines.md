@@ -28,6 +28,7 @@ of silently doing nothing.
 | Kill session | yes | yes | yes | — | yes | — | yes | yes | yes | — |
 | Server metrics | yes | yes | yes | — | yes | — | yes | yes | yes | — |
 | Slow queries | yes | yes | yes | — | — | — | — | — | — | — |
+| Scheduled jobs | yes | yes | yes | — | — | — | — | — | — | — |
 | Maintenance commands | yes | yes | yes | yes | yes | yes | yes | yes | yes | — |
 
 MongoDB and Redis are not SQL engines: their query tabs take the engines' own commands, and results

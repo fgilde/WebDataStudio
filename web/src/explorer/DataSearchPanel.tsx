@@ -74,7 +74,7 @@ export function DataSearchPanel({ connectionId, schema, onOpen }: {
                 <Table.Td>{hit.schema ? `${hit.schema}.${hit.table}` : hit.table}</Table.Td>
                 <Table.Td>{hit.column}</Table.Td>
                 <Table.Td><Text size="xs" c="dimmed">{hit.dataType}</Text></Table.Td>
-                <Table.Td>{hit.matches} rows</Table.Td>
+                <Table.Td>{hit.matches} {hit.matches === 1 ? "row" : "rows"}</Table.Td>
               </Table.Tr>
             ))}
           </Table.Tbody>

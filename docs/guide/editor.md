@@ -9,6 +9,24 @@
 - `Ctrl+Shift+Enter` runs the whole script; each statement gets its own result tab.
 - The **Cancel** button stops a running statement at the server, not only in the browser.
 
+## Before a statement runs
+
+The studio reads a statement before running it and says what it noticed:
+
+- an `UPDATE` or `DELETE` with no `WHERE` — every row
+- a `WHERE` that is always true, so it filters nothing
+- `= NULL`, which is never true
+- `TRUNCATE` and `DROP`, and what they take with them
+- an accidental cross product: a comma-separated `FROM` with nothing joining it, or a `JOIN` with no
+  `ON` — `CROSS JOIN` says that on purpose and is left alone
+
+It warns and never refuses. Every one of these is something somebody can legitimately mean, and a
+studio that blocked them would only teach people to work around the check, so the dialog says what it
+saw and its other button runs the statement anyway. Preferences turn the reading off.
+
+The check is lexical rather than a parser, with comments and string literals blanked first: a
+`-- DELETE FROM orders` is a comment, and a `WHERE` inside a literal is not a clause.
+
 ## Single transaction
 
 The **single transaction** switch in the toolbar wraps a whole script in one transaction: it

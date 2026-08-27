@@ -11,6 +11,32 @@ destruktiven sind markiert und fragen vor dem Ausführen nach.
 Der Endpunkt nimmt eine Befehls-Id aus diesem Katalog, nie rohes SQL, und quotet das Ziel über den
 Dialekt — dieses Panel kann also keine zweite, ungeloggte Abfragekonsole werden.
 
+## Jobs
+
+Was der Server selbst nach Plan ausführt, egal wie es dort heißt: SQL-Server-Agent-Jobs, pg_cron-
+Einträge, MySQL-Events. Ein Tab, denn die Frage ist dieselbe — was läuft, wann, und hat es
+funktioniert. Jede Zeile trägt den Plan, das Ergebnis des letzten Laufs und den nächsten Termin; ein
+Klick auf einen Job öffnet seine Historie.
+
+Lesen ist frei. Ändern nicht: **Enable**, **Disable** und **Run now** erzeugen ein Statement in einem
+Abfragetab, das dann denselben Weg geht wie alles Handgetippte. pg_cron und MySQL haben kein „jetzt
+ausführen“ und sagen das, statt heimlich einen Job-Körper auszuführen.
+
+Eine leere Liste ist kein Fehler — pg_cron kann fehlen, der Agent-Dienst aus sein, der Event-Scheduler
+abgeschaltet — und der Tab sagt, in welchem Scheduler er nachgesehen hat. Eine Engine ohne eigenen
+Scheduler sagt stattdessen genau das.
+
+## Aufzeichnen
+
+„Was läuft in der nächsten Minute auf diesem Server?“ Zeitfenster wählen, **Capture** drücken, und das
+Studio liest einmal pro Sekunde die eigene Liste des Servers und gruppiert, was es sieht, nach
+Statement — das längste zuerst, mit Anzahl der Sichtungen, Benutzer und ob es blockiert war.
+
+Das ist Sampling, kein Tracing: ein Statement, das zwischen zwei Messungen beginnt und endet, wird
+nicht gesehen, und der Tab sagt das. Extended Events und Äquivalente sind die richtige Antwort auf
+diese Frage und brauchen Rechte, die ein Studio nicht einfordern sollte. Eine Aufzeichnung lässt sich
+früher stoppen und behält, was sie gesehen hat; eine, die schon lief, wird beim Öffnen aufgenommen.
+
 ## Sitzungen
 
 Die Sitzungsliste zeigt, wer verbunden ist, was läuft, wie lange es schon dauert und wer wen

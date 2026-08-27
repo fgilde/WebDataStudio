@@ -9,10 +9,11 @@ import { describeDiff, diffRows } from "../grid/diffRows";
 import { ResultArea } from "./ResultArea";
 import { runQuery, type QueryRun } from "./runQuery";
 import { applyChunk, createResultState, type ResultState } from "./resultStore";
-import { addHistory, health } from "../api";
+import { addHistory, health, inspectSql, type SqlFindingDto } from "../api";
 import { preferences } from "../shell/preferences";
 import { findParameters } from "../editor/parameters";
 import { ParameterDialog } from "../editor/ParameterDialog";
+import { InspectionDialog } from "./InspectionDialog";
 import { useUserSnippets } from "../editor/SnippetManager";
 import type { DialectId } from "../sql/splitStatements";
 

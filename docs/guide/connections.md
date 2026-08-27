@@ -21,6 +21,22 @@ Destructive statements are written into a query tab instead of running from the 
 database, creating a table and changing an index are the exceptions — they have their own dialog,
 and every schema change still shows its SQL before it runs.
 
+### Azure SQL, Synapse and Fabric
+
+The form's **Start from** list carries the connection strings nobody remembers: Azure SQL with a
+managed identity, with your own account, or with an Entra password; a Synapse serverless or dedicated
+pool; a Fabric warehouse; the Azure database services. A preset fills the connection string in and
+can be edited afterwards like any other.
+
+Where the connection says a person signs in — `Authentication="Active Directory Device Code Flow"` or
+`Interactive` — the studio does not try to open a browser inside its container. It runs the device-code
+flow itself: the connection list marks the connection with a **sign-in** badge, the key icon opens a
+dialog with a code, and you enter that on any device that has a browser. The token then stays in
+memory on the server, never on disk and never in the browser, and the connection opens with it until it
+expires.
+
+A managed identity needs none of this and remains the better answer wherever it exists.
+
 A bucket is a connection too: `s3://`, `azblob://`, `gs://` and `file://` open object storage in
 the same tree, where a file can be queried as a table — see [Object storage](storage.md).
 

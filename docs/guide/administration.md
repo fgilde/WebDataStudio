@@ -11,6 +11,32 @@ destructive ones are marked and ask before they run.
 The endpoint takes a command id from that catalogue, never raw SQL, and quotes the target through
 the dialect — so this panel cannot become a second, unlogged query console.
 
+## Jobs
+
+What the server itself runs on a schedule, whatever it is called there: SQL Server Agent jobs,
+pg_cron entries, MySQL events. One tab, because the question is the same — what runs, when, and did
+it work. Each row carries the schedule, the outcome of the last run and the next run; clicking a job
+opens its history.
+
+Reading is free. Changing is not: **Enable**, **Disable** and **Run now** produce a statement in a
+query tab, which then goes through the same run as anything typed by hand. pg_cron and MySQL have no
+"run now" and say so rather than executing a job body behind your back.
+
+An empty list is not a failure — pg_cron may not be installed, the Agent service may be off, the
+event scheduler may be disabled — and the tab says which scheduler it looked in. An engine with no
+scheduler of its own says that instead.
+
+## Capture
+
+"What runs on this server in the next minute." Pick a window, press **Capture**, and the studio reads
+the server's own list of what it is doing once a second, grouping what it sees by statement with the
+longest first — how often it was seen, who ran it, whether it was blocked.
+
+This is sampling, not tracing: a statement that starts and finishes between two samples is not seen,
+and the tab says so. Extended Events and its equivalents are the real answer to this question and
+need permissions a studio has no business arranging. A capture can be stopped early and keeps what it
+saw; one started before the panel was opened is picked up again.
+
 ## Sessions
 
 The session list shows who is connected, what they are running, how long it has taken and who is

@@ -55,6 +55,8 @@ describe("DataSearchPanel", () => {
     await waitFor(() => expect(screen.getByText("public.orders")).toBeTruthy());
     expect(screen.getByText("reference")).toBeTruthy();
     expect(screen.getByText("3 rows")).toBeTruthy();
+    // One row is a row, not "1 rows".
+    expect(screen.getByText("1 row")).toBeTruthy();
     expect(screen.getByText(/12 tables searched, 2 skipped/)).toBeTruthy();
     expect(searchData).toHaveBeenCalledWith("c1", "4711", { schema: "public", exact: false });
   });

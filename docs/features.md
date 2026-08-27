@@ -187,3 +187,12 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F28.6 | The machine's own identity as credentials, or explicit keys stored encrypted | done | storage | Connections |
 | F28.7 | The storage extensions bundled into the image, so a private network needs no download | done | storage | Image |
 | F28.8 | A storage connection attached from an Aspire app host | done | storage | Nextended.Aspire.Hosting.WebDataStudio |
+| F29.1 | What the server runs on a schedule: SQL Server Agent jobs, pg_cron entries, MySQL events, with their history | done | sqlserver, postgresql, mysql | Admin panel, jobs tab |
+| F29.2 | Enabling, disabling or starting a job as a statement rather than a click | done | sqlserver, postgresql, mysql | Admin panel, jobs tab |
+| F29.3 | An interactive Entra sign-in for Azure SQL, Synapse and Fabric: a device code the person enters elsewhere | done | sqlserver | Connections |
+| F29.4 | Presets for the connection strings nobody remembers — Azure SQL, Synapse, Fabric, the Azure database services, a bucket | done | all | Connection form |
+| F29.5 | What ran in the next minute, sampled once a second and grouped by statement | done | sqlserver, postgresql, mysql | Admin panel, capture tab |
+| F29.6 | A read of the statement before it runs: no WHERE, an always-true WHERE, = NULL, TRUNCATE, DROP, an accidental cross product | done | all | Query editor |
+| F29.7 | Find a value in any table, server-side and type-aware | done | postgresql, mysql, sqlserver, sqlite, oracle, duckdb, clickhouse | Find data panel |
+| F29.8 | Read only the schemas somebody works in, from the environment or per studio | done | postgresql, mysql, sqlserver, oracle, clickhouse, duckdb | Explorer, connection properties |
+| F29.9 | Export formats written as text with placeholders rather than as code | done | all | Export dialog, templates |

@@ -270,6 +270,7 @@ app.MapExportEndpoints();
 app.MapArchiveEndpoints();
 app.MapImportEndpoints();
 app.MapDataEndpoints();
+app.MapStorageEndpoints();
 app.MapAnalysisEndpoints();
 app.MapDdlEndpoints();
 app.MapCompareEndpoints();

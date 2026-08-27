@@ -1,0 +1,204 @@
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
+using WebDataStudio.Server.Storage;
+
+namespace WebDataStudio.Server.Tests.Storage;
+
+/// The object rather than its rows: preview, download, upload, delete — and the two connections that
+/// refuse to be written to.
+public class StorageEndpointTests : IAsyncLifetime
+{
+    private readonly MinioFixture _minio = new();
+    private readonly string _dir = Directory.CreateTempSubdirectory("wds-storage-api").FullName;
+    private const string Bucket = "wds-api";
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    public async ValueTask InitializeAsync()
+    {
+        await _minio.StartAsync();
+        await _minio.CreateBucketAsync(Bucket, Ct);
+
+        using var store = new S3ObjectStore(StorageUrl.Parse(_minio.UrlFor(Bucket)));
+
+        await using (var text = new MemoryStream(Encoding.UTF8.GetBytes("name,age\nada,36\n")))
+            await store.WriteAsync("exports/people.csv", text, "text/csv", Ct);
+
+        // A PNG header: nothing about it should come back as text.
+        await using (var image = new MemoryStream([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 1]))
+            await store.WriteAsync("exports/logo.png", image, "image/png", Ct);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _minio.DisposeAsync();
+        TestDirectory.Remove(_dir);
+    }
+
+    private WebApplicationFactory<Program> Factory(
+        bool readOnly = false, string? color = null, int? previewBytes = null) =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DB_PATH"] = Path.Combine(_dir, $"wds-{readOnly}-{color}-{previewBytes}.db"),
+                ["WDS_CONN_LAKE"] = _minio.UrlFor(Bucket),
+                ["WDS_CONN_LAKE_READONLY"] = readOnly ? "true" : null,
+                ["WDS_CONN_LAKE_COLOR"] = color,
+                ["WDS_STORAGE_PREVIEW_BYTES"] = previewBytes?.ToString(),
+            })));
+
+    private static async Task<string> IdAsync(HttpClient client)
+    {
+        using var document = JsonDocument.Parse(await client.GetStringAsync("/api/connections", Ct));
+        return document.RootElement.EnumerateArray().First().GetProperty("id").GetString()!;
+    }
+
+    private const string Csv = $"StorageObject:{Bucket}/exports/people.csv";
+
+    [Fact]
+    public async Task A_preview_gives_the_text_and_the_object_s_own_facts()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var preview = JsonDocument.Parse(
+            await client.GetStringAsync($"/api/storage/{id}/preview?ref={Csv}", Ct)).RootElement;
+
+        Assert.Equal("name,age\nada,36\n", preview.GetProperty("text").GetString());
+        Assert.Equal("text/csv", preview.GetProperty("contentType").GetString());
+        Assert.Equal(16, preview.GetProperty("size").GetInt64());
+        Assert.False(preview.GetProperty("truncated").GetBoolean());
+        // A CSV is a table as well, and the UI offers that rather than only the text.
+        Assert.True(preview.GetProperty("queryable").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_preview_reads_the_front_of_a_file_and_says_that_it_did()
+    {
+        using var factory = Factory(previewBytes: 8);
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var preview = JsonDocument.Parse(
+            await client.GetStringAsync($"/api/storage/{id}/preview?ref={Csv}", Ct)).RootElement;
+
+        Assert.Equal("name,age", preview.GetProperty("text").GetString());
+        Assert.True(preview.GetProperty("truncated").GetBoolean());
+    }
+
+    [Fact]
+    public async Task An_image_is_not_offered_as_text()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var preview = JsonDocument.Parse(await client.GetStringAsync(
+            $"/api/storage/{id}/preview?ref=StorageObject:{Bucket}/exports/logo.png", Ct)).RootElement;
+
+        Assert.True(preview.GetProperty("binary").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, preview.GetProperty("text").ValueKind);
+        Assert.False(preview.GetProperty("queryable").GetBoolean());
+    }
+
+    [Fact]
+    public async Task A_download_streams_the_object_under_its_own_name()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var response = await client.GetAsync($"/api/storage/{id}/download?ref={Csv}", Ct);
+        response.EnsureSuccessStatusCode();
+
+        Assert.Equal("name,age\nada,36\n", await response.Content.ReadAsStringAsync(Ct));
+        Assert.Equal("people.csv", response.Content.Headers.ContentDisposition?.FileNameStar
+                                   ?? response.Content.Headers.ContentDisposition?.FileName);
+    }
+
+    [Fact]
+    public async Task An_upload_lands_in_the_folder_that_was_open_and_can_be_deleted_again()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        using var content = new StringContent("hello", Encoding.UTF8, "text/plain");
+        var upload = await client.PostAsync(
+            $"/api/storage/{id}/upload?ref=Prefix:{Bucket}/exports&name=note.txt", content, Ct);
+        upload.EnsureSuccessStatusCode();
+
+        var landed = JsonDocument.Parse(await client.GetStringAsync(
+            $"/api/storage/{id}/preview?ref=StorageObject:{Bucket}/exports/note.txt", Ct)).RootElement;
+        Assert.Equal("hello", landed.GetProperty("text").GetString());
+
+        var deleted = await client.DeleteAsync(
+            $"/api/storage/{id}?ref=StorageObject:{Bucket}/exports/note.txt", Ct);
+        deleted.EnsureSuccessStatusCode();
+
+        var gone = await client.GetAsync(
+            $"/api/storage/{id}/preview?ref=StorageObject:{Bucket}/exports/note.txt", Ct);
+        Assert.Equal(HttpStatusCode.NotFound, gone.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_name_that_tries_to_point_somewhere_else_is_refused()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        using var content = new StringContent("x");
+        var response = await client.PostAsync(
+            $"/api/storage/{id}/upload?ref=Prefix:{Bucket}/exports&name=../escaped.txt", content, Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_read_only_connection_refuses_to_be_written_to()
+    {
+        using var factory = Factory(readOnly: true);
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        using var content = new StringContent("x");
+        var upload = await client.PostAsync(
+            $"/api/storage/{id}/upload?ref=Prefix:{Bucket}/exports&name=note.txt", content, Ct);
+        var delete = await client.DeleteAsync($"/api/storage/{id}?ref={Csv}", Ct);
+
+        Assert.Equal(HttpStatusCode.Forbidden, upload.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
+        // Reading is untouched: the refusal is about changing things.
+        (await client.GetAsync($"/api/storage/{id}/preview?ref={Csv}", Ct)).EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task A_production_connection_refuses_as_well()
+    {
+        using var factory = Factory(color: "red");
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var delete = await client.DeleteAsync($"/api/storage/{id}?ref={Csv}", Ct);
+
+        Assert.Equal(HttpStatusCode.Forbidden, delete.StatusCode);
+        Assert.Contains("production", await delete.Content.ReadAsStringAsync(Ct));
+    }
+
+    [Fact]
+    public async Task Deleting_a_folder_is_not_something_this_offers()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var response = await client.DeleteAsync($"/api/storage/{id}?ref=Prefix:{Bucket}/exports", Ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+}

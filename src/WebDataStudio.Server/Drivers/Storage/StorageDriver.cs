@@ -216,7 +216,7 @@ public sealed class StorageDriver : AdoDriverBase
     }
 
     /// The key inside the connection's scope: the tree's first segment is the container.
-    internal static string KeyOf(SchemaNodeRef target) => string.Join('/', target.Path.Skip(1));
+    public static string KeyOf(SchemaNodeRef target) => string.Join('/', target.Path.Skip(1));
 
     private static IObjectStore StoreOf(IDbSession session) =>
         session.Unwrap() is StorageSession storage

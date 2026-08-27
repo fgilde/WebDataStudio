@@ -10,7 +10,9 @@ export type ExplorerAction =
   | "script-drop-index" | "script-reindex"
   | "script-drop-constraint"
   | "script-execute" | "script-refresh-matview" | "script-refresh-matview-live"
-  | "grant-schema" | "archive-table";
+  | "grant-schema" | "archive-table"
+  // Object storage: the object itself rather than the rows in it.
+  | "download-object" | "upload-object" | "delete-object" | "query-as-table" | "copy-uri";
 
 export interface ContextItem {
   action: ExplorerAction;
@@ -70,6 +72,24 @@ const ROUTINE: ContextItem[] = [
 const CONTAINER: ContextItem[] = [
   { action: "new-table", label: "New table…" },
   { action: "refresh", label: "Refresh" },
+];
+
+const STORAGE_OBJECT: ContextItem[] = [
+  { action: "open-data", label: "Open data" },
+  { action: "new-query", label: "New query (SELECT *)" },
+  { action: "download-object", label: "Download" },
+  { action: "export", label: "Export…", divider: true },
+  { action: "copy-uri", label: "Copy the URI" },
+  { action: "copy-link", label: "Copy link" },
+  { action: "delete-object", label: "Delete…", danger: true, divider: true },
+];
+
+const STORAGE_FOLDER: ContextItem[] = [
+  // A folder is a table only once a pattern says which of its files belong together.
+  { action: "query-as-table", label: "Query as table…" },
+  { action: "upload-object", label: "Upload here…" },
+  { action: "refresh", label: "Refresh" },
+  { action: "copy-uri", label: "Copy the path", divider: true },
 ];
 
 /// The menu for one node. Everything the engine cannot do is left out rather than shown broken.
@@ -144,6 +164,15 @@ export function actionsFor(kind: string, caps: MenuCapabilities = {}): ContextIt
         { action: "grant-schema", label: "Privileges on everything here…" },
         { action: "properties", label: "Properties…", divider: true },
       ]);
+
+    case "StorageObject":
+      // Nothing here is DDL: a file has no schema to change, so the writes flag does not apply and
+      // the delete is guarded on the server instead.
+      return STORAGE_OBJECT;
+
+    case "Container":
+    case "Prefix":
+      return STORAGE_FOLDER;
 
     case "TableFolder":
       return keepWritable(CONTAINER);

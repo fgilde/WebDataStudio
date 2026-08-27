@@ -49,7 +49,8 @@ import {
   selectColumn,
 } from "../sql/objectScripts";
 import {
-  applyDdl, describeObject, listConnections, loadTabs, previewRename, refreshStatement, saveTabs,
+  applyDdl, deleteObject, describeObject, listConnections, loadTabs, objectUrl, previewObject,
+  previewRename, refreshStatement, saveTabs, uploadObject,
   type Connection, type ForeignKeyDto,
 } from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
@@ -114,6 +115,9 @@ function StructurePanel() {
 
   return (
     <ObjectDetailPanel selection={shell.selection}
+      // A file in a bucket offers its rows from the panel, where a reader understands it.
+      onOpenData={selection =>
+        shell.openData(selection.connectionId, selection.node.ref, selection.node.label)}
       // The SQL tab and the privilege statements open a query tab rather than running anything:
       // a GRANT goes through the editor's preview like every other change.
       onOpenInEditor={sql => shell.selection
@@ -703,7 +707,73 @@ export function DockShell() {
         break;
 
       case "new-query":
+        if (s.node.kind === "StorageObject") {
+          // A file is selected from through a reader, and which one is the server's answer.
+          const object = await previewObject(s.connectionId, s.node.ref);
+
+          if (object.from) newTab(s.connectionId, `SELECT * FROM ${object.from}`);
+          else notifications.show({ color: "red", message: "nothing here reads this file" });
+          break;
+        }
+
         newTab(s.connectionId, `SELECT * FROM ${name}`);
+        break;
+
+      case "download-object": {
+        // A download is a link the browser follows; there is nothing for the app to hold.
+        const link = document.createElement("a");
+        link.href = objectUrl(s.connectionId, s.node.ref);
+        link.download = s.node.label;
+        link.click();
+        break;
+      }
+
+      case "upload-object": {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.onchange = () => {
+          const file = input.files?.[0];
+          if (!file) return;
+
+          uploadObject(s.connectionId, s.node.ref, file)
+            .then(result => {
+              notifications.show({ message: `Uploaded ${result.key}` });
+              setExplorerNonce(n => n + 1);
+            })
+            .catch(e => notifications.show({ color: "red", message: String(e.message ?? e) }));
+        };
+        input.click();
+        break;
+      }
+
+      case "delete-object":
+        // The server refuses this on a read-only or production connection; here it is only about
+        // not deleting something by a slip of the mouse.
+        if (!window.confirm(`Delete ${s.node.label}? This cannot be undone.`)) break;
+
+        await deleteObject(s.connectionId, s.node.ref)
+          .then(() => {
+            notifications.show({ message: `Deleted ${s.node.label}` });
+            setExplorerNonce(n => n + 1);
+          })
+          .catch(e => notifications.show({ color: "red", message: String(e.message ?? e) }));
+        break;
+
+      case "query-as-table": {
+        // A folder is one table once a pattern says which of its files belong together. Guessing
+        // that would turn a folder of CSVs into a Parquet error.
+        const pattern = window.prompt("Which files belong together?", "*.parquet");
+        if (!pattern) break;
+
+        const path = s.node.ref.split(":", 2)[1] ?? "";
+        await openData(s.connectionId, `Prefix:${path}/${pattern}`, `${s.node.label}/${pattern}`);
+        break;
+      }
+
+      case "copy-uri":
+        await navigator.clipboard.writeText(s.node.kind === "StorageObject"
+          ? (await previewObject(s.connectionId, s.node.ref)).uri
+          : s.node.ref.split(":", 2)[1] ?? "");
         break;
 
       case "copy-name":

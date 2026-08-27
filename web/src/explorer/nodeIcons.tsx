@@ -1,7 +1,7 @@
 import {
   IconBinaryTree, IconBolt, IconBox, IconBroadcast, IconColumns3, IconDatabase, IconEye, IconEyeCheck,
   IconFolder, IconFunction, IconHexagon, IconKey, IconLink, IconListNumbers, IconPuzzle, IconServer2,
-  IconTable, IconUsers,
+  IconTable, IconUsers, IconBucket, IconDots, IconFile, IconFolderOpen,
 } from "@tabler/icons-react";
 
 export function nodeIcon(kind: string) {
@@ -28,6 +28,12 @@ export function nodeIcon(kind: string) {
     case "Subscription": return <IconBroadcast size={size} />;
     case "Type": return <IconHexagon size={size} />;
     case "Domain": return <IconBox size={size} />;
+    // Object storage: a container, a prefix inside it, an object, and the row that fetches the next
+    // page of a long listing.
+    case "Container": return <IconBucket size={size} />;
+    case "Prefix": return <IconFolderOpen size={size} />;
+    case "StorageObject": return <IconFile size={size} />;
+    case "StorageMore": return <IconDots size={size} />;
     default: return <IconFolder size={size} />;
   }
 }

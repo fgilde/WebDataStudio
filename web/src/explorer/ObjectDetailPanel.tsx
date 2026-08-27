@@ -7,6 +7,7 @@ import {
 } from "./ObjectTabs";
 import { PartitionsTab, PoliciesTab } from "./ObjectAdminTabs";
 import { FunctionTab } from "./FunctionTab";
+import { StoragePreview } from "../storage/StoragePreview";
 
 const DESCRIBABLE = ["Table", "View", "MaterializedView"];
 
@@ -14,11 +15,14 @@ const DESCRIBABLE = ["Table", "View", "MaterializedView"];
 /// and a run, so the panel opens on those rather than saying nothing.
 const ROUTINES = ["Function", "Procedure"];
 
-export function ObjectDetailPanel({ selection, onOpenInEditor }: {
+export function ObjectDetailPanel({ selection, onOpenInEditor, onOpenData }: {
   selection: ExplorerSelection | null;
   /// Opens SQL in a query tab — used by the SQL tab and by the privilege statements, which go
   /// through the editor's own preview rather than running from here.
   onOpenInEditor?: (sql: string) => void;
+  /// Opens the object's rows in a data tab. A file in a bucket offers this where a reader
+  /// understands it.
+  onOpenData?: (selection: ExplorerSelection) => void;
 }) {
   const [detail, setDetail] = useState<ObjectDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +40,14 @@ export function ObjectDetailPanel({ selection, onOpenInEditor }: {
   }, [selection]);
 
   if (!selection) return <Text size="xs" c="dimmed" p="xs">Select an object.</Text>;
+
+  // An object in a bucket has no indexes, keys or privileges. What it has is its own facts, the
+  // front of its content and, where a reader understands it, the columns of the table it would be.
+  if (selection.node.kind === "StorageObject")
+    return (
+      <StoragePreview connectionId={selection.connectionId} objectRef={selection.node.ref}
+                      onOpenData={onOpenData && (() => onOpenData(selection))} />
+    );
 
   const routine = ROUTINES.includes(selection.node.kind);
 

@@ -29,7 +29,7 @@ public static class StorageEndpoints
         {
             try
             {
-                var (_, session) = await factory.OpenAsync(conn, ct);
+                var (driver, session) = await factory.OpenAsync(conn, ct);
                 await using (session)
                 {
                     if (StoreOf(session) is not { } store)
@@ -60,6 +60,11 @@ public static class StorageEndpoints
                         // A file that can be read as a table is offered as one; the preview is what
                         // is left for everything else.
                         queryable = StorageReader.CanRead(key),
+                        // What a query would select from, and the URI to copy — both come from the
+                        // driver so the browser never has to know one provider's spelling from
+                        // another's.
+                        from = driver.FromClause(session, target),
+                        uri = store.SqlUri(key),
                         truncated,
                         text = text ? System.Text.Encoding.UTF8.GetString(content) : null,
                         binary = !text,

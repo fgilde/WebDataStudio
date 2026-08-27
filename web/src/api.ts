@@ -975,3 +975,39 @@ export const redisPublish = (conn: string, channel: string, message: string):
 /// The subscription is server-sent events, so the browser's own EventSource carries it.
 export const redisSubscribeUrl = (conn: string, channels: string) =>
   `${base}/redis/${conn}/subscribe?channels=${encodeURIComponent(channels)}`;
+
+export interface StoragePreviewDto {
+  name: string;
+  key: string;
+  contentType: string | null;
+  size: number;
+  modified: string | null;
+  etag: string | null;
+  storageClass: string | null;
+  /// Whether a reader here understands the file, and the data tab can therefore open it.
+  queryable: boolean;
+  /// What a query selects from — `read_parquet('s3://…')` — or null where nothing reads it.
+  from: string | null;
+  /// The provider's own URI for this object, for copying.
+  uri: string;
+  truncated: boolean;
+  text: string | null;
+  binary: boolean;
+}
+
+export const previewObject = (conn: string, ref: string): Promise<StoragePreviewDto> =>
+  fetch(`${base}/storage/${conn}/preview?${refQuery(ref)}`).then(r => ok<StoragePreviewDto>(r));
+
+/// A download and an image both need a URL rather than a promise: one goes to a link, the other to
+/// an `img` tag.
+export const objectUrl = (conn: string, ref: string) =>
+  `${base}/storage/${conn}/download?${refQuery(ref)}`;
+
+export const uploadObject = (conn: string, ref: string, file: File): Promise<{ key: string }> =>
+  fetch(`${base}/storage/${conn}/upload?${refQuery(ref, new URLSearchParams({ name: file.name }))}`,
+    { method: "POST", headers: { "content-type": file.type || "application/octet-stream" }, body: file })
+    .then(r => ok<{ key: string }>(r));
+
+export const deleteObject = (conn: string, ref: string): Promise<{ key: string }> =>
+  fetch(`${base}/storage/${conn}?${refQuery(ref)}`, { method: "DELETE" })
+    .then(r => ok<{ key: string }>(r));

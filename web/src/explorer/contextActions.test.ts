@@ -24,6 +24,27 @@ describe("actionsFor", () => {
     expect(ids("View")).not.toContain("script-refresh-matview");
   });
 
+  it("offers a file in a bucket its rows, a download and a delete", () => {
+    const object = ids("StorageObject");
+
+    expect(object).toContain("open-data");
+    expect(object).toContain("download-object");
+    expect(object).toContain("delete-object");
+    // A file has no schema to change, so nothing that writes DDL is on offer.
+    expect(object).not.toContain("design");
+    expect(object).not.toContain("script-truncate");
+  });
+
+  it("offers a folder in a bucket an upload and a pattern to query by", () => {
+    const folder = ids("Prefix");
+
+    expect(folder).toContain("query-as-table");
+    expect(folder).toContain("upload-object");
+    // Opening a folder as rows would have to guess a format; the pattern is asked for instead.
+    expect(folder).not.toContain("open-data");
+    expect(ids("Container")).toEqual(folder);
+  });
+
   it("offers a column column-level actions only", () => {
     const column = ids("Column");
 

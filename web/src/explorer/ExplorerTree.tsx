@@ -20,7 +20,9 @@ export interface ExplorerSelection { connectionId: string; node: SchemaNodeDto }
 const INDENT = 16;
 
 // Actions that only make sense on a real object, not on a folder.
-const OBJECT_KINDS = ["Table", "View", "MaterializedView"];
+// A double-click opens the rows. A file in a bucket belongs here too: it is a table that happens
+// to live somewhere else.
+const OBJECT_KINDS = ["Table", "View", "MaterializedView", "StorageObject"];
 
 /// The menu opens where the pointer is. Anchoring it to the row would put it at the row's right
 /// edge — the full width of the explorer away from the click that asked for it.

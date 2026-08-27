@@ -3,6 +3,7 @@ using System.Xml.Linq;
 using Microsoft.Data.SqlClient;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Models;
+using WebDataStudio.Server.Services;
 
 namespace WebDataStudio.Server.Drivers.SqlServer;
 
@@ -53,7 +54,13 @@ public sealed class SqlServerDriver : AdoDriverBase
 
     public override async Task<IDbSession> OpenAsync(ConnectionSpec spec, CancellationToken ct)
     {
-        var connection = new SqlConnection(spec.ConnectionString);
+        // A token means somebody signed in through the studio's own device-code flow: SqlClient then
+        // gets the token rather than an Authentication= keyword, because the two are exclusive.
+        var connection = spec.AccessToken is { Length: > 0 } token
+            ? new SqlConnection(EntraConnectionString.WithoutAuthentication(spec.ConnectionString))
+                { AccessToken = token }
+            : new SqlConnection(spec.ConnectionString);
+
         await connection.OpenAsync(ct);
         return new AdoSession(spec, connection);
     }

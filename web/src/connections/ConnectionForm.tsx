@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Accordion, Button, ColorInput, Group, NumberInput, PasswordInput, Select, Stack, Switch, Text,
   Textarea, TextInput,
 } from "@mantine/core";
 import { ENGINES, engineFromConnectionString } from "./engines";
-import { testConnection, type ConnectionInput, type TunnelInput } from "../api";
+import {
+  connectionPresets, testConnection,
+  type ConnectionInput, type ConnectionPresetDto, type TunnelInput,
+} from "../api";
 
 const TLS_MODES = ["default", "disable", "prefer", "require", "verify-ca", "verify-full"];
 
@@ -39,6 +42,11 @@ export function ConnectionForm({ initial, onSubmit, onCancel }: {
   const [busy, setBusy] = useState(false);
   const [sslMode, setSslMode] = useState("default");
   const [tunnel, setTunnel] = useState<TunnelInput | null>(initial?.tunnel ?? null);
+  const [presets, setPresets] = useState<ConnectionPresetDto[]>([]);
+  const [preset, setPreset] = useState<string | null>(null);
+
+  // The connection strings nobody remembers: Azure SQL, Synapse, Fabric, a bucket.
+  useEffect(() => { connectionPresets().then(setPresets).catch(() => setPresets([])); }, []);
 
   // Pasting a connection string picks the engine automatically.
   const setConnectionString = (text: string) => {
@@ -64,6 +72,21 @@ export function ConnectionForm({ initial, onSubmit, onCancel }: {
         onChange={e => { const name = e.currentTarget.value; setValue(v => ({ ...v, name })); }} />
       <Select label="Engine" data={ENGINES.map(e => ({ value: e.id, label: e.label }))}
         value={value.engine} onChange={id => id && setValue(v => ({ ...v, engine: id }))} />
+
+      {presets.length > 0 &&
+        <Select label="Start from" clearable searchable
+          placeholder="Azure SQL, Synapse, Fabric, a bucket…"
+          description={presets.find(p => p.id === preset)?.description
+            ?? "Fills in the connection string; the placeholders in braces are yours to replace"}
+          data={presets.map(p => ({ value: p.id, label: p.label }))}
+          value={preset}
+          onChange={id => {
+            setPreset(id);
+            const chosen = presets.find(p => p.id === id);
+            if (chosen) setValue(v => ({
+              ...v, engine: chosen.engine, connectionString: chosen.template,
+            }));
+          }} />}
       <Textarea label="Connection string" autosize minRows={2} value={value.connectionString}
         onChange={e => setConnectionString(e.currentTarget.value)}
         description="A provider connection string or a URL such as postgres://user:pw@host:5432/db" />

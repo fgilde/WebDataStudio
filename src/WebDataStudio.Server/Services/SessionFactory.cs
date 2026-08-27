@@ -8,6 +8,11 @@ namespace WebDataStudio.Server.Services;
 public sealed class UnknownConnectionException(string id)
     : Exception($"no connection with id '{id}'");
 
+/// This connection is one a person signs in to, and nobody has. The endpoints turn it into an
+/// answer the UI can act on — "sign in" — rather than into an authentication failure.
+public sealed class EntraSignInRequiredException(string id)
+    : Exception($"connection '{id}' needs an interactive Entra sign-in");
+
 /// Holds the tunnel open for exactly as long as the session that needs it.
 internal sealed class TunnelledSession(
     IDbSession inner, TunnelManager tunnels, TunnelSpec spec, string host, int port) : IDbSessionWrapper
@@ -24,12 +29,21 @@ internal sealed class TunnelledSession(
 }
 
 public sealed class SessionFactory(
-    ConnectionRegistry registry, DriverRegistry drivers, TunnelManager tunnels, SessionPool pool)
+    ConnectionRegistry registry, DriverRegistry drivers, TunnelManager tunnels, SessionPool pool,
+    EntraSignIn entra)
 {
     public async Task<(IDbDriver Driver, IDbSession Session)> OpenAsync(string connectionId, CancellationToken ct)
     {
         var spec = registry.Find(connectionId) ?? throw new UnknownConnectionException(connectionId);
         var driver = drivers.Get(spec.Engine);
+
+        // A connection that says a person signs in cannot be opened by the machine. Where somebody
+        // has signed in, their token comes along; where nobody has, the open fails with a message
+        // that says to sign in rather than with an authentication error nobody can act on.
+        if (EntraConnectionString.WantsAPerson(spec.ConnectionString))
+            spec = entra.TokenFor(connectionId) is { Length: > 0 } token
+                ? spec with { AccessToken = token }
+                : throw new EntraSignInRequiredException(connectionId);
 
         return (driver, await pool.RentAsync(connectionId, token => OpenRawAsync(spec, driver, token), ct));
     }

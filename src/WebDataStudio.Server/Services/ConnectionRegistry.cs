@@ -48,7 +48,8 @@ public sealed class ConnectionRegistry
 
     public static ConnectionDto ToDto(ConnectionSpec spec) => new(
         spec.Id, spec.Name, spec.Engine, spec.ReadOnly, spec.Color, spec.Group,
-        spec.Source.ToString(), Summarize(spec), spec.Tunnel is not null);
+        spec.Source.ToString(), Summarize(spec), spec.Tunnel is not null,
+        EntraConnectionString.WantsAPerson(spec.ConnectionString));
 
     /// A human-readable target for the connection list — host and database only, never a secret.
     private static string Summarize(ConnectionSpec spec)

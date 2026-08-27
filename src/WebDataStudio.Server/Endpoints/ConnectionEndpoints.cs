@@ -13,6 +13,24 @@ public static class ConnectionEndpoints
     {
         var api = app.MapGroup("/api/connections");
 
+        // --- presets and the interactive Entra sign-in -----------------------
+        // The connection strings nobody remembers, and the flow for the ones a person signs in to.
+        app.MapGet("/api/connection-presets", (string? engine) =>
+            Results.Ok(ConnectionPresets.For(engine)));
+
+        // Starts a device-code sign-in and returns at once: the code arrives on the next poll,
+        // because the person needs a moment to get to a browser.
+        api.MapPost("/{id}/entra/signin", (string id, string? tenant, EntraSignIn entra,
+            CancellationToken ct) => Results.Ok(entra.Start(id, tenant, ct)));
+
+        api.MapGet("/{id}/entra", (string id, EntraSignIn entra) => Results.Ok(entra.Status(id)));
+
+        api.MapDelete("/{id}/entra", (string id, EntraSignIn entra) =>
+        {
+            entra.SignOut(id);
+            return Results.NoContent();
+        });
+
         api.MapGet("/", (ConnectionRegistry registry) =>
             Results.Ok(registry.All().Select(ConnectionRegistry.ToDto)));
 

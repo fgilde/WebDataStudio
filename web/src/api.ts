@@ -11,6 +11,8 @@ export interface Connection {
   id: string; name: string; engine: string; readOnly: boolean;
   color: string | null; group: string | null; source: "Environment" | "Stored"; summary: string;
   tunnelled: boolean;
+  /// This connection is one a person signs in to rather than one the machine can open on its own.
+  interactive?: boolean;
 }
 export interface TunnelInput {
   host: string; port: number; user: string;
@@ -698,6 +700,36 @@ export const listSessions = (conn: string): Promise<SessionDto[]> =>
 export const killSession = (conn: string, id: string): Promise<void> =>
   fetch(`${base}/admin/sessions/${conn}/${encodeURIComponent(id)}/kill`, { method: "POST" })
     .then(r => ok<void>(r));
+
+export interface ConnectionPresetDto {
+  id: string; label: string; engine: string; template: string; description: string;
+  /// Opening it needs a person to sign in — the device-code flow — rather than the machine's identity.
+  interactive: boolean;
+}
+
+export const connectionPresets = (engine?: string): Promise<ConnectionPresetDto[]> =>
+  fetch(`${base}/connection-presets${engine ? `?engine=${encodeURIComponent(engine)}` : ""}`)
+    .then(r => ok<ConnectionPresetDto[]>(r));
+
+export interface EntraStatusDto {
+  /// none, starting, pending, signed-in, expired or failed. The token never leaves the server.
+  state: string;
+  userCode: string | null;
+  verificationUrl: string | null;
+  message: string | null;
+  expiresOn: string | null;
+  error: string | null;
+}
+
+export const entraSignIn = (conn: string, tenant?: string): Promise<EntraStatusDto> =>
+  fetch(`${base}/connections/${conn}/entra/signin${tenant ? `?tenant=${encodeURIComponent(tenant)}` : ""}`,
+    { method: "POST" }).then(r => ok<EntraStatusDto>(r));
+
+export const entraStatus = (conn: string): Promise<EntraStatusDto> =>
+  fetch(`${base}/connections/${conn}/entra`).then(r => ok<EntraStatusDto>(r));
+
+export const entraSignOut = (conn: string): Promise<void> =>
+  fetch(`${base}/connections/${conn}/entra`, { method: "DELETE" }).then(r => ok<void>(r));
 
 export interface JobDto {
   id: string; name: string; enabled: boolean; schedule: string;

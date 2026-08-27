@@ -101,7 +101,8 @@ public class SshTunnelTests(JumpHostFixture fixture) : IClassFixture<JumpHostFix
 
         var config = new ConfigurationBuilder().Build();
         var registry = new ConnectionRegistry(config, store);
-        return (new SessionFactory(registry, new DriverRegistry(), tunnels, new SessionPool(config)),
+        return (new SessionFactory(registry, new DriverRegistry(), tunnels, new SessionPool(config),
+                new EntraSignIn(Microsoft.Extensions.Logging.Abstractions.NullLogger<EntraSignIn>.Instance)),
             stored.Id);
     }
 

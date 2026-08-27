@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { ActionIcon, Badge, Button, Group, Modal, Stack, Table, Text, Title } from "@mantine/core";
-import { IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconKey, IconPlus, IconTrash } from "@tabler/icons-react";
 import { createConnection, deleteConnection, listConnections, type Connection } from "../api";
 import { ConnectionForm } from "./ConnectionForm";
+import { EntraSignInModal } from "./EntraSignInModal";
 
 export function ConnectionsPage() {
   const [items, setItems] = useState<Connection[]>([]);
   const [adding, setAdding] = useState(false);
+  const [signingIn, setSigningIn] = useState<Connection | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => listConnections().then(setItems).catch(e => setError(e.message));
@@ -35,8 +37,17 @@ export function ConnectionsPage() {
               <Table.Td>
                 {c.source === "Environment" && <Badge variant="light">from environment</Badge>}
                 {c.readOnly && <Badge color="orange" variant="light" ml={4}>read-only</Badge>}
+                {c.interactive && <Badge color="blue" variant="light" ml={4}>sign-in</Badge>}
               </Table.Td>
               <Table.Td>
+                {/* A connection opened as a person: nothing can be read from it until somebody has
+                    signed in, so the sign-in is offered here rather than behind a failed query. */}
+                {c.interactive && (
+                  <ActionIcon variant="subtle" aria-label={`Sign in to ${c.name}`}
+                    onClick={() => setSigningIn(c)}>
+                    <IconKey size={16} />
+                  </ActionIcon>
+                )}
                 {c.source === "Stored" && (
                   <ActionIcon variant="subtle" color="red"
                     onClick={() => deleteConnection(c.id).then(refresh).catch(e => setError(e.message))}>
@@ -48,6 +59,11 @@ export function ConnectionsPage() {
           ))}
         </Table.Tbody>
       </Table>
+
+      {signingIn && (
+        <EntraSignInModal connectionId={signingIn.id} name={signingIn.name} opened
+          onClose={() => setSigningIn(null)} />
+      )}
 
       <Modal opened={adding} onClose={() => setAdding(false)} title="Add connection">
         <ConnectionForm

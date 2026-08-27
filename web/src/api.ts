@@ -731,6 +731,22 @@ export const entraStatus = (conn: string): Promise<EntraStatusDto> =>
 export const entraSignOut = (conn: string): Promise<void> =>
   fetch(`${base}/connections/${conn}/entra`, { method: "DELETE" }).then(r => ok<void>(r));
 
+export interface ExportTemplateDto {
+  id: string; label: string; extension: string; contentType: string;
+  header: string | null; row: string; footer: string | null; separator: string;
+}
+
+export const exportTemplates = (): Promise<{ templates: ExportTemplateDto[]; error: string | null }> =>
+  fetch(`${base}/export/templates`)
+    .then(r => ok<{ templates: ExportTemplateDto[]; error: string | null }>(r));
+
+export const saveExportTemplate = (template: ExportTemplateDto): Promise<ExportTemplateDto> =>
+  fetch(`${base}/export/templates`, json("PUT", template)).then(r => ok<ExportTemplateDto>(r));
+
+export const deleteExportTemplate = (id: string): Promise<void> =>
+  fetch(`${base}/export/templates/${encodeURIComponent(id)}`, { method: "DELETE" })
+    .then(r => ok<void>(r));
+
 export interface SchemaScopeDto {
   /// Every schema the connection could read.
   available: string[];

@@ -145,7 +145,14 @@ builder.Services.AddSingleton<EntraSignIn>();
 builder.Services.AddSingleton<SessionFactory>();
 builder.Services.AddSingleton<StatementCapture>();
 builder.Services.AddSingleton<QueryRunner>();
-builder.Services.AddSingleton<ExporterRegistry>();
+// Export formats somebody wrote themselves: a folder the deployment mounts, plus whatever was
+// saved in this studio. They are text with placeholders, never code to run.
+builder.Services.AddSingleton(sp => new ExportTemplates(
+    sp.GetRequiredService<IConfiguration>(),
+    () => sp.GetRequiredService<WorkspaceStore>().LoadItem("export-templates"),
+    json => sp.GetRequiredService<WorkspaceStore>().SaveItem("export-templates", json)));
+
+builder.Services.AddSingleton(sp => new ExporterRegistry(sp.GetRequiredService<ExportTemplates>()));
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton(sp => new WorkspaceStore(
     sp.GetRequiredService<IConfiguration>()["DB_PATH"] ?? "/data/webdatastudio.db"));

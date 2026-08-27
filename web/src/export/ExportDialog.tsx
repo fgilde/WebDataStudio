@@ -3,6 +3,7 @@ import {
   Alert, Button, Group, Modal, NumberInput, Radio, Select, Stack, Switch, Text, TextInput,
 } from "@mantine/core";
 import { listExportFormats, type ExportFormatDto } from "../api";
+import { TemplateEditor } from "./TemplateEditor";
 
 export type ExportScope = "result" | "table" | "schema";
 
@@ -25,6 +26,7 @@ const SCOPE_LABELS: Record<ExportScope, string> = {
 export function ExportDialog({ target, onClose }: { target: ExportTarget | null; onClose: () => void }) {
   const [formats, setFormats] = useState<ExportFormatDto[]>([]);
   const [format, setFormat] = useState("csv");
+  const [templatesOpen, setTemplatesOpen] = useState(false);
   const [scope, setScope] = useState<ExportScope>("result");
   const [delimiter, setDelimiter] = useState(",");
   const [header, setHeader] = useState(true);
@@ -98,8 +100,19 @@ export function ExportDialog({ target, onClose }: { target: ExportTarget | null;
   return (
     <Modal opened onClose={onClose} title="Export" size="md">
       <Stack gap="sm">
-        <Select label="Format" value={format} onChange={v => v && setFormat(v)}
-          data={formats.map(f => ({ value: f.format, label: f.label }))} />
+        <Group align="flex-end" gap="xs">
+          <Select style={{ flex: 1 }} label="Format" value={format} onChange={v => v && setFormat(v)}
+            data={formats.map(f => ({ value: f.format, label: f.label }))} />
+          {/* An export format written here rather than shipped: text with placeholders, no code. */}
+          <Button size="compact-xs" variant="subtle" onClick={() => setTemplatesOpen(true)}>
+            Templates…
+          </Button>
+        </Group>
+
+        {templatesOpen && (
+          <TemplateEditor onClose={() => setTemplatesOpen(false)}
+            onSaved={() => listExportFormats().then(setFormats).catch(() => {})} />
+        )}
 
         <Radio.Group label="Scope" value={scope} onChange={v => setScope(v as ExportScope)}>
           <Group gap="md" mt={4}>

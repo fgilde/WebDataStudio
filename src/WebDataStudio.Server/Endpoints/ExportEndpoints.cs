@@ -23,6 +23,30 @@ public static class ExportEndpoints
         var defaultMaxRows = int.TryParse(app.Configuration["WDS_EXPORT_MAX_ROWS"], out var m) ? m : int.MaxValue;
         var timeout = int.TryParse(app.Configuration["WDS_QUERY_TIMEOUT_SECONDS"], out var t) ? t : 300;
 
+        // The templates themselves: text with placeholders, listed, saved and deleted like any other
+        // piece of workspace state. A template mounted by the deployment is read-only here.
+        app.MapGet("/api/export/templates", (ExportTemplates templates) =>
+            Results.Ok(new { templates = templates.All(), error = templates.Error }));
+
+        app.MapPut("/api/export/templates", (ExportTemplate body, ExportTemplates templates) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Id) || string.IsNullOrWhiteSpace(body.Row))
+                return Results.BadRequest(new { message = "a template needs an id and a row" });
+
+            try
+            {
+                templates.Save(body);
+                return Results.Ok(body);
+            }
+            catch (InvalidOperationException e) { return Results.BadRequest(new { message = e.Message }); }
+        });
+
+        app.MapDelete("/api/export/templates/{id}", (string id, ExportTemplates templates) =>
+        {
+            templates.Delete(id);
+            return Results.NoContent();
+        });
+
         app.MapGet("/api/export/formats", (ExporterRegistry registry) =>
             Results.Ok(registry.All()
                 .OrderBy(e => e.Label)

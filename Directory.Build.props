@@ -17,11 +17,11 @@
          1.1.0, not 1.1.<whatever the run number happened to be>. Without this the download said one
          thing and the image it was built from said another. -->
     <VersionPrefix Condition="'$(WdsVersion)' != ''">$(WdsVersion)</VersionPrefix>
-    <VersionPrefix Condition="'$(WdsVersion)' == ''">1.1.$(WdsBuild)</VersionPrefix>
+    <VersionPrefix Condition="'$(WdsVersion)' == ''">1.2.$(WdsBuild)</VersionPrefix>
     <VersionSuffix Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' == '0'">dev</VersionSuffix>
     <InformationalVersion Condition="'$(WdsVersion)' != ''">$(WdsVersion)+$(WdsCommit)</InformationalVersion>
-    <InformationalVersion Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' == '0'">1.1.0-dev+$(WdsCommit)</InformationalVersion>
-    <InformationalVersion Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' != '0'">1.1.$(WdsBuild)+$(WdsCommit)</InformationalVersion>
+    <InformationalVersion Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' == '0'">1.2.0-dev+$(WdsCommit)</InformationalVersion>
+    <InformationalVersion Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' != '0'">1.2.$(WdsBuild)+$(WdsCommit)</InformationalVersion>
   </PropertyGroup>
 
 </Project>

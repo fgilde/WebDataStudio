@@ -11,6 +11,9 @@ public sealed class ConnectionRegistry
     [
         "postgresql", "mysql", "sqlserver", "sqlite",
         "oracle", "duckdb", "clickhouse", "mongodb", "redis",
+        // Object storage — S3, Azure Blob, Google Cloud Storage or a folder, told apart by the
+        // connection's own URL rather than by a separate engine each.
+        "storage",
     ];
 
     private readonly IReadOnlyList<ConnectionSpec> _environment;

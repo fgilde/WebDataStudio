@@ -18,6 +18,15 @@ public static class ConnectionUrl
         ["clickhouse"] = "clickhouse",
         ["mongodb"] = "mongodb",
         ["redis"] = "redis",
+
+        // Object storage: one engine, four schemes. The scheme picks the provider inside the driver,
+        // which is why they all answer with the same engine id here.
+        ["s3"] = "storage",
+        ["azblob"] = "storage",
+        ["azure"] = "storage",
+        ["gs"] = "storage",
+        ["gcs"] = "storage",
+        ["file"] = "storage",
     };
 
     private static readonly Dictionary<string, int> DefaultPorts = new(StringComparer.OrdinalIgnoreCase)
@@ -44,6 +53,10 @@ public static class ConnectionUrl
 
         // File-backed engines carry a path, not a host.
         if (engine is "sqlite" or "duckdb") return $"Data Source={url.LocalPath}";
+
+        // A storage connection is its URL: the driver parses it into a bucket, a prefix and
+        // credentials, and there is no ADO connection string to translate it into.
+        if (engine is "storage") return url.ToString();
 
         var userInfo = url.UserInfo.Split(':', 2);
         var user = Uri.UnescapeDataString(userInfo[0]);

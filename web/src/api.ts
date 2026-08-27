@@ -731,6 +731,30 @@ export const entraStatus = (conn: string): Promise<EntraStatusDto> =>
 export const entraSignOut = (conn: string): Promise<void> =>
   fetch(`${base}/connections/${conn}/entra`, { method: "DELETE" }).then(r => ok<void>(r));
 
+export interface DataHitDto {
+  schema: string; table: string; column: string; dataType: string; matches: number;
+}
+export interface DataSearchDto {
+  hits: DataHitDto[];
+  tablesSearched: number;
+  tablesSkipped: number;
+  /// Tables that could not be searched, with the reason.
+  notes: string[];
+  truncated: boolean;
+}
+
+/// "Find this value in any table", server-side and type-aware.
+export const searchData = (
+  conn: string, value: string, options?: { schema?: string; exact?: boolean; maxTables?: number },
+): Promise<DataSearchDto> => {
+  const query = new URLSearchParams({ value });
+  if (options?.schema) query.set("schema", options.schema);
+  if (options?.exact) query.set("exact", "true");
+  if (options?.maxTables) query.set("maxTables", String(options.maxTables));
+
+  return fetch(`${base}/search/${conn}/data?${query}`).then(r => ok<DataSearchDto>(r));
+};
+
 export interface SqlFindingDto {
   id: string;
   /// warning for what is probably a mistake, note for what is merely worth knowing.

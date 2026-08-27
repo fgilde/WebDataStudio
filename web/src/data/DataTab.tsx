@@ -39,10 +39,13 @@ export interface DataTabProps {
   onFollowForeignKey?: (fk: ForeignKeyDto, value: unknown) => void;
   /// Opens the export dialog on this table. Absent only where there is no shell to open it in.
   onExport?: () => void;
+  /// The filter the tab opens with. The data search uses it: a hit opens its table already filtered
+  /// on the column that matched.
+  initialFilter?: { column: string; value: string } | null;
 }
 
 export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], onFollowForeignKey,
-  onExport }: DataTabProps) {
+  onExport, initialFilter = null }: DataTabProps) {
   // How many rows a page holds is a preference, not a constant: a wide table wants fewer.
   const { pageSize } = usePreferences();
   const [page, setPage] = useState<DataPageDto | null>(null);
@@ -58,7 +61,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   // Sorting and filtering happen on the server: a page holds 200 of possibly millions of rows, so
   // doing either in the browser would order and filter the wrong set.
   const [sort, setSort] = useState<{ column: string; desc: boolean } | null>(null);
-  const [filter, setFilter] = useState<{ column: string; value: string } | null>(null);
+  const [filter, setFilter] = useState<{ column: string; value: string } | null>(initialFilter);
   // What the server says could be taken back on this table, and whether its script is open.
   const [undoState, setUndoState] = useState<UndoStateDto | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);

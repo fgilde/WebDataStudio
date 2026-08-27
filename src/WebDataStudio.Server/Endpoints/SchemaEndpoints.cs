@@ -251,6 +251,34 @@ public static class SchemaEndpoints
                     message = "no snapshot directory is configured; set WDS_SCHEMA_SNAPSHOT_DIR",
                 }));
 
+        // "Find 4711 in any table." The object search says where a table is; this says where a value
+        // is, server-side and type-aware — a number is compared as a number, and a column that
+        // cannot hold the value is not scanned at all.
+        app.MapGet("/api/search/{conn}/data", async (string conn, string value, string? schema,
+            bool? exact, int? maxTables, int? timeoutSeconds, SessionFactory factory,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (!driver.Caps.Sql)
+                        return Results.BadRequest(new
+                        {
+                            message = $"{driver.Info.Label} has no tables to search",
+                        });
+
+                    return Results.Ok(await DataSearch.RunAsync(driver, session, value, schema,
+                        exact ?? false, maxTables ?? DataSearch.DefaultMaxTables,
+                        timeoutSeconds ?? 30, ct));
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (OperationCanceledException) { return Results.NoContent(); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
         app.MapGet("/api/drivers", (DriverRegistry drivers) =>
             Results.Ok(drivers.All().Select(d => new { d.Info, d.Caps })));
 

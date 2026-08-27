@@ -5,7 +5,7 @@ import { ActionIcon, Group, Modal, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import {
   IconArchive, IconArrowsJoin, IconBinaryTree, IconNotebook,
-  IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconKey, IconLayoutBoard,
+  IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconKey, IconLayoutBoard, IconZoomCode,
   IconSettingsCog, IconSitemap, IconSquarePlus, IconTable,
 } from "@tabler/icons-react";
 import "dockview-react/dist/styles/dockview.css";
@@ -27,6 +27,7 @@ import { TableDesigner } from "../designer/TableDesigner";
 import { DiagramPanel } from "../diagram/DiagramPanel";
 import { AdminPanel } from "../admin/AdminPanel";
 import { ComparePanel } from "../compare/ComparePanel";
+import { DataSearchPanel } from "../explorer/DataSearchPanel";
 import { QueryDesigner } from "../designer/QueryDesigner";
 import { RedisPanel } from "../redis/RedisPanel";
 import { parseModel } from "../designer/buildSelect";
@@ -67,6 +68,8 @@ interface DesignerTabState {
 
 interface DataTabState {
   id: string; connectionId: string; objectRef: string; tableName: string; foreignKeys: ForeignKeyDto[];
+  /// Where the tab opens already filtered — a hit from the data search.
+  filter?: { column: string; value: string } | null;
 }
 
 interface ShellState {
@@ -81,7 +84,8 @@ interface ShellState {
   exportObject: (connectionId: string, objectRef: string, label: string) => void;
   followForeignKey: (from: DataTabState, fk: ForeignKeyDto, value: unknown) => void;
   runStatement: (connectionId: string, sql: string) => void;
-  openData: (connectionId: string, objectRef: string, tableName: string) => void;
+  openData: (connectionId: string, objectRef: string, tableName: string,
+    filter?: { column: string; value: string }) => void;
   dialectOf: (connectionId: string) => DialectId;
   // The explorer is a dock panel like any other, so it can be dragged, split off or closed. What
   // it needs from the shell travels through here instead of through props.
@@ -158,6 +162,7 @@ function DataPanel(props: IDockviewPanelProps<{ tabId: string }>) {
       objectRef={tab.objectRef}
       tableName={tab.tableName}
       foreignKeys={tab.foreignKeys}
+      initialFilter={tab.filter ?? null}
       onFollowForeignKey={(fk, value) => shell.followForeignKey(tab, fk, value)}
       onExport={() => shell.exportObject(tab.connectionId, tab.objectRef, tab.tableName)} />
   );
@@ -273,6 +278,18 @@ function AdminDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
   );
 }
 
+function DataSearchDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+  const shell = useShell();
+
+  return (
+    <DataSearchPanel connectionId={props.params.connectionId}
+      // A hit opens the table it is in, so the next question — which row? — is one click away.
+      onOpen={(table, schema, column, value) =>
+        shell.openData(props.params.connectionId,
+          schema ? `Table:${schema}/${table}` : `Table:${table}`, table, { column, value })} />
+  );
+}
+
 function CompareDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
   return <ComparePanel connectionId={props.params.connectionId} />;
 }
@@ -311,6 +328,12 @@ function ExplorerDockPanel() {
           <ActionIcon size="sm" variant="subtle" aria-label="Diagram" disabled={!connection}
             onClick={() => explorer.openTool("diagram", "Diagram", connection)}>
             <IconSitemap size={15} />
+          </ActionIcon>
+        </Tooltip>
+        <Tooltip label="Find a value in any table">
+          <ActionIcon size="sm" variant="subtle" aria-label="Find data" disabled={!connection}
+            onClick={() => explorer.openTool("datasearch", "Find data", connection)}>
+            <IconZoomCode size={15} />
           </ActionIcon>
         </Tooltip>
         <Tooltip label="Compare">
@@ -400,7 +423,7 @@ const components = {
   data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel, designer: DesignerPanel,
   diagram: DiagramDockPanel, admin: AdminDockPanel, compare: CompareDockPanel,
   saved: SavedQueriesDockPanel, builder: QueryDesignerDockPanel, redis: RedisDockPanel,
-  federate: FederationDockPanel, notebook: NotebookDockPanel,
+  federate: FederationDockPanel, notebook: NotebookDockPanel, datasearch: DataSearchDockPanel,
   perspective: PerspectiveDockPanel, archive: ArchiveDockPanel,
 };
 
@@ -626,12 +649,14 @@ export function DockShell() {
     });
   }, []);
 
-  const openData = useCallback(async (connectionId: string, objectRef: string, tableName: string) => {
+  const openData = useCallback(async (connectionId: string, objectRef: string, tableName: string,
+    filter?: { column: string; value: string }) => {
     const detail = await describeObject(connectionId, objectRef).catch(() => null);
     const tab: DataTabState = {
       id: "d" + Date.now().toString(36),
       connectionId, objectRef, tableName,
       foreignKeys: detail?.foreignKeys ?? [],
+      filter: filter ?? null,
     };
     setDataTabs(list => [...list, tab]);
     api.current?.addPanel({

@@ -8,7 +8,10 @@ public class EngineCoverageTests
 {
     private static readonly string[] Expected =
     [
-        "clickhouse", "duckdb", "mongodb", "mysql", "oracle", "postgresql", "redis", "sqlite", "sqlserver",
+        "clickhouse", "duckdb", "mongodb", "mysql", "oracle", "postgresql", "redis", "sqlite",
+        "sqlserver",
+        // Object storage: one engine, four schemes — the scheme picks the provider inside it.
+        "storage",
     ];
 
     [Fact]

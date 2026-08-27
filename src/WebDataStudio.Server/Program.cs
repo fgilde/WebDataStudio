@@ -140,6 +140,7 @@ builder.Services.AddSingleton<TunnelManager>();
 builder.Services.AddSingleton(sp => new SessionPool(sp.GetRequiredService<IConfiguration>()));
 // An interactive Entra sign-in is per studio, not per request: the token it ends up with is what
 // the next connection uses.
+builder.Services.AddSingleton<SchemaScope>();
 builder.Services.AddSingleton<EntraSignIn>();
 builder.Services.AddSingleton<SessionFactory>();
 builder.Services.AddSingleton<StatementCapture>();

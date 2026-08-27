@@ -1266,7 +1266,9 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       </Modal>
 
       <PropertiesDialog connectionId={propertiesFor?.connectionId ?? null}
-        label={propertiesFor?.label ?? ""} onClose={() => setPropertiesFor(null)} />
+        label={propertiesFor?.label ?? ""} onClose={() => setPropertiesFor(null)}
+        // Fewer schemas means a different tree, so it is re-read rather than left stale.
+        onScopeChanged={() => setExplorerNonce(n => n + 1)} />
 
       <GrantDialog target={grantTarget} onClose={() => setGrantTarget(null)} onScript={runStatement} />
       <ArchiveDialog target={archiveTarget} onClose={() => setArchiveTarget(null)} />

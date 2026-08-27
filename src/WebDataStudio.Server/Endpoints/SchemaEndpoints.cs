@@ -279,11 +279,61 @@ public static class SchemaEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
+        // Which schemas this connection reads, and the whole list to choose from. The deployment can
+        // fix the scope with WDS_CONN_<NAME>_SCHEMAS, and then this only reports it.
+        app.MapGet("/api/schema/{conn}/scope", async (string conn, SessionFactory factory,
+            SchemaScope scope, ConnectionRegistry connections, CancellationToken ct) =>
+        {
+            var spec = connections.Find(conn);
+            if (spec is null) return Results.NotFound(new { message = $"no connection '{conn}'" });
+
+            var fixedByEnvironment = scope.FromEnvironment(spec.Name);
+
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var all = (await driver.IntrospectAsync(session, null, ct))
+                        .Where(node => node.Ref.Kind is SchemaNodeKind.Schema or SchemaNodeKind.Database)
+                        .Select(node => node.Label)
+                        .ToList();
+
+                    return Results.Ok(new
+                    {
+                        available = all,
+                        chosen = scope.Chosen(spec.Id),
+                        fixedByEnvironment,
+                        editable = fixedByEnvironment.Count == 0,
+                    });
+                }
+            }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        app.MapPut("/api/schema/{conn}/scope", (string conn, string[] body, SchemaScope scope,
+            ConnectionRegistry connections) =>
+        {
+            var spec = connections.Find(conn);
+            if (spec is null) return Results.NotFound(new { message = $"no connection '{conn}'" });
+
+            if (scope.FromEnvironment(spec.Name).Count > 0)
+                return Results.BadRequest(new
+                {
+                    message = "this connection's schemas are fixed by WDS_CONN_"
+                              + spec.Name.ToUpperInvariant() + "_SCHEMAS",
+                });
+
+            scope.Choose(spec.Id, body);
+            return Results.Ok(new { chosen = body });
+        });
+
         app.MapGet("/api/drivers", (DriverRegistry drivers) =>
             Results.Ok(drivers.All().Select(d => new { d.Info, d.Caps })));
 
         app.MapGet("/api/schema/{conn}", async (string conn, string? parent,
-            SessionFactory factory, CancellationToken ct) =>
+            SessionFactory factory, SchemaScope scope, ConnectionRegistry connections,
+            CancellationToken ct) =>
         {
             try
             {
@@ -292,6 +342,11 @@ public static class SchemaEndpoints
                 {
                     var parentRef = string.IsNullOrEmpty(parent) ? null : SchemaNodeRef.Parse(parent);
                     var nodes = await driver.IntrospectAsync(session, parentRef, ct);
+
+                    // A server with five thousand tables should not make every studio pay for all of
+                    // them. Where somebody named the schemas they work in, the rest is not listed.
+                    if (parentRef is null && connections.Find(conn) is { } spec)
+                        nodes = scope.Filter(new ConnectionSpecName(spec.Id, spec.Name), nodes);
 
                     // Every driver stops at the object itself. Its columns, indexes, keys and
                     // triggers are already in DescribeAsync, so the tree grows one level deeper

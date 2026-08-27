@@ -4,6 +4,7 @@ import {
 } from "@mantine/core";
 import { IconCheck, IconCopy, IconEye, IconEyeOff } from "@tabler/icons-react";
 import { connectionProperties, revealConnectionString, type ConnectionPropertiesDto } from "../api";
+import { SchemaScopePicker } from "./SchemaScopePicker";
 
 /// The capability flags worth showing in plain words. The rest of them describe internals a
 /// reader of this dialog has no use for.
@@ -34,10 +35,12 @@ const CAPABILITY_LABELS: [string, string][] = [
   ["systemCommands", "Maintenance commands"],
 ];
 
-export function PropertiesDialog({ connectionId, label, onClose }: {
+export function PropertiesDialog({ connectionId, label, onClose, onScopeChanged }: {
   connectionId: string | null;
   label: string;
   onClose: () => void;
+  /// The tree is re-read when the schemas in scope change.
+  onScopeChanged?: () => void;
 }) {
   const [data, setData] = useState<ConnectionPropertiesDto | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +88,10 @@ export function PropertiesDialog({ connectionId, label, onClose }: {
               {data.error}
             </Alert>
           ) : null}
+
+          {/* Which schemas this connection reads at all: on a large server that is the difference
+              between a tree that opens and one that takes a minute. */}
+          {connectionId && <SchemaScopePicker connectionId={connectionId} onChanged={onScopeChanged} />}
 
           <div>
             <Group gap={6} mb={4} justify="space-between">

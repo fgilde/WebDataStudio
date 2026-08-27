@@ -731,6 +731,22 @@ export const entraStatus = (conn: string): Promise<EntraStatusDto> =>
 export const entraSignOut = (conn: string): Promise<void> =>
   fetch(`${base}/connections/${conn}/entra`, { method: "DELETE" }).then(r => ok<void>(r));
 
+export interface SchemaScopeDto {
+  /// Every schema the connection could read.
+  available: string[];
+  /// The ones this studio chose, empty meaning all of them.
+  chosen: string[];
+  /// Where the deployment fixed the scope, that list; then `editable` is false.
+  fixedByEnvironment: string[];
+  editable: boolean;
+}
+
+export const schemaScope = (conn: string): Promise<SchemaScopeDto> =>
+  fetch(`${base}/schema/${conn}/scope`).then(r => ok<SchemaScopeDto>(r));
+
+export const chooseSchemas = (conn: string, schemas: string[]): Promise<{ chosen: string[] }> =>
+  fetch(`${base}/schema/${conn}/scope`, json("PUT", schemas)).then(r => ok<{ chosen: string[] }>(r));
+
 export interface DataHitDto {
   schema: string; table: string; column: string; dataType: string; matches: number;
 }

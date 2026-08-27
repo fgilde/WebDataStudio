@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using WebDataStudio.Server.Drivers;
+using WebDataStudio.Server.Drivers.Storage;
 using WebDataStudio.Server.Endpoints;
 using WebDataStudio.Server.Export;
 using OpenTelemetry.Metrics;
@@ -9,6 +10,20 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using WebDataStudio.Server.Mcp;
 using WebDataStudio.Server.Services;
+
+// The image build stages DuckDB's storage extensions with this, so that a studio in a private
+// network never has to download one. It installs and exits; it does not start a server.
+if (args.Contains("--install-storage-extensions"))
+{
+    var directory = Environment.GetEnvironmentVariable(DuckDbExtensions.DirectoryVariable)
+                    is { Length: > 0 } given
+        ? given
+        : "/opt/duckdb/extensions";
+
+    Console.WriteLine($"staging DuckDB storage extensions in {directory}");
+    Console.WriteLine("loaded: " + await DuckDbExtensions.StageAsync(directory));
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddOpenApi();

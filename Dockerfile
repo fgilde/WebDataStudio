@@ -50,6 +50,13 @@ https://repo.mongodb.org/apt/debian bookworm/mongodb-org/8.0 main" \
 WORKDIR /app
 COPY --from=build /app .
 
+# DuckDB reads s3://, az:// and gs:// through its httpfs and azure extensions, and INSTALL
+# needs the internet, which a container in a private network does not have. They are staged
+# here, once, by the application's own DuckDB, so the versions match by construction and no
+# session ever downloads anything. About 60 MB, and the price of storage working offline.
+ENV WDS_DUCKDB_EXTENSION_DIR=/opt/duckdb/extensions
+RUN dotnet WebDataStudio.Server.dll --install-storage-extensions
+
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080 \
     DB_PATH=/data/webdatastudio.db
 

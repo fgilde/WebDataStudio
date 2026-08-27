@@ -731,6 +731,32 @@ export const entraStatus = (conn: string): Promise<EntraStatusDto> =>
 export const entraSignOut = (conn: string): Promise<void> =>
   fetch(`${base}/connections/${conn}/entra`, { method: "DELETE" }).then(r => ok<void>(r));
 
+export interface CapturedStatementDto {
+  text: string; samples: number; maxDurationMs: number;
+  firstSeen: string; lastSeen: string;
+  sessions: string[]; users: string[]; databases: string[]; blocked: boolean;
+}
+export interface CaptureDto {
+  /// none, running, done, stopped or failed.
+  state: string;
+  startedAt: string | null;
+  seconds: number;
+  secondsLeft: number;
+  samples: number;
+  statements: CapturedStatementDto[];
+  error: string | null;
+}
+
+export const startCapture = (conn: string, seconds: number): Promise<CaptureDto> =>
+  fetch(`${base}/admin/capture/${conn}?seconds=${seconds}`, { method: "POST" })
+    .then(r => ok<CaptureDto>(r));
+
+export const captureStatus = (conn: string): Promise<CaptureDto> =>
+  fetch(`${base}/admin/capture/${conn}`).then(r => ok<CaptureDto>(r));
+
+export const stopCapture = (conn: string): Promise<CaptureDto> =>
+  fetch(`${base}/admin/capture/${conn}`, { method: "DELETE" }).then(r => ok<CaptureDto>(r));
+
 export interface JobDto {
   id: string; name: string; enabled: boolean; schedule: string;
   lastRun: string | null; lastOutcome: string | null; nextRun: string | null;

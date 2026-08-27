@@ -362,6 +362,30 @@ public static class AdminEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         }).DisableAntiforgery();
 
+        // --- what ran in the next minute --------------------------------------
+        // Sampling rather than tracing: the server's own list of what it is doing, read once a
+        // second. A statement that starts and finishes between two samples is missed, and the panel
+        // says so — Extended Events is the real answer and needs permissions a studio should not ask
+        // for.
+        app.MapPost("/api/admin/capture/{conn}", (string conn, int? seconds,
+            StatementCapture capture, SessionFactory factory, CancellationToken ct) =>
+            WithSession(conn, factory, ct, (driver, _) =>
+                Task.FromResult(driver.Caps.SessionList
+                    ? Results.Ok(capture.Start(conn, seconds ?? 60))
+                    : Results.BadRequest(new
+                    {
+                        message = $"{driver.Info.Label} cannot say what it is running",
+                    }))));
+
+        app.MapGet("/api/admin/capture/{conn}", (string conn, StatementCapture capture) =>
+            Results.Ok(capture.Status(conn)));
+
+        app.MapDelete("/api/admin/capture/{conn}", (string conn, StatementCapture capture) =>
+        {
+            capture.Stop(conn);
+            return Results.Ok(capture.Status(conn));
+        });
+
         // --- scheduled jobs ---------------------------------------------------
         app.MapGet("/api/admin/jobs/{conn}", (string conn, SessionFactory factory,
             CancellationToken ct) =>

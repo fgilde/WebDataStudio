@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using WebDataStudio.Server.Admin;
 using WebDataStudio.Server.Drivers;
 using WebDataStudio.Server.Drivers.Storage;
 using WebDataStudio.Server.Endpoints;
@@ -137,7 +138,11 @@ builder.Services.AddHttpClient("assist", client => client.Timeout = TimeSpan.Fro
 builder.Services.AddSingleton<DriverRegistry>();
 builder.Services.AddSingleton<TunnelManager>();
 builder.Services.AddSingleton(sp => new SessionPool(sp.GetRequiredService<IConfiguration>()));
+// An interactive Entra sign-in is per studio, not per request: the token it ends up with is what
+// the next connection uses.
+builder.Services.AddSingleton<EntraSignIn>();
 builder.Services.AddSingleton<SessionFactory>();
+builder.Services.AddSingleton<StatementCapture>();
 builder.Services.AddSingleton<QueryRunner>();
 builder.Services.AddSingleton<ExporterRegistry>();
 builder.Services.AddMemoryCache();

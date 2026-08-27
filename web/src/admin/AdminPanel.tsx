@@ -16,6 +16,7 @@ import { StudioUsers } from "./StudioUsers";
 import { SizeTreemap } from "./SizeTreemap";
 import { Replication } from "./Replication";
 import { Jobs } from "./Jobs";
+import { Capture } from "./Capture";
 import { runJob } from "../shell/jobs";
 import { formatBytes } from "../redis/format";
 
@@ -492,6 +493,7 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor }: {
         <Tabs.Tab value="maintenance">Maintenance</Tabs.Tab>
         <Tabs.Tab value="sessions">Sessions</Tabs.Tab>
         <Tabs.Tab value="jobs">Jobs</Tabs.Tab>
+        <Tabs.Tab value="capture">Capture</Tabs.Tab>
         <Tabs.Tab value="databases">Databases</Tabs.Tab>
         <Tabs.Tab value="users">Users</Tabs.Tab>
         <Tabs.Tab value="studio-users">Studio users</Tabs.Tab>
@@ -504,6 +506,7 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor }: {
 
       <Tabs.Panel value="maintenance"><Maintenance connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="sessions"><Sessions connectionId={connectionId} /></Tabs.Panel>
+      <Tabs.Panel value="capture"><Capture connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="jobs">
         <Jobs connectionId={connectionId} onOpenInEditor={onOpenInEditor} />
       </Tabs.Panel>

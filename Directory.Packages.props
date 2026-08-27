@@ -39,6 +39,14 @@
     <PackageVersion Include="Testcontainers.MySql" Version="4.14.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.14.0" />
     <PackageVersion Include="xunit.v3" Version="4.0.0" />
-  </ItemGroup>
+      <!-- Object storage. One SDK per provider; the S3 one covers everything with an S3 endpoint,
+         which is most of what is not Azure or Google. -->
+    <PackageVersion Include="AWSSDK.S3" Version="4.0.102.4" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.29.2" />
+    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
+    <PackageVersion Include="Google.Cloud.Storage.V1" Version="4.15.0" />
+    <PackageVersion Include="Testcontainers.Minio" Version="4.14.0" />
+    <PackageVersion Include="Testcontainers.Azurite" Version="4.14.0" />
+</ItemGroup>
 
 </Project>

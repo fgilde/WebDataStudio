@@ -55,7 +55,16 @@ public static class DataEndpoints
                     var detail = await driver.DescribeAsync(session, target, ct);
                     var identity = RowIdentity.Resolve(detail);
 
-                    var table = ChangeScriptBuilder.Qualify(target, driver.Dialect);
+                    // A table is selected from by name; a file in a bucket by a reader over it.
+                    // The driver says which, and a file no reader understands says so instead of
+                    // producing SQL that fails.
+                    if (driver.FromClause(session, target) is not { } table)
+                        return Results.BadRequest(new
+                        {
+                            message = "this object cannot be read as a table; open the preview or " +
+                                      "download it instead",
+                        });
+
                     var take = Math.Clamp(limit ?? defaultLimit, 1, 100_000);
                     var skip = Math.Max(offset ?? 0, 0);
 
@@ -200,7 +209,7 @@ public static class DataEndpoints
                     }
 
                     var sql = driver.Dialect.Paginate(
-                        $"SELECT {quoted}, count(*) AS n FROM {ChangeScriptBuilder.Qualify(target, driver.Dialect)}"
+                        $"SELECT {quoted}, count(*) AS n FROM {driver.FromClause(session, target)}"
                         + $"{where} GROUP BY {quoted} ORDER BY n DESC", 0, take + 1);
 
                     var values = new List<object>();
@@ -575,7 +584,7 @@ public static class DataEndpoints
 
                     var key = driver.Dialect.QuoteIdentifier(column);
                     var labelExpression = label is null ? key : driver.Dialect.QuoteIdentifier(label.Name);
-                    var table = ChangeScriptBuilder.Qualify(target, driver.Dialect);
+                    var table = driver.FromClause(session, target);
 
                     var where = "";
                     var parameters = new Dictionary<string, string?>();

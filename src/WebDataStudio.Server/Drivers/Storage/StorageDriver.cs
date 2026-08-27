@@ -169,7 +169,9 @@ public sealed class StorageDriver : AdoDriverBase
 
         await using var command = session.Connection.CreateCommand();
         command.CommandText =
-            $"SELECT sum(num_rows) FROM parquet_file_metadata('{uri.Replace("'", "''")}')";
+            // Cast in SQL: the sum is a HUGEINT, which arrives as a BigInteger that Convert
+            // refuses, and no Parquet has more rows than a BIGINT holds.
+            $"SELECT sum(num_rows)::BIGINT FROM parquet_file_metadata('{uri.Replace("'", "''")}')";
 
         var value = await command.ExecuteScalarAsync(ct);
         return value is null or DBNull ? null : Convert.ToInt64(value);

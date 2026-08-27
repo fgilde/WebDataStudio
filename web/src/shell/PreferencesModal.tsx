@@ -51,6 +51,11 @@ export function PreferencesModal({ commands, opened, onClose }: {
               step={20} value={prefs.pageSize}
               onChange={value => store({ pageSize: Math.max(20, Number(value) || 200) })} />
 
+            <Switch size="xs" checked={prefs.inspectBeforeRun}
+              label="Read a statement before running it"
+              description="Says what it noticed — an UPDATE with no WHERE, an accidental cross product. It never refuses."
+              onChange={e => store({ inspectBeforeRun: e.currentTarget.checked })} />
+
             <Switch size="xs" checked={prefs.historySnapshots}
               label="Keep the result with each history entry"
               description="A snapshot is a copy of the data in the workspace database. Off by default."

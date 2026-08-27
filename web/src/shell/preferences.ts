@@ -11,6 +11,9 @@ export interface Preferences {
   snapshotRows: number;
   /// Command id to key combination, for the commands whose binding the user changed.
   shortcuts: Record<string, string>;
+  /// Whether the studio reads a statement before running it and says what it noticed — an UPDATE
+  /// with no WHERE, an accidental cross product. It only ever warns.
+  inspectBeforeRun: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -18,6 +21,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   historySnapshots: false,
   snapshotRows: 200,
   shortcuts: {},
+  inspectBeforeRun: true,
 };
 
 const KEY = "preferences";

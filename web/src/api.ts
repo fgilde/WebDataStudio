@@ -731,6 +731,21 @@ export const entraStatus = (conn: string): Promise<EntraStatusDto> =>
 export const entraSignOut = (conn: string): Promise<void> =>
   fetch(`${base}/connections/${conn}/entra`, { method: "DELETE" }).then(r => ok<void>(r));
 
+export interface SqlFindingDto {
+  id: string;
+  /// warning for what is probably a mistake, note for what is merely worth knowing.
+  severity: string;
+  message: string;
+  statement: number;
+  line: number;
+  excerpt: string;
+}
+
+/// A read of the SQL before it runs. It warns; it never refuses.
+export const inspectSql = (conn: string, sql: string): Promise<SqlFindingDto[]> =>
+  fetch(`${base}/query/inspect`, json("POST", { connectionId: conn, sql }))
+    .then(r => ok<SqlFindingDto[]>(r));
+
 export interface CapturedStatementDto {
   text: string; samples: number; maxDurationMs: number;
   firstSeen: string; lastSeen: string;

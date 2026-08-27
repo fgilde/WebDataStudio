@@ -1,4 +1,5 @@
 using System.Text.Json;
+using WebDataStudio.Server.Drivers;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Services;
 
@@ -11,12 +12,30 @@ public static class QueryEndpoints
 
     public record PlanRequest(string ConnectionId, string Sql, string Mode);
 
+    public record InspectRequest(string ConnectionId, string Sql);
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     public static void MapQueryEndpoints(this WebApplication app)
     {
         var defaultMaxRows = int.TryParse(app.Configuration["WDS_MAX_ROWS"], out var m) ? m : 1000;
         var defaultTimeout = int.TryParse(app.Configuration["WDS_QUERY_TIMEOUT_SECONDS"], out var t) ? t : 300;
+
+        // A read of the SQL before it runs: an UPDATE with no WHERE, an accidental cross product,
+        // = NULL. It warns and never refuses — every one of these is something a person can
+        // legitimately mean, and refusing would only teach people to bypass it.
+        app.MapPost("/api/query/inspect", (InspectRequest body, ConnectionRegistry connections,
+            DriverRegistry drivers) =>
+        {
+            var engine = connections.Find(body.ConnectionId)?.Engine;
+            var dialect = engine is { Length: > 0 } known
+                ? drivers.Get(known).Dialect
+                // No connection chosen yet: the checks that matter here are the same in every
+                // dialect, so a default is better than a refusal.
+                : drivers.Get("postgresql").Dialect;
+
+            return Results.Ok(SqlInspections.Inspect(body.Sql, dialect));
+        });
 
         app.MapPost("/api/query/execute", async (ExecuteRequest body, HttpContext ctx,
             SessionFactory factory, QueryRunner runner, MaskPolicyStore policies) =>

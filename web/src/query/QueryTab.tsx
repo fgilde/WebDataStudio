@@ -51,6 +51,9 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   // The rows the last run produced, to diff the next one against. A ref rather than state: the
   // comparison happens inside a run, not during a render.
   const lastRows = useRef<unknown[][] | null>(null);
+  // What the pre-run read found, and the statement it was about.
+  const [inspection, setInspection] =
+    useState<{ sql: string; findings: SqlFindingDto[] } | null>(null);
 
   useEffect(() => { onSqlChange?.(tabId, sql); }, [tabId, sql, onSqlChange]);
 
@@ -144,13 +147,26 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   }, [watchSeconds, firstWatchError]);
 
   // A statement with bind variables asks for them once, then runs with the values as parameters.
-  const execute = useCallback((text: string) => {
+  const start = useCallback((text: string) => {
     const names = findParameters(text, engine);
     if (names.length === 0) return run(text);
 
     setPending({ sql: text, names });
     return Promise.resolve();
   }, [run, engine]);
+
+  // Before that: a read of the SQL. An UPDATE with no WHERE, an accidental cross product, = NULL.
+  // It warns and never refuses — the dialog's other button runs it anyway.
+  const execute = useCallback(async (text: string) => {
+    if (!text.trim() || !preferences().inspectBeforeRun) return start(text);
+
+    const findings = (await inspectSql(connectionId, text).catch(() => []))
+      .filter(finding => finding.severity === "warning");
+
+    if (findings.length === 0) return start(text);
+
+    setInspection({ sql: text, findings });
+  }, [start, connectionId]);
 
   const firstError = result.statements.find(s => s.error)?.error ?? null;
 
@@ -224,6 +240,16 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
 
       <AssistModal connectionId={connectionId} sql={sql} opened={assistOpen}
         onClose={() => setAssistOpen(false)} onUseStatement={setSql} />
+
+      {inspection && (
+        <InspectionDialog findings={inspection.findings}
+          onCancel={() => setInspection(null)}
+          onRun={() => {
+            const text = inspection.sql;
+            setInspection(null);
+            void start(text);
+          }} />
+      )}
 
       <ParameterDialog names={pending?.names ?? null} initial={lastValues}
         onCancel={() => setPending(null)}

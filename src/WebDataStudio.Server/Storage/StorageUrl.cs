@@ -1,4 +1,3 @@
-using System.Web;
 
 namespace WebDataStudio.Server.Storage;
 
@@ -77,16 +76,25 @@ public static class StorageUrl
         // more than one and the connection has to say which.
         var segments = uri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
 
-        if (uri.Host.Length == 0) throw new FormatException($"'{url}' names no bucket");
-
         if (provider == StorageProvider.AzureBlob)
         {
+            // azblob:///container?connectionstring=... — an app host hands over a connection string
+            // or a service URI, and the account name is already inside it. Asking for it a second
+            // time in the URL would be a way to write down two different accounts.
+            var account = uri.Host.Length > 0 ? uri.Host : null;
+
+            if (account is null && options.GetValueOrDefault("connectionstring") is not { Length: > 0 })
+                throw new FormatException(
+                    "an azblob:// connection needs an account: azblob://account/container");
+
             if (segments.Length == 0)
                 throw new FormatException("an azblob:// connection needs a container: azblob://account/container");
 
-            return new StorageTarget(provider, uri.Host, segments[0],
+            return new StorageTarget(provider, account, segments[0],
                 string.Join('/', segments.Skip(1)), options);
         }
+
+        if (uri.Host.Length == 0) throw new FormatException($"'{url}' names no bucket");
 
         return new StorageTarget(provider, null, uri.Host, string.Join('/', segments), options);
     }
@@ -94,10 +102,17 @@ public static class StorageUrl
     private static Dictionary<string, string> Options(Uri uri)
     {
         var options = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var query = HttpUtility.ParseQueryString(uri.Query);
 
-        foreach (var key in query.AllKeys)
-            if (key is { Length: > 0 } && query[key] is { } value) options[key] = value;
+        foreach (var pair in uri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            // Split on the first '=' only: an Azure connection string is itself full of them.
+            var split = pair.Split('=', 2);
+
+            // Unescaped as a URI component, not as a query string: a query parser turns '+' into a
+            // space, and a base64 account key is full of them — which broke the key silently.
+            options[Uri.UnescapeDataString(split[0])] =
+                split.Length > 1 ? Uri.UnescapeDataString(split[1]) : "";
+        }
 
         return options;
     }

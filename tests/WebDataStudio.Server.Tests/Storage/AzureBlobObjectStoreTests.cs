@@ -82,4 +82,19 @@ public class AzureBlobObjectStoreTests : ObjectStoreContract, IAsyncLifetime
         Assert.Equal(2, page.Entries.Count);
         Assert.DoesNotContain(page.Entries, entry => entry.Name == "root.txt");
     }
+
+    [Fact]
+    public void A_service_uri_means_the_identity_this_process_runs_as()
+    {
+        // What a deployed Aspire blob resource hands over. There is no key in it, and there should
+        // not be one: DuckDB walks the same credential chain the SDK does.
+        var store = new AzureBlobObjectStore(StorageUrl.Parse(
+            "azblob:///exports?connectionstring=https://acct.blob.core.windows.net/"));
+
+        var secret = store.SecretStatement();
+
+        Assert.Contains("PROVIDER credential_chain", secret);
+        Assert.Contains("ACCOUNT_NAME 'acct'", secret);
+        Assert.DoesNotContain("CONNECTION_STRING", secret);
+    }
 }

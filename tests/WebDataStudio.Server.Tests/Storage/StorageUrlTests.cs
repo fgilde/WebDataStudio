@@ -88,4 +88,33 @@ public class StorageUrlTests
     [Fact]
     public void A_scheme_with_no_bucket_says_so() =>
         Assert.Throws<FormatException>(() => StorageUrl.Parse("s3:///prefix"));
+
+    [Fact]
+    public void A_plus_in_a_key_survives_the_query_string()
+    {
+        // A base64 account key is full of them, and a query-string parser turns '+' into a space —
+        // which broke the key without saying anything.
+        var target = StorageUrl.Parse("azblob://acct/exports?key=ab+cd/ef==");
+
+        Assert.Equal("ab+cd/ef==", target.Option("key"));
+    }
+
+    [Fact]
+    public void An_azure_connection_string_can_carry_the_account_on_its_own()
+    {
+        // What an Aspire app host hands over: the account name is inside the connection string, so
+        // the URL does not repeat it.
+        var target = StorageUrl.Parse(
+            "azblob:///exports?connectionstring=DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=k+/=");
+
+        Assert.Equal(StorageProvider.AzureBlob, target.Provider);
+        Assert.Null(target.Account);
+        Assert.Equal("exports", target.Container);
+        Assert.Equal("DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=k+/=",
+            target.Option("connectionstring"));
+    }
+
+    [Fact]
+    public void An_azure_url_without_an_account_or_a_connection_string_is_refused() =>
+        Assert.Throws<FormatException>(() => StorageUrl.Parse("azblob:///exports"));
 }

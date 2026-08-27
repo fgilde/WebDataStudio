@@ -24,15 +24,25 @@ public sealed class AzureBlobObjectStore : IObjectStore
 
     private static BlobContainerClient Connect(StorageTarget target)
     {
+        if (target.Option("connectionstring") is { Length: > 0 } connectionString)
+        {
+            // An Aspire blob resource hands over a connection string while developing (Azurite) and
+            // the service URI itself once deployed. A URI means the identity this process runs as,
+            // which is the whole point of not carrying a key.
+            if (connectionString.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                return new BlobContainerClient(
+                    new Uri($"{connectionString.TrimEnd('/')}/{target.Container}"),
+                    new DefaultAzureCredential());
+
+            return new BlobServiceClient(connectionString).GetBlobContainerClient(target.Container);
+        }
+
         var account = target.Account ?? throw new FormatException("an azblob:// URL needs an account");
 
         // Azurite is not at *.blob.core.windows.net, so a connection to it says where it is.
         var endpoint = target.Option("endpoint") is { Length: > 0 } given
             ? given.TrimEnd('/')
             : $"https://{account}.blob.core.windows.net";
-
-        if (target.Option("connectionstring") is { Length: > 0 } connectionString)
-            return new BlobServiceClient(connectionString).GetBlobContainerClient(target.Container);
 
         if (target.Option("sas") is { Length: > 0 } sas)
             return new BlobContainerClient(
@@ -126,8 +136,16 @@ public sealed class AzureBlobObjectStore : IObjectStore
         var account = Target.Account ?? "";
 
         if (Target.Option("connectionstring") is { Length: > 0 } connectionString)
+        {
+            // A service URI is not a connection string: DuckDB takes the account name and finds the
+            // same credential chain the SDK does.
+            if (connectionString.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                return $"CREATE OR REPLACE SECRET wds_storage (TYPE azure, PROVIDER credential_chain, "
+                     + $"ACCOUNT_NAME '{Escape(AccountOf(connectionString) ?? account)}')";
+
             return $"CREATE OR REPLACE SECRET wds_storage (TYPE azure, "
                  + $"CONNECTION_STRING '{Escape(connectionString)}')";
+        }
 
         if (Target.Option("key") is { Length: > 0 } key)
         {
@@ -159,6 +177,12 @@ public sealed class AzureBlobObjectStore : IObjectStore
         var slash = trimmed.LastIndexOf('/');
         return slash < 0 ? trimmed : trimmed[(slash + 1)..];
     }
+
+    /// The account name in a blob service URI: the first label of its host.
+    private static string? AccountOf(string uri) =>
+        Uri.TryCreate(uri, UriKind.Absolute, out var parsed) && parsed.Host.Split('.') is [var first, ..]
+            ? first
+            : null;
 
     private static string Escape(string value) => value.Replace("'", "''");
 }

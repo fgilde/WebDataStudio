@@ -6,6 +6,27 @@ Ordner ist eine Verbindung wie jede andere — über `WDS_CONN_*` konfiguriert, 
 angehängt, im gleichen Baum durchsuchbar und **abfragbar**, denn eine Parquet-Datei im Bucket ist
 eine Tabelle, die zufällig woanders liegt.
 
+## In der Oberfläche anlegen
+
+**Verbindungen → Add a bucket** fragt nach den Bestandteilen statt nach einer URL: Anbieter, Bucket
+bzw. Container, optionales Prefix und die Art der Anmeldung — und zeigt die Verbindung, die gespeichert
+wird, mit maskierten Geheimnissen.
+
+![Einen Bucket anlegen](../../assets/screenshots/bucket-wizard-dark.png)
+
+Das Formular bietet nur an, was ein Anbieter hat: einen Endpunkt für S3 (den MinIO, R2, Wasabi und Ceph
+brauchen), ein Konto für Azure, HMAC-Schlüssel für Google. Ein Anbieterwechsel setzt die Anmeldeart
+zurück, statt eine falsche mitzunehmen, und was noch fehlt, steht da — nicht bloß ein grauer Knopf ohne
+Begründung.
+
+**Test** erreicht den Bucket und listet eine Seite, bevor irgendetwas gespeichert wird: die Antwort
+sagt, was drin ist — „reached lake: 3 object(s), 1 folder(s)“ — oder was der Anbieter gemeldet hat.
+Eine Storage-Verbindung nur zu öffnen beweist nichts, ein grüner Haken hier heißt also, dass der Bucket
+wirklich geantwortet hat.
+
+`Read-only` und eine rote Farbe verweigern danach jeden Upload und jedes Löschen — im Server, nicht in
+der Oberfläche.
+
 ## Verbinden
 
 Eine Engine-Id, `storage`; das Schema wählt den Anbieter.

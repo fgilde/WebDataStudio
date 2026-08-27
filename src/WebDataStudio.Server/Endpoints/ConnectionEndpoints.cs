@@ -1,4 +1,6 @@
 using WebDataStudio.Server.Drivers;
+using WebDataStudio.Server.Drivers.Abstractions;
+using WebDataStudio.Server.Drivers.Storage;
 using WebDataStudio.Server.Models;
 using WebDataStudio.Server.Services;
 
@@ -207,6 +209,24 @@ public static class ConnectionEndpoints
                 var spec = new ConnectionSpec("probe", body.Name, body.Engine, connectionString,
                     true, null, null, ConnectionSource.Stored);
                 await using var session = await driver.OpenAsync(spec, ct);
+
+                // Opening a storage connection proves nothing: it builds a client and a DuckDB and
+                // never touches the bucket. So the probe lists a page — "connected" for a bucket
+                // that does not exist would be the most annoying kind of green tick.
+                if (session.Unwrap() is StorageSession storage)
+                {
+                    var page = await storage.Store.ListAsync("", null, 5, ct);
+                    var folders = page.Entries.Count(entry => entry.IsPrefix);
+
+                    return Results.Ok(new
+                    {
+                        ok = true,
+                        message = $"reached {storage.Store.Target.Container}: "
+                                  + $"{page.Entries.Count - folders} object(s), {folders} folder(s)"
+                                  + (page.Cursor is null ? "" : " and more"),
+                    });
+                }
+
                 return Results.Ok(new { ok = true, message = $"connected to {driver.Info.Label}" });
             }
             catch (Exception e)

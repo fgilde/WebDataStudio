@@ -54,6 +54,26 @@ public sealed class ConnectionRegistry
     /// A human-readable target for the connection list — host and database only, never a secret.
     private static string Summarize(ConnectionSpec spec)
     {
+        // A bucket's connection string is a URL, and the useful half of it is the container and the
+        // prefix. Everything after the '?' is credentials and never shown.
+        if (spec.Engine.Equals("storage", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var target = Storage.StorageUrl.Parse(spec.ConnectionString);
+                var where = target.Prefix.Length == 0
+                    ? target.Container
+                    : $"{target.Container}/{target.Prefix}";
+
+                return target.Account is { Length: > 0 } account ? $"{account}/{where}" : where;
+            }
+            catch (FormatException)
+            {
+                // A URL the parser refuses is still a connection somebody has to see in the list.
+                return spec.Engine;
+            }
+        }
+
         var parts = spec.ConnectionString.Split(';', StringSplitOptions.RemoveEmptyEntries);
         string? Value(params string[] keys) => parts
             .Select(p => p.Split('=', 2))

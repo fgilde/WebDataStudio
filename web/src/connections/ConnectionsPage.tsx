@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { ActionIcon, Badge, Button, Group, Modal, Stack, Table, Text, Title } from "@mantine/core";
-import { IconKey, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconBucket, IconKey, IconPlus, IconTrash } from "@tabler/icons-react";
 import { createConnection, deleteConnection, listConnections, type Connection } from "../api";
 import { ConnectionForm } from "./ConnectionForm";
 import { EntraSignInModal } from "./EntraSignInModal";
+import { StorageWizard } from "./StorageWizard";
 
 export function ConnectionsPage() {
   const [items, setItems] = useState<Connection[]>([]);
   const [adding, setAdding] = useState(false);
   const [signingIn, setSigningIn] = useState<Connection | null>(null);
+  const [addingBucket, setAddingBucket] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = () => listConnections().then(setItems).catch(e => setError(e.message));
@@ -18,7 +20,12 @@ export function ConnectionsPage() {
     <Stack p="md">
       <Group justify="space-between">
         <Title order={4}>Connections</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={() => setAdding(true)}>Add connection</Button>
+        <Group gap="xs">
+          {/* A bucket is a URL, which is a poor thing to type: its own form asks for the pieces. */}
+          <Button variant="default" leftSection={<IconBucket size={16} />}
+            onClick={() => setAddingBucket(true)}>Add a bucket</Button>
+          <Button leftSection={<IconPlus size={16} />} onClick={() => setAdding(true)}>Add connection</Button>
+        </Group>
       </Group>
       {error && <Text c="red" size="sm">{error}</Text>}
       <Table striped highlightOnHover>
@@ -64,6 +71,9 @@ export function ConnectionsPage() {
         <EntraSignInModal connectionId={signingIn.id} name={signingIn.name} opened
           onClose={() => setSigningIn(null)} />
       )}
+
+      <StorageWizard opened={addingBucket} onClose={() => setAddingBucket(false)}
+        onCreated={refresh} />
 
       <Modal opened={adding} onClose={() => setAdding(false)} title="Add connection">
         <ConnectionForm

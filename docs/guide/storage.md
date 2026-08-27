@@ -6,6 +6,26 @@ like any other — configured through `WDS_CONN_*`, attached from an Aspire app 
 same tree, and **queryable**, because a Parquet file in a bucket is a table that happens to live
 somewhere else.
 
+## Adding one in the UI
+
+**Connections → Add a bucket** asks for the pieces instead of a URL: the provider, the bucket or
+container, an optional prefix, and how to sign in — and it shows the connection it will store, with
+every secret masked.
+
+![Adding a bucket](../assets/screenshots/bucket-wizard-dark.png)
+
+The form only offers what a provider has: an endpoint for S3 (which is what MinIO, R2, Wasabi and Ceph
+need), an account for Azure, HMAC keys for Google. Changing the provider resets the sign-in choice
+rather than carrying a wrong one over, and what is still missing is listed rather than left as a
+greyed-out button with no reason.
+
+**Test** reaches the bucket and lists a page before anything is saved: it answers with what is in
+there — "reached lake: 3 object(s), 1 folder(s)" — or with what the provider said. Opening a storage
+connection alone proves nothing, so a green tick here means the bucket really answered.
+
+`Read-only` and a red colour both refuse every upload and delete afterwards, in the server rather than
+in the UI.
+
 ## Connecting
 
 One engine id, `storage`; the scheme picks the provider.

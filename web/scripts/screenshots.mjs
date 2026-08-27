@@ -342,6 +342,21 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
     console.log("skipped the storage shots: no connection whose engine is storage");
   }
 
+  // --- adding a bucket without writing a URL --------------------------------------------------
+  await page.goto(`${baseUrl}/connections`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "Add a bucket" }).click();
+  // The wizard is a modal in a portal: wait for it rather than for the click to have "worked".
+  await page.getByText(/anything else speaking S3/).waitFor({ timeout: 20000 });
+  await page.getByLabel("Bucket", { exact: true }).fill("data-lake");
+  await page.getByLabel("Prefix").fill("exports/2026");
+  await page.getByLabel("Region").fill("eu-central-1");
+  // The sign-in choice stays on the machine's own role: that is the one to show, and a shot with a
+  // key field in it invites somebody to fill it in.
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${out}/bucket-wizard-${suffix}.png` });
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await page.goto(baseUrl, { waitUntil: "networkidle" });
+
   // --- command palette -----------------------------------------------------------------------
   await page.keyboard.press("Control+k");
   await page.getByPlaceholder("Type a command").waitFor({ timeout: 10000 });

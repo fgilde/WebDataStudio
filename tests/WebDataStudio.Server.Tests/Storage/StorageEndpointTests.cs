@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -200,5 +201,45 @@ public class StorageEndpointTests : IAsyncLifetime
         var response = await client.DeleteAsync($"/api/storage/{id}?ref=Prefix:{Bucket}/exports", Ct);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Testing_a_storage_connection_actually_reaches_the_bucket()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/connections/test", new
+        {
+            name = "LAKE", engine = "storage", connectionString = _minio.UrlFor(Bucket),
+            readOnly = false,
+        }, Ct);
+
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(Ct);
+
+        // Opening a storage connection builds a client and a DuckDB and touches nothing: a probe that
+        // stopped there would say "connected" for a bucket that does not exist.
+        Assert.True(result.GetProperty("ok").GetBoolean());
+        Assert.Contains("object(s)", result.GetProperty("message").GetString());
+    }
+
+    [Fact]
+    public async Task And_says_so_when_the_bucket_is_not_there()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/connections/test", new
+        {
+            name = "NOPE", engine = "storage",
+            connectionString = _minio.UrlFor("no-such-bucket"), readOnly = false,
+        }, Ct);
+
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>(Ct);
+
+        Assert.False(result.GetProperty("ok").GetBoolean());
+        Assert.NotEmpty(result.GetProperty("message").GetString() ?? "");
     }
 }

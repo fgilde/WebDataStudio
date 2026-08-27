@@ -138,4 +138,31 @@ public class StorageUrlTests
         Assert.Equal("DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=k+/=",
             target.Option("connectionstring"));
     }
+
+    [Theory]
+    [InlineData("s3://lake/exports?access=a&secret=b", "lake/exports")]
+    [InlineData("azblob://acct/exports?key=secret", "acct/exports")]
+    [InlineData("gs://lake?credentials=%7B%7D", "lake")]
+    public void A_bucket_in_the_connection_list_shows_where_it_points_and_no_secret(
+        string url, string expected)
+    {
+        var spec = new WebDataStudio.Server.Models.ConnectionSpec("id", "LAKE", "storage", url,
+            false, null, null, WebDataStudio.Server.Models.ConnectionSource.Environment);
+
+        var summary = ConnectionRegistry.ToDto(spec).Summary;
+
+        Assert.Equal(expected, summary);
+        foreach (var secret in new[] { "secret", "credentials", "key=" })
+            Assert.DoesNotContain(secret, summary);
+    }
+
+    [Fact]
+    public void And_a_local_folder_shows_its_path()
+    {
+        var spec = new WebDataStudio.Server.Models.ConnectionSpec("id", "DROP", "storage",
+            "file:///data/incoming", false, null, null,
+            WebDataStudio.Server.Models.ConnectionSource.Environment);
+
+        Assert.Equal("/data/incoming", ConnectionRegistry.ToDto(spec).Summary);
+    }
 }

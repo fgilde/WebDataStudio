@@ -98,6 +98,18 @@ check("and filters with the studio's own filter language",
   (await rows(`filterColumn=age&filter=${encodeURIComponent(">40")}`)).length === 2);
 check("and pages", (await rows("sort=name&limit=1&offset=1")).length === 1);
 
+// --- the probe behind the wizard's Test button --------------------------------------------------
+const probe = async (url) => await (await page.request.post(`${baseUrl}/api/connections/test`, {
+  data: { name: "PROBE", engine: "storage", connectionString: url, readOnly: false },
+})).json();
+
+const reached = await probe(`file:///${path.replace(/^\/+/, "")}`);
+check("a storage connection is tested by reaching it", reached.ok === true);
+check("and the answer says what is in there", /object\(s\)/.test(reached.message));
+
+const missing = await probe("s3://no-such-bucket-wds?region=eu-central-1");
+check("a bucket that is not there is not a green tick", missing.ok === false);
+
 // --- the UI: the tree, the preview panel, the rows ---------------------------------------------
 await page.request.put(`${baseUrl}/api/workspace/tabs`, { data: [] });
 await page.goto(baseUrl, { waitUntil: "networkidle" });

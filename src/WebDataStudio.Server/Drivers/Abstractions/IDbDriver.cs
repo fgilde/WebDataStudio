@@ -43,5 +43,13 @@ public interface IDbDriver
 
     Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct);
 
+    /// What to select from for this object. A database returns the qualified name; object storage
+    /// returns a reader over the file, which is the same thing said differently. Null means nothing
+    /// here reads it, and the UI offers a preview instead of a query that would fail.
+    string? FromClause(IDbSession session, SchemaNodeRef target) =>
+        target.Path.Count > 1
+            ? $"{Dialect.QuoteIdentifier(target.Path[0])}.{Dialect.QuoteIdentifier(target.Name)}"
+            : Dialect.QuoteIdentifier(target.Name);
+
     Task<AnalyzeReport> AnalyzeAsync(IDbSession session, AnalyzeScope scope, SchemaNodeRef? target, CancellationToken ct);
 }

@@ -14,6 +14,10 @@ public enum SchemaNodeKind
     TablespaceFolder, Tablespace,
     PublicationFolder, Publication,
     SubscriptionFolder, Subscription,
+
+    // Object storage: a container, a prefix inside it, an object, and the row that fetches the next
+    // page of a listing — because a container is paged rather than walked.
+    Container, Prefix, StorageObject, StorageMore,
 }
 
 /// Identifies an object across the whole tree. `Path` is the ordered chain of names from the

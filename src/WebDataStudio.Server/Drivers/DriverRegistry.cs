@@ -7,6 +7,7 @@ using WebDataStudio.Server.Drivers.Oracle;
 using WebDataStudio.Server.Drivers.Redis;
 using WebDataStudio.Server.Drivers.PostgreSql;
 using WebDataStudio.Server.Drivers.Sqlite;
+using WebDataStudio.Server.Drivers.Storage;
 using WebDataStudio.Server.Drivers.SqlServer;
 
 namespace WebDataStudio.Server.Drivers;
@@ -28,6 +29,7 @@ public sealed class DriverRegistry
             new ClickHouseDriver(),
             new MongoDbDriver(),
             new RedisDriver(),
+            new StorageDriver(),
         ];
         _drivers = drivers.ToDictionary(d => d.Info.Id, StringComparer.OrdinalIgnoreCase);
     }

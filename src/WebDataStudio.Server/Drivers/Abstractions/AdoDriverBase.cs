@@ -27,6 +27,11 @@ public abstract class AdoDriverBase : IDbDriver
     public abstract Task<IReadOnlyList<SchemaNode>> IntrospectAsync(IDbSession session, SchemaNodeRef? parent, CancellationToken ct);
     public abstract Task<ObjectDetail> DescribeAsync(IDbSession session, SchemaNodeRef target, CancellationToken ct);
 
+    public virtual string? FromClause(IDbSession session, SchemaNodeRef target) =>
+        target.Path.Count > 1
+            ? $"{Dialect.QuoteIdentifier(target.Path[0])}.{Dialect.QuoteIdentifier(target.Name)}"
+            : Dialect.QuoteIdentifier(target.Name);
+
     public virtual Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct) =>
         throw new NotSupportedException($"{Info.Label} does not support execution plans");
 

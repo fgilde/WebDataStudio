@@ -17,6 +17,8 @@ public sealed class MySqlDriver : AdoDriverBase
         Views = true, ForeignKeys = true, FullTextIndexes = true, Backup = true, Restore = true,
         UserManagement = true, SessionList = true, KillSession = true, ServerStats = true,
         SlowQueryLog = true, SystemCommands = true,
+        // The event scheduler: the same concept under another name.
+        Jobs = true,
         ActivityProgress = true, Replication = true,
     };
 

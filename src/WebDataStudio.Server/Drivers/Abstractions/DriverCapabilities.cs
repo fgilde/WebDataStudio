@@ -33,6 +33,10 @@ public sealed record DriverCapabilities
     public bool SlowQueryLog { get; init; }
     public bool SystemCommands { get; init; }
 
+    /// The server has a scheduler of its own: SQL Server Agent, pg_cron, MySQL events. What runs
+    /// there is listed and its history read; changing it is a statement the person reads first.
+    public bool Jobs { get; init; }
+
     /// The server can say what it is working on right now — a vacuum's progress, a running
     /// statement's age — and which session is waiting for which.
     public bool ActivityProgress { get; init; }

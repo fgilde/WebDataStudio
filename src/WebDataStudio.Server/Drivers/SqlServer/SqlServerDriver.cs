@@ -42,6 +42,9 @@ public sealed class SqlServerDriver : AdoDriverBase
         // database and the file already sitting there, so we do not offer it.
         IncludeColumns = true, Backup = true, UserManagement = true,
         SessionList = true, KillSession = true, ServerStats = true, SlowQueryLog = true,
+        // SQL Server Agent. msdb answers even where the service is off, and an empty list is
+        // then the truth rather than an error.
+        Jobs = true,
         SystemCommands = true,
         ActivityProgress = true, Replication = true,
     };

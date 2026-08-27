@@ -20,6 +20,9 @@ public sealed class PostgreSqlDriver : AdoDriverBase
         Backup = true, Restore = true,
         UserManagement = true, SessionList = true, KillSession = true, ServerStats = true,
         SlowQueryLog = true, SystemCommands = true,
+        // pg_cron, where it is installed. Without the extension the list is empty and the panel
+        // says which scheduler it looked for.
+        Jobs = true,
         ActivityProgress = true, Replication = true,
     };
 

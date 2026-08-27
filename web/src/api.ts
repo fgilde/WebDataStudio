@@ -699,6 +699,36 @@ export const killSession = (conn: string, id: string): Promise<void> =>
   fetch(`${base}/admin/sessions/${conn}/${encodeURIComponent(id)}/kill`, { method: "POST" })
     .then(r => ok<void>(r));
 
+export interface JobDto {
+  id: string; name: string; enabled: boolean; schedule: string;
+  lastRun: string | null; lastOutcome: string | null; nextRun: string | null;
+  command: string | null;
+}
+export interface JobRunDto {
+  started: string | null; finished: string | null; outcome: string;
+  durationMs: number | null; message: string | null;
+}
+export interface JobsDto {
+  available: boolean;
+  /// What this engine calls its scheduler: SQL Server Agent, pg_cron, events.
+  scheduler: string | null;
+  reason: string | null;
+  jobs: JobDto[];
+  actions: { id: string; label: string; destructive: boolean }[];
+}
+
+export const listJobs = (conn: string): Promise<JobsDto> =>
+  fetch(`${base}/admin/jobs/${conn}`).then(r => ok<JobsDto>(r));
+
+export const jobHistory = (conn: string, id: string): Promise<JobRunDto[]> =>
+  fetch(`${base}/admin/jobs/${conn}/history?id=${encodeURIComponent(id)}`)
+    .then(r => ok<JobRunDto[]>(r));
+
+/// Changing a job comes back as SQL: it goes through the editor's run like every other change.
+export const jobStatement = (conn: string, id: string, action: string): Promise<{ sql: string }> =>
+  fetch(`${base}/admin/jobs/${conn}/statement`, json("POST", { id, action }))
+    .then(r => ok<{ sql: string }>(r));
+
 export const listDatabases = (conn: string): Promise<DatabaseDto[]> =>
   fetch(`${base}/admin/databases/${conn}`).then(r => ok<DatabaseDto[]>(r));
 

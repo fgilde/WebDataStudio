@@ -12,6 +12,7 @@ public static class AdminEndpoints
     public record UserApplyRequest(string Hash);
     public record HashRequest(string Password);
     public record DatabaseRequest(string Name);
+    public record JobActionRequest(string Id, string Action);
     public record BackupRequest(
         bool? SchemaOnly, bool? DataOnly, List<string>? Tables, string? ServerPath,
         string? Format, bool? NoOwner, bool? Clean, int? Compress);
@@ -360,6 +361,68 @@ public static class AdminEndpoints
             catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         }).DisableAntiforgery();
+
+        // --- scheduled jobs ---------------------------------------------------
+        app.MapGet("/api/admin/jobs/{conn}", (string conn, SessionFactory factory,
+            CancellationToken ct) =>
+            WithSession(conn, factory, ct, async (driver, session) =>
+            {
+                var scheduler = JobService.SchedulerOf(driver.Info.Id);
+
+                if (!driver.Caps.Jobs || scheduler is null)
+                    return Results.Ok(new
+                    {
+                        available = false,
+                        scheduler = (string?)null,
+                        reason = $"{driver.Info.Label} has no scheduler of its own",
+                        jobs = Array.Empty<JobEntry>(),
+                        actions = Array.Empty<JobAction>(),
+                    });
+
+                // An empty list is not a failure: pg_cron may not be installed, the Agent service
+                // may be off, the event scheduler may be disabled. The panel says what it looked in.
+                return Results.Ok(new
+                {
+                    available = true,
+                    scheduler,
+                    reason = (string?)null,
+                    jobs = await JobService.ListAsync(driver, session, ct),
+                    actions = JobService.ActionsFor(driver.Info.Id),
+                });
+            }));
+
+        app.MapGet("/api/admin/jobs/{conn}/history", (string conn, string id, int? limit,
+            SessionFactory factory, CancellationToken ct) =>
+            WithSession(conn, factory, ct, async (driver, session) =>
+                driver.Caps.Jobs
+                    ? Results.Ok(await JobService.HistoryAsync(driver, session, id, limit ?? 50, ct))
+                    : Results.BadRequest(new { message = $"{driver.Info.Label} has no scheduler" })));
+
+        // Changing a job is a statement, not a click: it comes back as SQL and goes through the
+        // editor's own run, like every other change in this studio.
+        app.MapPost("/api/admin/jobs/{conn}/statement", (string conn, JobActionRequest body,
+            SessionFactory factory, CancellationToken ct) =>
+            WithSession(conn, factory, ct, async (driver, session) =>
+            {
+                if (!driver.Caps.Jobs)
+                    return Results.BadRequest(new { message = $"{driver.Info.Label} has no scheduler" });
+
+                var job = (await JobService.ListAsync(driver, session, ct))
+                    .FirstOrDefault(entry => entry.Id == body.Id || entry.Name == body.Id);
+
+                if (job is null)
+                    return Results.NotFound(new { message = $"no job '{body.Id}'" });
+
+                var sql = JobService.Statement(driver, body.Action, job);
+
+                return sql is null
+                    ? Results.BadRequest(new
+                    {
+                        message = $"{JobService.SchedulerOf(driver.Info.Id)} cannot " +
+                                  $"{body.Action.ToLowerInvariant()} a job",
+                    })
+                    : Results.Ok(new { sql });
+            }));
 
         // --- server logs ------------------------------------------------------
         app.MapGet("/api/admin/logs/{conn}", (string conn, int? lines, SessionFactory factory,

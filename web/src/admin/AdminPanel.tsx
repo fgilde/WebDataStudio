@@ -15,6 +15,7 @@ import { Overview } from "./Overview";
 import { StudioUsers } from "./StudioUsers";
 import { SizeTreemap } from "./SizeTreemap";
 import { Replication } from "./Replication";
+import { Jobs } from "./Jobs";
 import { runJob } from "../shell/jobs";
 import { formatBytes } from "../redis/format";
 
@@ -476,7 +477,12 @@ function Logs({ connectionId }: { connectionId: string }) {
   );
 }
 
-export function AdminPanel({ connectionId, database = "" }: { connectionId: string; database?: string }) {
+export function AdminPanel({ connectionId, database = "", onOpenInEditor }: {
+  connectionId: string;
+  database?: string;
+  /// Where a statement goes: the jobs tab hands its changes to a query tab rather than running them.
+  onOpenInEditor?: (sql: string) => void;
+}) {
   if (!connectionId) return <Text size="xs" c="dimmed" p="xs">Select a connection first.</Text>;
 
   return (
@@ -485,6 +491,7 @@ export function AdminPanel({ connectionId, database = "" }: { connectionId: stri
         <Tabs.Tab value="overview">Overview</Tabs.Tab>
         <Tabs.Tab value="maintenance">Maintenance</Tabs.Tab>
         <Tabs.Tab value="sessions">Sessions</Tabs.Tab>
+        <Tabs.Tab value="jobs">Jobs</Tabs.Tab>
         <Tabs.Tab value="databases">Databases</Tabs.Tab>
         <Tabs.Tab value="users">Users</Tabs.Tab>
         <Tabs.Tab value="studio-users">Studio users</Tabs.Tab>
@@ -497,6 +504,9 @@ export function AdminPanel({ connectionId, database = "" }: { connectionId: stri
 
       <Tabs.Panel value="maintenance"><Maintenance connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="sessions"><Sessions connectionId={connectionId} /></Tabs.Panel>
+      <Tabs.Panel value="jobs">
+        <Jobs connectionId={connectionId} onOpenInEditor={onOpenInEditor} />
+      </Tabs.Panel>
       <Tabs.Panel value="databases">
         {/* The list to act on, and above it where the disk actually went. */}
         <ScrollArea h="100%" p="xs">

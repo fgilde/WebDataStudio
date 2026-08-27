@@ -263,7 +263,14 @@ function DiagramDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) 
 }
 
 function AdminDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
-  return <AdminPanel connectionId={props.params.connectionId} />;
+  const shell = useShell();
+
+  return (
+    <AdminPanel connectionId={props.params.connectionId}
+      // A job is enabled, disabled or started through a statement in a query tab — the same path
+      // every other change in this studio takes.
+      onOpenInEditor={sql => shell.runStatement(props.params.connectionId, sql)} />
+  );
 }
 
 function CompareDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {

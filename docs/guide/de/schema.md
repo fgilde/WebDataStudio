@@ -84,7 +84,7 @@ Datenbank, dort verweist das Studio auf **New database…**.
 **Description…** schreibt die Beschreibung, die die Datenbank selbst führt (`COMMENT ON`) — das, was
 ein anderes Werkzeug an dieser Datenbank sieht. Bei PostgreSQL für Tabellen, Views, Spalten,
 Sequenzen und Routinen, bei MySQL für Tabellen. SQL Server führt Beschreibungen als Extended
-Properties, SQLite gar keine; dort sind die eigenen [Notizen](explorer.md) des Studios der Platz
+Properties, SQLite gar keine; dort sind die eigenen [Notizen](../explorer.md) des Studios der Platz
 dafür — die brauchen weder Rechte noch Migration.
 
 **Drop…** ersetzt bei jeder Objektart das frühere „Script: DROP“: das Statement steht da, daneben

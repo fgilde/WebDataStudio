@@ -1,13 +1,15 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { ActionIcon, AppShell, Divider, Group, Text, Tooltip } from "@mantine/core";
-import { IconDatabaseCog, IconLayoutBoard, IconPalette, IconTable } from "@tabler/icons-react";
+import { IconCommand, IconDatabaseCog, IconLayoutBoard, IconPalette, IconTable } from "@tabler/icons-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeDrawer } from "../ThemeDrawer";
 import { ChatDock } from "../assist/ChatDock";
 import { UserMenu } from "../auth/UserMenu";
 import { McpButton } from "../mcp/McpButton";
 import { BrandLinks } from "./BrandLinks";
+import { ToolsMenu } from "../shell/ToolsMenu";
+import { emit } from "../shell/bus";
 import { useStudioTitle } from "./useStudioTitle";
 
 export function AppShellFrame({ children }: { children: ReactNode }) {
@@ -48,15 +50,25 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
           ) : null}
 
           <Group gap={2} wrap="nowrap">
-            {/* The explorer holds the same button, but the explorer itself can be closed — and a
-                lost layout is exactly when you need this. */}
+            {/* Everything the studio can open, and the way to find it by typing. Up here rather
+                than in the explorer: the explorer is a panel that can be closed, and losing the
+                way back to every tool with it is exactly the wrong failure. */}
             {pathname === "/" ? (
-              <Tooltip label="Layout presets (Ctrl+L)">
-                <ActionIcon variant="subtle" aria-label="Layout presets"
-                  onClick={() => document.dispatchEvent(new CustomEvent("wds:layouts"))}>
-                  <IconLayoutBoard size={18} />
-                </ActionIcon>
-              </Tooltip>
+              <>
+                <ToolsMenu size="md" />
+                <Tooltip label="Command palette (Ctrl+K)">
+                  <ActionIcon variant="subtle" aria-label="Command palette"
+                    onClick={() => emit("palette")}>
+                    <IconCommand size={18} />
+                  </ActionIcon>
+                </Tooltip>
+                <Tooltip label="Layout presets (Ctrl+L)">
+                  <ActionIcon variant="subtle" aria-label="Layout presets"
+                    onClick={() => emit("layouts")}>
+                    <IconLayoutBoard size={18} />
+                  </ActionIcon>
+                </Tooltip>
+              </>
             ) : null}
             <Tooltip label="Theme">
               <ActionIcon variant="subtle" aria-label="Theme" onClick={() => setThemeOpen(true)}>
@@ -75,8 +87,7 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
       </AppShell.Header>
       <AppShell.Main h="calc(100vh - 44px)">{children}</AppShell.Main>
       {/* In the corner, over everything, and absent unless assistance is configured. */}
-      <ChatDock onUseStatement={sql =>
-        document.dispatchEvent(new CustomEvent("wds:use-sql", { detail: sql }))} />
+      <ChatDock onUseStatement={sql => emit("use-sql", sql)} />
       <ThemeDrawer opened={themeOpen} onClose={() => setThemeOpen(false)} />
     </AppShell>
   );

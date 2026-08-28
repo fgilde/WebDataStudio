@@ -478,16 +478,24 @@ function Logs({ connectionId }: { connectionId: string }) {
   );
 }
 
-export function AdminPanel({ connectionId, database = "", onOpenInEditor }: {
+export function AdminPanel({ connectionId, database = "", onOpenInEditor, tab }: {
   connectionId: string;
   database?: string;
   /// Where a statement goes: the jobs tab hands its changes to a query tab rather than running them.
   onOpenInEditor?: (sql: string) => void;
+  /// Which tab to open on. A command that says "scheduled jobs" should not land on the overview.
+  tab?: string;
 }) {
+  // Controlled from the outside only while it is asked for: after that the tabs are the person's
+  // own, and re-opening the same panel with another command moves them again.
+  const [active, setActive] = useState<string | null>(tab ?? "overview");
+
+  useEffect(() => { if (tab) setActive(tab); }, [tab]);
+
   if (!connectionId) return <Text size="xs" c="dimmed" p="xs">Select a connection first.</Text>;
 
   return (
-    <Tabs defaultValue="overview" keepMounted={false}>
+    <Tabs value={active} onChange={setActive} keepMounted={false}>
       <Tabs.List>
         <Tabs.Tab value="overview">Overview</Tabs.Tab>
         <Tabs.Tab value="maintenance">Maintenance</Tabs.Tab>

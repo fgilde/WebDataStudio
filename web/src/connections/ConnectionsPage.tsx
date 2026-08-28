@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ActionIcon, Badge, Button, Group, Modal, Stack, Table, Text, Title } from "@mantine/core";
 import { IconBucket, IconKey, IconPlus, IconTrash } from "@tabler/icons-react";
 import { createConnection, deleteConnection, listConnections, type Connection } from "../api";
@@ -13,8 +14,25 @@ export function ConnectionsPage() {
   const [addingBucket, setAddingBucket] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [query, setQuery] = useSearchParams();
+
   const refresh = () => listConnections().then(setItems).catch(e => setError(e.message));
   useEffect(() => { refresh(); }, []);
+
+  // "Add connection" and "Add a bucket" in the palette navigate here and say which form to open.
+  // Without this the command opened the page and left the person looking for the button.
+  useEffect(() => {
+    if (query.get("add") === "1") setAdding(true);
+    if (query.get("bucket") === "1") setAddingBucket(true);
+
+    if (query.has("add") || query.has("bucket")) {
+      const next = new URLSearchParams(query);
+      next.delete("add");
+      next.delete("bucket");
+      // Cleared so a reload does not reopen a dialog somebody closed.
+      setQuery(next, { replace: true });
+    }
+  }, [query, setQuery]);
 
   return (
     <Stack p="md">

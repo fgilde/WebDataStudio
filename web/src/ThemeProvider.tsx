@@ -6,6 +6,7 @@ import { Notifications } from "@mantine/notifications";
 import "@mantine/notifications/styles.css";
 import "@mantine/spotlight/styles.css";
 import { THEMES, DEFAULT_THEME, THEME_KEY, getTheme, type AppTheme } from "./themes";
+import { onShell } from "./shell/bus";
 
 interface ThemeCtx {
   themeId: string;
@@ -30,8 +31,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
       return next;
     });
 
-    document.addEventListener("wds:cycle-theme", cycle);
-    return () => document.removeEventListener("wds:cycle-theme", cycle);
+    return onShell("cycle-theme", cycle);
   }, []);
 
   return (

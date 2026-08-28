@@ -3,11 +3,8 @@ import { DockviewReact } from "dockview-react";
 import type { DockviewApi, DockviewReadyEvent, DockviewGroupPanel, IDockviewPanelProps } from "dockview-react";
 import { ActionIcon, Group, Modal, Text, Tooltip } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import {
-  IconArchive, IconArrowsJoin, IconBinaryTree, IconNotebook,
-  IconBookmarks, IconCommand, IconGitCompare, IconHistory, IconKey, IconLayoutBoard, IconZoomCode,
-  IconSettingsCog, IconSitemap, IconSquarePlus, IconTable,
-} from "@tabler/icons-react";
+import { IconBookmarks, IconSquarePlus, IconZoomCode } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
 import "dockview-react/dist/styles/dockview.css";
 import "../editor/dockview-mantine.css";
 import { useAppTheme } from "../ThemeProvider";
@@ -34,6 +31,9 @@ import { parseModel } from "../designer/buildSelect";
 import { SavedQueriesPanel } from "../query/SavedQueriesPanel";
 import { SnippetManager } from "../editor/SnippetManager";
 import { CommandPalette, ShortcutsHelp } from "../shell/CommandPalette";
+import { ToolsMenu } from "../shell/ToolsMenu";
+import { emit, onShell, publishShell } from "../shell/bus";
+import { type ToolComponent } from "../shell/tools";
 import { PreferencesModal } from "../shell/PreferencesModal";
 import { comboOf, loadPreferences, preferences } from "../shell/preferences";
 import { StudioTab, TabPinsProvider, type TabPins } from "./StudioTab";
@@ -267,11 +267,14 @@ function DiagramDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) 
   return <DiagramPanel connectionId={props.params.connectionId} onOpenTable={shell.openData} />;
 }
 
-function AdminDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+function AdminDockPanel(props: IDockviewPanelProps<{ connectionId: string; tab?: string }>) {
   const shell = useShell();
 
   return (
     <AdminPanel connectionId={props.params.connectionId}
+      // "Scheduled jobs" and "Capture" are commands of their own, so they land on their tab rather
+      // than on the overview with a hunt to follow.
+      tab={props.params.tab}
       // A job is enabled, disabled or started through a statement in a query tab — the same path
       // every other change in this studio takes.
       onOpenInEditor={sql => shell.runStatement(props.params.connectionId, sql)} />
@@ -305,29 +308,16 @@ function WelcomePanel() {
 function ExplorerDockPanel() {
   const { explorer } = useShell();
   const connection = explorer.activeConnection;
-  // The administration surface belongs to admins; the server refuses it for anybody else, so
-  // offering the button would only be a promise it cannot keep.
-  const role = useRole();
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Three things that act on what is in front of you, and every tool behind one menu. This
+          used to be thirteen icons in a 280-pixel column, cut off at the panel's edge. */}
       <Group gap={2} px={4} pt={4} wrap="nowrap">
-        <Tooltip label="New query">
+        <Tooltip label="New query (Ctrl+N)">
           <ActionIcon size="sm" variant="subtle" aria-label="New query" disabled={!connection}
             onClick={explorer.newQuery}>
             <IconSquarePlus size={15} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="History">
-          <ActionIcon size="sm" variant="subtle" aria-label="History"
-            onClick={() => explorer.focusPanel("history")}>
-            <IconHistory size={15} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Diagram">
-          <ActionIcon size="sm" variant="subtle" aria-label="Diagram" disabled={!connection}
-            onClick={() => explorer.openTool("diagram", "Diagram", connection)}>
-            <IconSitemap size={15} />
           </ActionIcon>
         </Tooltip>
         <Tooltip label="Find a value in any table">
@@ -336,78 +326,13 @@ function ExplorerDockPanel() {
             <IconZoomCode size={15} />
           </ActionIcon>
         </Tooltip>
-        <Tooltip label="Compare">
-          <ActionIcon size="sm" variant="subtle" aria-label="Compare" disabled={!connection}
-            onClick={() => explorer.openTool("compare", "Compare", connection)}>
-            <IconGitCompare size={15} />
-          </ActionIcon>
-        </Tooltip>
-        {isAdmin(role) ? (
-          <Tooltip label="Administration">
-            <ActionIcon size="sm" variant="subtle" aria-label="Administration" disabled={!connection}
-              onClick={() => explorer.openTool("admin", "Admin", connection)}>
-              <IconSettingsCog size={15} />
-            </ActionIcon>
-          </Tooltip>
-        ) : null}
-        <Tooltip label="Notebook: SQL, prose and results in one document">
-          <ActionIcon size="sm" variant="subtle" aria-label="Notebook"
-            onClick={() => explorer.openTool("notebook", "Notebook", connection)}>
-            <IconNotebook size={15} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Archives: results kept as files">
-          <ActionIcon size="sm" variant="subtle" aria-label="Archives" disabled={!connection}
-            onClick={() => explorer.openTool("archive", "Archives", connection)}>
-            <IconArchive size={15} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Perspective: a row, and everything related to it">
-          <ActionIcon size="sm" variant="subtle" aria-label="Perspective" disabled={!connection}
-            onClick={() => explorer.openTool("perspective", "Perspective", connection)}>
-            <IconBinaryTree size={15} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Join across connections">
-          <ActionIcon size="sm" variant="subtle" aria-label="Federated query"
-            disabled={!connection}
-            onClick={() => explorer.openTool("federate", "Federated", connection)}>
-            <IconArrowsJoin size={15} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Query builder">
-          <ActionIcon size="sm" variant="subtle" aria-label="Query builder" disabled={!connection}
-            onClick={() => explorer.openTool("builder", "Builder", connection)}>
-            <IconTable size={15} />
-          </ActionIcon>
-        </Tooltip>
-        {/* Only for Redis: a key browser on PostgreSQL would be a button that cannot work. */}
-        {explorer.engineOf(connection) === "redis" ? (
-          <Tooltip label="Redis browser">
-            <ActionIcon size="sm" variant="subtle" aria-label="Redis browser"
-              onClick={() => explorer.openTool("redis", "Redis", connection)}>
-              <IconKey size={15} />
-            </ActionIcon>
-          </Tooltip>
-        ) : null}
         <Tooltip label="Saved queries">
           <ActionIcon size="sm" variant="subtle" aria-label="Saved queries"
             onClick={() => explorer.focusPanel("saved")}>
             <IconBookmarks size={15} />
           </ActionIcon>
         </Tooltip>
-        <Tooltip label="Layout presets">
-          <ActionIcon size="sm" variant="subtle" aria-label="Layout presets"
-            onClick={explorer.openLayouts}>
-            <IconLayoutBoard size={15} />
-          </ActionIcon>
-        </Tooltip>
-        <Tooltip label="Command palette (Ctrl+K)">
-          <ActionIcon size="sm" variant="subtle" aria-label="Command palette"
-            onClick={explorer.openPalette}>
-            <IconCommand size={15} />
-          </ActionIcon>
-        </Tooltip>
+        <ToolsMenu />
       </Group>
 
       <div style={{ flex: 1, minHeight: 0 }}>
@@ -417,14 +342,33 @@ function ExplorerDockPanel() {
   );
 }
 
+/// A dock panel, however much of its params it reads: some take the connection from them, the
+/// always-there panels take everything from the shell.
+type DockPanel = React.FunctionComponent<IDockviewPanelProps<Record<string, unknown>>>;
+
+/// Every tool in `tools.ts` needs a panel here. Typing the map by `ToolComponent` is what makes a
+/// tool nobody wired up a compile error rather than a menu entry that does nothing.
+const toolComponents: Record<ToolComponent, DockPanel> = {
+  datasearch: DataSearchDockPanel as DockPanel,
+  diagram: DiagramDockPanel as DockPanel,
+  builder: QueryDesignerDockPanel as DockPanel,
+  notebook: NotebookDockPanel as DockPanel,
+  perspective: PerspectiveDockPanel as DockPanel,
+  compare: CompareDockPanel as DockPanel,
+  federate: FederationDockPanel as DockPanel,
+  archive: ArchiveDockPanel as DockPanel,
+  redis: RedisDockPanel as DockPanel,
+  admin: AdminDockPanel as DockPanel,
+  health: HealthDockPanel as DockPanel,
+  history: HistoryDockPanel as DockPanel,
+  saved: SavedQueriesDockPanel as DockPanel,
+};
+
 const components = {
+  ...toolComponents,
   explorer: ExplorerDockPanel,
-  structure: StructurePanel, query: QueryPanel, history: HistoryDockPanel, welcome: WelcomePanel,
-  data: DataPanel, plan: PlanDockPanel, health: HealthDockPanel, designer: DesignerPanel,
-  diagram: DiagramDockPanel, admin: AdminDockPanel, compare: CompareDockPanel,
-  saved: SavedQueriesDockPanel, builder: QueryDesignerDockPanel, redis: RedisDockPanel,
-  federate: FederationDockPanel, notebook: NotebookDockPanel, datasearch: DataSearchDockPanel,
-  perspective: PerspectiveDockPanel, archive: ArchiveDockPanel,
+  structure: StructurePanel, query: QueryPanel, welcome: WelcomePanel,
+  data: DataPanel, plan: PlanDockPanel, designer: DesignerPanel,
 };
 
 /// The default arrangement, in one place: the initial layout and the reset command must produce
@@ -484,6 +428,12 @@ function flashPanel(element: HTMLElement | undefined) {
 }
 
 export function DockShell() {
+  // The administration surface belongs to admins; the server refuses it for anybody else, so the
+  // tools menu leaves it out rather than offering a promise it cannot keep.
+  const role = useRole();
+  // This is a BrowserRouter, so a command that wants another page navigates. Setting
+  // window.location.hash — which is what these did — moved nobody anywhere.
+  const navigate = useNavigate();
   const { current } = useAppTheme();
   const [selection, setSelection] = useState<ExplorerSelection | null>(null);
   const [connections, setConnections] = useState<Connection[]>([]);
@@ -1000,13 +950,21 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
   // One panel per tool and connection: clicking the button again focuses the panel that is
   // already open instead of stacking duplicates.
-  const openTool = useCallback((component: string, title: string, connectionId: string) => {
+  const openTool = useCallback((component: string, title: string, connectionId: string,
+    tab?: string) => {
     if (!connectionId) return;
     const id = `${component}:${connectionId}`;
-    if (api.current?.getPanel(id)) { focusPanel(id); return; }
+    // Already open: focus it, and switch it to the tab that was asked for — "Scheduled jobs" has to
+    // land on the jobs tab whether or not the admin panel was open already.
+    const existing = api.current?.getPanel(id);
+    if (existing) {
+      focusPanel(id);
+      if (tab) existing.api.updateParameters({ connectionId, tab });
+      return;
+    }
 
     api.current?.addPanel({
-      id, component, title, params: { connectionId },
+      id, component, title, params: { connectionId, tab },
       position: centerGroup.current ? { referenceGroup: centerGroup.current } : undefined,
     });
     flashPanel(api.current?.getPanel(id)?.group.element);
@@ -1073,21 +1031,20 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       new KeyboardEvent("keydown", { key: "c", ctrlKey: true, shiftKey: true })),
     formatCurrent: () => document.dispatchEvent(
       new KeyboardEvent("keydown", { key: "f", ctrlKey: true, shiftKey: true })),
-    openConnections: () => { window.location.hash = "#/connections"; },
-    addConnection: () => { window.location.hash = "#/connections?add=1"; },
+    openConnections: () => navigate("/connections"),
+    addConnection: () => navigate("/connections?add=1"),
     refreshExplorer: () => setExplorerNonce(n => n + 1),
     goToObject: () => setGotoOpen(true),
-    openDiagram: () => openTool("diagram", "Diagram", activeConnection),
-    openHealth: () => focusPanel("health"),
-    openAdmin: () => openTool("admin", "Admin", activeConnection),
-    openCompare: () => openTool("compare", "Compare", activeConnection),
-    openNotebook: () => openTool("notebook", "Notebook", activeConnection),
-    openFederation: () => openTool("federate", "Federated", activeConnection),
-    openPerspective: () => openTool("perspective", "Perspective", activeConnection),
-    openArchives: () => openTool("archive", "Archives", activeConnection),
-    openHistory: () => focusPanel("history"),
-    openSavedQueries: () => focusPanel("saved"),
+    addBucket: () => navigate("/connections?bucket=1"),
+    // Every tool goes through the one registry: a panel is focused, a per-connection tool is
+    // opened, and the tab it asked for travels with it.
+    openTool: tool => tool.dock === "panel"
+      ? focusPanel(tool.component)
+      : openTool(tool.component, tool.title, activeConnection, tool.tab),
     saveCurrentQuery: () => focusPanel("saved"),
+    activeConnection,
+    engine: engineOf(activeConnection),
+    admin: isAdmin(role),
     exportResult: () => {
       const tab = tabs[tabs.length - 1];
       if (tab) exportQuery(tab.connectionId, tab.sql);
@@ -1098,7 +1055,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       const tab = tabs[tabs.length - 1];
       if (tab) openInBuilder(tab.connectionId, tab.sql);
     },
-    switchTheme: () => document.dispatchEvent(new CustomEvent("wds:cycle-theme")),
+    switchTheme: () => emit("cycle-theme"),
     saveLayout: () => setLayoutsOpen(true),
     resetLayout,
     copyLink: () => {
@@ -1190,23 +1147,33 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     return () => window.removeEventListener("keydown", onKey);
   }, [activeConnection, applyLayout, commands, presets, resetLayout, showExplorer]);
 
-  // The header button lives outside this component; the theme switch uses the same channel.
-  useEffect(() => {
-    const open = () => setLayoutsOpen(true);
-    document.addEventListener("wds:layouts", open);
-    return () => document.removeEventListener("wds:layouts", open);
-  }, []);
+  // The header and the chat dock live outside this component — they wrap the routes — so what they
+  // ask for arrives through the shell bus rather than through props that do not exist.
+  useEffect(() => onShell("layouts", () => setLayoutsOpen(true)), []);
+  useEffect(() => onShell("palette", () => setPaletteOpen(true)), []);
 
-  // The chat lives outside the dock, so "put this in the editor" arrives as an event.
-  useEffect(() => {
-    const use = (event: Event) => {
-      const sql = (event as CustomEvent<string>).detail;
-      if (typeof sql === "string" && sql.trim().length > 0) newTab(activeConnection, sql);
-    };
+  useEffect(() => onShell("use-sql", sql => {
+    if (typeof sql === "string" && sql.trim().length > 0) newTab(activeConnection, sql);
+  }), [activeConnection, newTab]);
 
-    document.addEventListener("wds:use-sql", use);
-    return () => document.removeEventListener("wds:use-sql", use);
-  }, [activeConnection, newTab]);
+  // The header names a command; the dock owns them, so it runs it. A disabled one is ignored, which
+  // is what the menu already shows.
+  useEffect(() => onShell("command", id => {
+    const command = commands.find(entry => entry.id === id);
+    if (command && !command.disabled) command.run();
+  }), [commands]);
+
+  // And what the header needs to render: whether a connection is selected, which engine it is,
+  // whether this is an admin, and the command list itself — so the menu and the palette cannot
+  // offer different things.
+  useEffect(() => {
+    publishShell({
+      activeConnection,
+      engine: engineOf(activeConnection),
+      admin: isAdmin(role),
+      commands,
+    });
+  }, [activeConnection, commands, engineOf, role]);
 
   // A deep link opens its target once the connections are known.
   const followedLink = useRef(false);

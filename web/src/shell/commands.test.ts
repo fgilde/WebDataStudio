@@ -99,7 +99,16 @@ describe("TOOLS", () => {
   it("names a dock component for every entry", () => {
     for (const tool of TOOLS) {
       expect(tool.component.length).toBeGreaterThan(2);
-      expect(["tool", "panel"]).toContain(tool.dock);
+      expect(["tool", "panel", "route"]).toContain(tool.dock);
+    }
+  });
+
+  it("a route tool names a path and nothing else does", () => {
+    // A route is the one surface that is deliberately not a dock panel — the reports page, for
+    // somebody who is not here to write SQL.
+    for (const tool of TOOLS) {
+      if (tool.dock === "route") expect(tool.component.startsWith("/")).toBe(true);
+      else expect(tool.component.startsWith("/")).toBe(false);
     }
   });
 

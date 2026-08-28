@@ -9,6 +9,7 @@ import { PartitionsTab, PoliciesTab } from "./ObjectAdminTabs";
 import { FunctionTab } from "./FunctionTab";
 import { StoragePreview } from "../storage/StoragePreview";
 import { ProfileTab } from "./ProfileTab";
+import { NotesTab } from "./NotesTab";
 
 /// The kinds that hold rows, and so have something to count.
 const OBJECT_KINDS = ["Table", "View", "MaterializedView"];
@@ -69,6 +70,7 @@ export function ObjectDetailPanel({ selection, onOpenInEditor, onOpenData }: {
         {detail && <Tabs.Tab value="statistics">Statistics</Tabs.Tab>}
         {detail && OBJECT_KINDS.includes(selection.node.kind)
           && <Tabs.Tab value="profile">Profile</Tabs.Tab>}
+        <Tabs.Tab value="notes">Notes</Tabs.Tab>
         {/* Only where they mean something: a view has no partitions, and only PostgreSQL has
             row-level security — the tabs themselves say so if opened anyway. */}
         {selection.node.kind === "Table" && <Tabs.Tab value="policies">Policies</Tabs.Tab>}
@@ -84,6 +86,12 @@ export function ObjectDetailPanel({ selection, onOpenInEditor, onOpenData }: {
       {/* The four tabs pgAdmin taught people to look for. Each asks the server for itself, so
           opening an object stays one request. */}
       {detail && <>
+      <Tabs.Panel value="notes" keepMounted={false}>
+        {/* Every kind of object, not only the ones with rows: a function is exactly the thing
+            somebody needs a sentence about. */}
+        <NotesTab connectionId={selection.connectionId} objectRef={selection.node.ref} />
+      </Tabs.Panel>
+
       <Tabs.Panel value="profile" keepMounted={false}>
         {/* Counted on demand: one statement per look, and a sample of the rows for the patterns. */}
         <ProfileTab connectionId={selection.connectionId} objectRef={selection.node.ref}

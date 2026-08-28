@@ -302,3 +302,20 @@ WDS_SCHEDULE_OUTPUT_DIR=/data/exports          # the default
 - The file is re-read every minute, so editing the schedule needs no restart.
 - `GET /api/schedule` reports the jobs and what each last did; `POST /api/schedule/{name}/run` runs
   one now. A failed run is a message when [alerts](administration.md#alerts) are configured.
+
+## A saved query as a form
+
+Saved queries, bind parameters and shared links each existed on their own. **Reports** is the shape
+somebody who does not write SQL can use: pick the report, fill in the boxes, press run.
+
+A saved query becomes a report as soon as it names a connection, and the boxes are the bind
+parameters it already had — `:from` and `:to` on PostgreSQL and Oracle, `$from` on SQLite and DuckDB,
+`@from` on SQL Server and MySQL, the same markers the editor offers.
+
+**The link carries the values.** `/report/<id>?from=2026-06-01&to=2026-06-30` runs by itself when it
+is opened, so "the numbers for last month" is something to send rather than something to explain.
+*Copy link* writes it, and *Download CSV* takes the answer away.
+
+Reading only, whatever the saved query says: a report is pressed by people who are not reading the
+SQL, so one that changes data is refused with that sentence rather than run. It is behind the same
+login as the rest of the studio, and masked columns stay masked.

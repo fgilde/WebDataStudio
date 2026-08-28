@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Services;
 
 namespace WebDataStudio.Server.Tests;
@@ -73,6 +74,69 @@ public class HealthAlertTests : IAsyncLifetime
                 foreach (var (key, value) in extra) settings[key] = value;
                 c.AddInMemoryCollection(settings);
             }));
+
+    [Fact]
+    public async Task A_message_carries_the_way_back_where_the_deployment_said_one()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory(
+            ("WDS_ALERT_WEBHOOK", _hookUrl),
+            ("WDS_PUBLIC_URL", "https://studio.example.com/"));
+
+        var sent = await factory.Services.GetRequiredService<HealthAlerts>().SweepAsync(ct);
+
+        Assert.True(sent > 0);
+
+        var payload = JsonDocument.Parse(Assert.Single(_posted)).RootElement;
+
+        // Half the value of a message is the way back to the thing it is about, and the link is the
+        // studio's own deep link — the same one "Copy link" writes.
+        Assert.StartsWith("https://studio.example.com/#/c/",
+            payload.GetProperty("url").GetString());
+
+        // And it is in the text as well, because that is all Slack renders.
+        Assert.Contains("|open the studio>", payload.GetProperty("text").GetString());
+
+        // Every finding carries a way back. This one — a table with no primary key on SQLite — has no
+        // statement that would fix it, so it opens the connection; a finding that does carry a fix
+        // opens the object that statement is about, which is what ObjectOf decides below.
+        var finding = payload.GetProperty("findings").EnumerateArray().First();
+        Assert.StartsWith("https://studio.example.com/#/c/", finding.GetProperty("url").GetString());
+        Assert.Contains("|open>", payload.GetProperty("text").GetString());
+    }
+
+    [Theory]
+    [InlineData("CREATE INDEX ix_orders_person ON orders (person_id)", "Table:orders")]
+    [InlineData("CREATE INDEX ix ON public.orders (a)", "Table:public/orders")]
+    [InlineData("VACUUM (ANALYZE) orders", "Table:orders")]
+    [InlineData("ALTER TABLE \"public\".\"orders\" ADD COLUMN x int", "Table:public/orders")]
+    public void The_object_is_read_out_of_the_fix_rather_than_the_title(string fix, string expected) =>
+        // A title is a sentence: "events has no primary key" ends in a word that is not a table.
+        Assert.Equal(expected, HealthAlerts.ObjectOf(
+            new AnalyzeFinding("indexes", "warning", "Index suggestion for orders", "…", fix)));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("REINDEX")]
+    public void And_a_finding_with_no_fix_links_to_the_connection(string? fix) =>
+        Assert.Null(HealthAlerts.ObjectOf(
+            new AnalyzeFinding("keys", "warning", "events has no primary key", "…", fix)));
+
+    [Fact]
+    public async Task And_without_a_public_url_it_offers_none()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory(("WDS_ALERT_WEBHOOK", _hookUrl));
+
+        await factory.Services.GetRequiredService<HealthAlerts>().SweepAsync(ct);
+
+        var payload = JsonDocument.Parse(Assert.Single(_posted)).RootElement;
+
+        // A container cannot know its own public address, and a guessed hostname is worse than none.
+        Assert.Equal(JsonValueKind.Null, payload.GetProperty("url").ValueKind);
+        Assert.DoesNotContain("|open>", payload.GetProperty("text").GetString());
+    }
 
     [Fact]
     public async Task Without_a_webhook_nothing_is_watched()

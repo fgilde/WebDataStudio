@@ -219,3 +219,7 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F30.21 | Which way a rule is going: every run kept as a measurement, and the direction rather than a mean | done | all | Data quality tab |
 | F30.22 | The rows kept as an archive before a statement that takes all of them, so a DELETE with no WHERE has a way back | done | all | Query editor, `WDS_SAFETY_NET` |
 | F30.23 | A suggested index measured rather than claimed: created, the plan asked again, and dropped | done | postgresql, mysql, sqlserver, sqlite, oracle, clickhouse | Plan panel, findings |
+| F30.24 | Notes on any object — a name, a date and a sentence — kept in the studio rather than needing a DDL right and a migration | done | all | Structure panel, notes tab |
+| F30.25 | A saved query as a form: the bind parameters as boxes, the values in the link, and the answer as a CSV | done | postgresql, mysql, sqlserver, sqlite, oracle, duckdb | Reports page |
+| F30.26 | Every alert carrying the way back to what it is about, read out of the statement that would fix it | done | all | Alert webhook, `WDS_PUBLIC_URL` |
+| F30.27 | The profile and the notes as MCP tools, so an agent can read what a table holds and what people wrote about it | done | all | MCP endpoint |

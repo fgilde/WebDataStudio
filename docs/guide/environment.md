@@ -24,6 +24,7 @@
 | `WDS_SCHEMA_SNAPSHOT_DIR` | snapshot every connection's schema on start and report the drift — see [Schema editing](schema.md) |
 | `WDS_ARCHIVE_DIR`, `WDS_ARCHIVE_MAX_ROWS` | where kept results are written, and how many rows one keeps — see [Results and export](results.md) |
 | `WDS_ALERT_WEBHOOK`, `WDS_ALERT_INTERVAL_MINUTES`, `WDS_ALERT_MIN_SEVERITY`, `WDS_ALERT_CONNECTIONS` | post new health findings to a webhook — see [Administration](administration.md) |
+| `WDS_PUBLIC_URL` | where this studio can be reached from outside, so an alert can link back to what it is about |
 | `WDS_MASK_EXTRA`, `WDS_MASK_NEVER`, `WDS_MASK_DEFAULT` | which columns are masked before they leave the server — see [Safety](safety.md) |
 | `WDS_SAFETY_NET`, `WDS_SAFETY_MAX_ROWS` | keep the rows before a statement that takes all of them — see [Safety](safety.md#kept-before-it-goes) |
 | `WDS_ASSIST_TOOLS` | `false` keeps the assistant from using the MCP tools; otherwise it uses them when both are configured |

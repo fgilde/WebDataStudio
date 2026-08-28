@@ -5,13 +5,15 @@
 /// buttons the palette had never heard of. So the list lives here, and each surface renders it.
 ///
 /// `dock` says how a tool is opened: a `tool` gets one panel per connection, a `panel` is a single
-/// panel that is focused rather than duplicated.
+/// panel that is focused rather than duplicated, and a `route` is a page of its own — for the one
+/// surface that is deliberately not a dock panel, because the person using it is not here to write
+/// SQL.
 export interface ToolDefinition {
   /// The command id, which is also the palette's and the keyboard help's key for it.
   id: string;
-  /// The dockview component for a tool, or the panel id for a panel.
+  /// The dockview component for a tool, the panel id for a panel, or the path for a route.
   component: string;
-  dock: "tool" | "panel";
+  dock: "tool" | "panel" | "route";
   /// The dock tab's title.
   title: string;
   /// What a menu or the palette shows.
@@ -81,6 +83,10 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: "tool.health", component: "health", dock: "panel", title: "Health",
     label: "Health report",
+  },
+  {
+    id: "tool.reports", component: "/report", dock: "route", title: "Reports",
+    label: "Reports — a saved query as a form",
   },
   {
     id: "tool.history", component: "history", dock: "panel", title: "History",

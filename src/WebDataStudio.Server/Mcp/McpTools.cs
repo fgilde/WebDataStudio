@@ -23,7 +23,7 @@ public sealed record McpToolResult(string Text, bool IsError = false);
 public sealed class McpToolbox(
     ConnectionRegistry registry, SessionFactory factory, MaskPolicyStore policies,
     McpOptions options, IMemoryCache cache, WorkspaceStore workspace,
-    Analysis.QualityRunner quality)
+    Analysis.QualityRunner quality, MaskPolicyStore maskPolicies)
 {
     /// Rows a single tool call may return. An agent that wants more can page with `offset`.
     private const int MaxRows = 200;
@@ -207,6 +207,34 @@ public sealed class McpToolbox(
                 ("message", "string", "What to say when it fails.", false)),
             Writes: true);
 
+        yield return new McpTool("profile_table",
+            "What a table actually holds, counted rather than guessed: rows, how many of them have a "
+            + "value in each column, how many different values, the smallest and the largest — plus "
+            + "which columns look like they hold something personal, read from a sample of the values "
+            + "rather than from the column's name.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("ref", "string", "Object ref of a table or view.", true),
+                ("sample", "integer", "Rows read for the pattern check, default 200.", false)),
+            Writes: false);
+
+        yield return new McpTool("object_notes",
+            "The notes people left on an object in this studio — what a column really means, why a "
+            + "table is shaped the way it is. Without a ref, the notes of the whole connection.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("ref", "string", "Object ref. Omit for every note of this connection.", false)),
+            Writes: false);
+
+        yield return new McpTool("add_note",
+            "Leaves a note on an object, so what was worked out once is next to the thing it is "
+            + "about. Changes the studio's own state, not the database.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("ref", "string", "Object ref the note belongs to.", true),
+                ("body", "string", "The note.", true)),
+            Writes: true);
+
         yield return new McpTool("preview_script",
             "Splits a script into statements, says which of them are destructive, and returns a "
             + "hash. Nothing runs. The hash is what apply_script takes, so what runs is what was "
@@ -290,6 +318,9 @@ public sealed class McpToolbox(
                 "quality_rules" => Ok(quality.For(Required(arguments, "connectionId"))),
                 "run_quality_rules" => await RunQualityAsync(arguments, ct),
                 "save_quality_rule" => SaveQualityRule(arguments),
+                "profile_table" => await ProfileAsync(arguments, ct),
+                "object_notes" => Notes(arguments),
+                "add_note" => AddNote(arguments),
                 "preview_script" => await PreviewAsync(arguments, ct),
                 "apply_script" => await ApplyAsync(arguments, ct),
                 _ => new McpToolResult($"there is no tool called '{name}'", IsError: true),
@@ -900,6 +931,91 @@ public sealed class McpToolbox(
 
         quality.Save(rule);
         return Ok(rule);
+    }
+
+    /// The numbers behind a table, and the columns whose values gave them away.
+    private async Task<McpToolResult> ProfileAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var reference = Required(arguments, "ref");
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            var target = SchemaNodeRef.Parse(reference);
+            var detail = await driver.DescribeAsync(session, target, ct);
+
+            if (driver.FromClause(session, target) is not { } from)
+                return new McpToolResult("this object cannot be read", IsError: true);
+
+            var columns = detail.Columns
+                .Select(column => new ColumnMeta(column.Name, column.DataType, column.Nullable))
+                .ToList();
+
+            if (columns.Count == 0)
+                return new McpToolResult($"there is nothing to profile in {target.Name}",
+                    IsError: true);
+
+            var (stats, note) = await Analysis.ColumnProfile.ReadAsync(session, driver.Dialect, from,
+                columns, ct);
+
+            var hints = await Analysis.ColumnProfile.SniffAsync(session, driver.Dialect, from, columns,
+                Number(arguments, "sample") ?? Analysis.ColumnProfile.DefaultSample, ct);
+
+            var policy = maskPolicies.For(connection);
+
+            return Ok(new
+            {
+                note,
+                rows = stats.Count > 0 ? stats[0].Rows : 0,
+                columns = stats.Select(stat => new
+                {
+                    stat.Name,
+                    stat.DataType,
+                    stat.Nulls,
+                    stat.NullPercent,
+                    stat.Distinct,
+                    stat.Min,
+                    stat.Max,
+                    stat.Unique,
+                    stat.Constant,
+                    masked = SensitiveColumns.ShouldMask(stat.Name, policy),
+                }),
+                hints = hints.Select(hint => new { hint.Column, hint.Looks, hint.Percent }),
+                suggestions = Analysis.ColumnProfile.Suggest(stats).Select(suggestion => new
+                {
+                    suggestion.Column,
+                    kind = suggestion.Kind.ToString(),
+                    suggestion.Argument,
+                    suggestion.Why,
+                }),
+            });
+        }
+    }
+
+    /// What people wrote down about an object. Worth reading before answering a question about it.
+    private McpToolResult Notes(JsonElement arguments)
+    {
+        if (!workspace.Available)
+            return new McpToolResult("this studio has no workspace file, so it keeps no notes",
+                IsError: true);
+
+        var connection = Required(arguments, "connectionId");
+
+        return Ok(workspace.ListNotes(connection, Optional(arguments, "ref"), 100));
+    }
+
+    private McpToolResult AddNote(JsonElement arguments)
+    {
+        if (!workspace.Available)
+            return new McpToolResult("this studio has no workspace file, so it keeps no notes",
+                IsError: true);
+
+        var body = Required(arguments, "body");
+
+        // Named for what it is: a note from an agent should not read as though a person wrote it.
+        return Ok(workspace.AddNote(Required(arguments, "connectionId"), Required(arguments, "ref"),
+            "mcp", body));
     }
 
     private static McpToolResult Ok(object payload) =>

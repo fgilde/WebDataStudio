@@ -623,6 +623,68 @@ public class McpTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_table_can_be_profiled_and_the_values_give_the_columns_away()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+
+        var (text, failed) = await CallAsync(client, "profile_table", new
+        {
+            connectionId = await IdAsync(client), @ref = "Table:customers",
+        });
+
+        Assert.False(failed);
+        // Counted: two rows, and a column where every value is different.
+        Assert.Contains("\"rows\": 2", text);
+        Assert.Contains("\"unique\": true", text);
+        // And read from the values: the api_key column holds tokens, the city column does not.
+        Assert.Contains("suggestions", text);
+    }
+
+    [Fact]
+    public async Task Notes_can_be_read_and_left()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"), ("WDS_MCP_ALLOW_WRITE", "true"));
+        var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var (written, writeFailed) = await CallAsync(client, "add_note", new
+        {
+            connectionId = id, @ref = "Table:customers",
+            body = "The api_key column is a token, not a password.",
+        });
+
+        Assert.False(writeFailed);
+        // Named for what it is: a note from an agent should not read as though a person wrote it.
+        Assert.Contains("\"author\": \"mcp\"", written);
+
+        var (read, readFailed) = await CallAsync(client, "object_notes", new
+        {
+            connectionId = id, @ref = "Table:customers",
+        });
+
+        Assert.False(readFailed);
+        Assert.Contains("not a password", read);
+    }
+
+    [Fact]
+    public async Task Leaving_a_note_needs_the_write_flag()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+
+        var tools = (await RpcAsync(client, "tools/list"))
+            .GetProperty("result").GetProperty("tools").EnumerateArray()
+            .Select(tool => tool.GetProperty("name").GetString())
+            .ToList();
+
+        Assert.Contains("profile_table", tools);
+        Assert.Contains("object_notes", tools);
+        // Writing changes the studio's own state, so it waits for WDS_MCP_ALLOW_WRITE.
+        Assert.DoesNotContain("add_note", tools);
+    }
+
+    [Fact]
     public async Task What_this_studio_has_run_is_a_tool_call()
     {
         using var factory = Factory(("WDS_MCP_ENABLED", "true"));

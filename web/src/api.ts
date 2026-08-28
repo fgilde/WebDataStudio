@@ -494,6 +494,56 @@ export const previewUndo = (conn: string, ref: string): Promise<ChangePreviewDto
   fetch(`${base}/data/${conn}/undo/preview?${refQuery(ref, new URLSearchParams())}`,
     { method: "POST" }).then(r => ok<ChangePreviewDto>(r));
 
+/// A saved query offered as a form: what it is called, what it asks for, and the statement itself.
+export interface ReportDto {
+  id: string;
+  name: string;
+  folder: string | null;
+  connectionId: string;
+  parameters: string[];
+  sql: string;
+}
+
+export interface ReportResultDto {
+  name: string;
+  columns: { name: string; dataType: string }[];
+  rows: (string | number | boolean | null)[][];
+  truncated: boolean;
+}
+
+export const listReports = (): Promise<ReportDto[]> =>
+  fetch(`${base}/reports`).then(r => ok<ReportDto[]>(r));
+
+/// Runs one, reading only and capped. A saved query that changes data is not offered as a report.
+export const runReport = (id: string, parameters: Record<string, string>):
+  Promise<ReportResultDto> =>
+  fetch(`${base}/reports/${encodeURIComponent(id)}/run`, json("POST", { parameters }))
+    .then(r => ok<ReportResultDto>(r));
+
+/// A note somebody left on an object: what a column really means, why a table is shaped this way.
+export interface ObjectNoteDto {
+  id: number;
+  connectionId: string;
+  objectRef: string;
+  author: string;
+  body: string;
+  at: string;
+}
+
+export const objectNotes = (conn: string, ref: string): Promise<ObjectNoteDto[]> =>
+  fetch(`${base}/notes/${conn}?${refQuery(ref)}`).then(r => ok<ObjectNoteDto[]>(r));
+
+export const addNote = (conn: string, ref: string, body: string): Promise<ObjectNoteDto> =>
+  fetch(`${base}/notes/${conn}`, json("POST", { ref, body })).then(r => ok<ObjectNoteDto>(r));
+
+export const deleteNote = (conn: string, id: number): Promise<void> =>
+  fetch(`${base}/notes/${conn}/${id}`, { method: "DELETE" }).then(r => ok<void>(r));
+
+/// Notes across every object of every connection: the studio's own answer to "somebody wrote
+/// something about this once".
+export const searchNotes = (search: string): Promise<ObjectNoteDto[]> =>
+  fetch(`${base}/notes?search=${encodeURIComponent(search)}`).then(r => ok<ObjectNoteDto[]>(r));
+
 export interface MaskPolicyDto { maskByDefault: boolean; extra: string[]; never: string[] }
 
 /// What one column actually holds, counted rather than guessed.

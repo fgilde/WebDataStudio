@@ -8,6 +8,11 @@ public sealed record HistoryEntry(long Id, string ConnectionId, string Sql,
     /// history panel would carry every snapshot it ever took.
     bool HasSnapshot);
 
+/// A note somebody left on an object: what a column really means, why a table is the way it is,
+/// what the last migration broke.
+public sealed record ObjectNote(
+    long Id, string ConnectionId, string ObjectRef, string Author, string Body, DateTimeOffset At);
+
 /// One line of the audit trail: who asked for what, and what came of it.
 public sealed record AuditEntry(long Id, DateTimeOffset At, string User, string Role,
     string ConnectionId, string Action,
@@ -93,6 +98,18 @@ public sealed class WorkspaceStore
                 ran_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS ix_quality_runs ON quality_runs(connection_id, ran_at);
+            -- What people know about an object and nowhere to put it. The database has COMMENT ON,
+            -- which needs a DDL right and a migration; this is the studio's own note next to the
+            -- object, with a name and a date on it.
+            CREATE TABLE IF NOT EXISTS notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                connection_id TEXT NOT NULL,
+                object_ref TEXT NOT NULL,
+                author TEXT NOT NULL,
+                body TEXT NOT NULL,
+                at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_notes_object ON notes(connection_id, object_ref);
             """);
 
         _connectionString = prepared.ConnectionString;
@@ -153,6 +170,87 @@ public sealed class WorkspaceStore
         cmd.Parameters.AddWithValue("$err", (object?)error ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$snap", (object?)snapshot ?? DBNull.Value);
         cmd.ExecuteNonQuery();
+    }
+
+    public ObjectNote AddNote(string connectionId, string objectRef, string author, string body)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO notes (connection_id, object_ref, author, body, at)
+            VALUES ($c, $o, $a, $b, $at) RETURNING id
+            """;
+
+        var at = DateTimeOffset.UtcNow;
+        cmd.Parameters.AddWithValue("$c", connectionId);
+        cmd.Parameters.AddWithValue("$o", objectRef);
+        cmd.Parameters.AddWithValue("$a", author);
+        cmd.Parameters.AddWithValue("$b", body);
+        cmd.Parameters.AddWithValue("$at", at.ToString("O"));
+
+        var id = Convert.ToInt64(cmd.ExecuteScalar());
+        return new ObjectNote(id, connectionId, objectRef, author, body, at);
+    }
+
+    /// The notes on one object, or — with no object — every note of a connection. Newest first: the
+    /// last thing somebody learned is the thing worth reading.
+    public IReadOnlyList<ObjectNote> ListNotes(string connectionId, string? objectRef, int limit)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, connection_id, object_ref, author, body, at FROM notes
+            WHERE connection_id = $c AND ($o IS NULL OR object_ref = $o)
+            ORDER BY id DESC LIMIT $limit
+            """;
+        cmd.Parameters.AddWithValue("$c", connectionId);
+        cmd.Parameters.AddWithValue("$o",
+            string.IsNullOrWhiteSpace(objectRef) ? DBNull.Value : objectRef);
+        cmd.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 500));
+
+        var notes = new List<ObjectNote>();
+        using var reader = cmd.ExecuteReader();
+
+        while (reader.Read())
+            notes.Add(new ObjectNote(reader.GetInt64(0), reader.GetString(1), reader.GetString(2),
+                reader.GetString(3), reader.GetString(4),
+                DateTimeOffset.Parse(reader.GetString(5))));
+
+        return notes;
+    }
+
+    /// Notes matching a search, across every object of every connection: the studio's own answer to
+    /// "somebody wrote something about this once".
+    public IReadOnlyList<ObjectNote> SearchNotes(string search, int limit)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, connection_id, object_ref, author, body, at FROM notes
+            WHERE body LIKE $q OR object_ref LIKE $q
+            ORDER BY id DESC LIMIT $limit
+            """;
+        cmd.Parameters.AddWithValue("$q", $"%{search}%");
+        cmd.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 500));
+
+        var notes = new List<ObjectNote>();
+        using var reader = cmd.ExecuteReader();
+
+        while (reader.Read())
+            notes.Add(new ObjectNote(reader.GetInt64(0), reader.GetString(1), reader.GetString(2),
+                reader.GetString(3), reader.GetString(4),
+                DateTimeOffset.Parse(reader.GetString(5))));
+
+        return notes;
+    }
+
+    public bool DeleteNote(long id)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "DELETE FROM notes WHERE id = $id";
+        cmd.Parameters.AddWithValue("$id", id);
+        return cmd.ExecuteNonQuery() > 0;
     }
 
     /// One run of one rule, as it happened.

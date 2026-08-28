@@ -1149,9 +1149,13 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     importFile: () => setNewTable({ connectionId: activeConnection }),
     // Every tool goes through the one registry: a panel is focused, a per-connection tool is
     // opened, and the tab it asked for travels with it.
-    openTool: tool => tool.dock === "panel"
-      ? focusPanel(tool.component)
-      : openTool(tool.component, tool.title, activeConnection, tool.tab),
+    openTool: tool => {
+      if (tool.dock === "route") { navigate(tool.component); return; }
+
+      if (tool.dock === "panel") { focusPanel(tool.component); return; }
+
+      openTool(tool.component, tool.title, activeConnection, tool.tab);
+    },
     saveCurrentQuery: () => focusPanel("saved"),
     activeConnection,
     engine: engineOf(activeConnection),

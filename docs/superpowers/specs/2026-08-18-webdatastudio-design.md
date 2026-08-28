@@ -521,6 +521,10 @@ it works for every engine whose capability set claims support for it.
 | F30.21 | Which way a rule is going |
 | F30.22 | The rows kept before a statement takes all of them |
 | F30.23 | An index measured rather than claimed |
+| F30.24 | Notes on an object, kept by the studio |
+| F30.25 | A saved query as a form, and a link that runs |
+| F30.26 | An alert that links back to what it is about |
+| F30.27 | The profile and the notes as MCP tools |
 
 ## 10. Safety behaviour
 

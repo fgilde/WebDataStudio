@@ -397,6 +397,7 @@ app.MapAdminEndpoints();
 app.MapRedisEndpoints();
 app.MapDiagramEndpoints();
 app.MapSavedQueryEndpoints();
+app.MapReportEndpoints();
 app.MapFederationEndpoints();
 app.MapAssistantEndpoints();
 app.MapShareEndpoints();

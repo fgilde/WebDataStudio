@@ -236,6 +236,12 @@ recommendation nobody can act on is a recommendation nobody acts on.
 The studio runs the analysis behind its health report on a timer and posts what is **new** to a
 webhook, so somebody hears about a missing index without opening the studio first.
 
+Half the value of a message is the way back to the thing it is about, so with `WDS_PUBLIC_URL` set
+every message carries a link: the connection, and the object where the finding's own fix names one —
+read out of that statement rather than out of the title, because "events has no primary key" ends in a
+word that is not a table. Without that variable there are no links: a container cannot know its own
+public address, and a guessed hostname is worse than none.
+
 | Variable | Meaning |
 |---|---|
 | `WDS_ALERT_WEBHOOK` | the URL to post to; without it nothing is watched |

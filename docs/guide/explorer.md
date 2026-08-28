@@ -88,6 +88,16 @@ the view readable while it rebuilds and needs a unique index on it; plain is fas
 Both come back as statements from the server, which knows how the engine spells it — Oracle's is
 `DBMS_MVIEW.REFRESH` — and refuses to build one for an object that is not a materialised view.
 
+## Notes on an object
+
+A database has `COMMENT ON`, which needs a DDL right and a migration — so what somebody learns about a
+table ends up in a chat message and is gone by Friday. The **Notes** tab is the studio's own note next
+to the object: a name, a date and a sentence, kept in the workspace database with the query history.
+
+Every kind of object has the tab, not only the ones with rows: a function is exactly the thing
+somebody needs a sentence about. Notes are searchable across every connection, which is the answer to
+"somebody wrote something about this once".
+
 ## What a table actually holds
 
 The **Profile** tab counts it. One statement per look: how many rows, how many of them have a value

@@ -63,6 +63,7 @@ deployment from a terminal.
 | `list_objects` | walks the object tree a level at a time, for a database too large to list |
 | `describe_object` | columns, indexes, foreign keys, triggers, row count, and which columns are masked |
 | `browse_rows` | a page of rows from a table, view, collection or key space — sortable and filterable, masked and capped |
+| `list_accounts` | the server's own accounts and roles, who is in which role, and what one of them was granted |
 | `run_query` | one **reading** statement, masked and capped |
 | `preview_script` | splits a script, marks the destructive statements, returns a hash. Nothing runs |
 | `explain_plan` | the query plan for a statement — why it is slow, without guessing |

@@ -5,6 +5,7 @@ using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Drivers.Redis;
 using WebDataStudio.Server.Endpoints;
 using WebDataStudio.Server.Services;
+using WebDataStudio.Server.Admin;
 
 namespace WebDataStudio.Server.Mcp;
 
@@ -224,6 +225,16 @@ public sealed class McpToolbox(
                 ("sample", "integer", "Rows read for the pattern check, default 200.", false)),
             Writes: false);
 
+        yield return new McpTool("list_accounts",
+            "The server's own accounts and roles: who may sign in, who is a superuser, and which "
+            + "roles each one is in — the answer to \"why can they read that\". Reading them is "
+            + "itself a privilege, so an empty list means this connection does not have it. Add a "
+            + "name to see what was granted to that one directly.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("user", "string", "One account or role, to list what it was granted.", false)),
+            Writes: false);
+
         yield return new McpTool("object_notes",
             "The notes people left on an object in this studio — what a column really means, why a "
             + "table is shaped the way it is. Without a ref, the notes of the whole connection.",
@@ -325,6 +336,7 @@ public sealed class McpToolbox(
                 "run_quality_rules" => await RunQualityAsync(arguments, ct),
                 "save_quality_rule" => SaveQualityRule(arguments),
                 "profile_table" => await ProfileAsync(arguments, ct),
+                "list_accounts" => await AccountsAsync(arguments, ct),
                 "object_notes" => Notes(arguments),
                 "add_note" => AddNote(arguments),
                 "preview_script" => await PreviewAsync(arguments, ct),
@@ -1022,6 +1034,42 @@ public sealed class McpToolbox(
     }
 
     /// What people wrote down about an object. Worth reading before answering a question about it.
+    /// Accounts and roles, and what one of them may do. Reading only: creating an account is a
+    /// password in a statement, and that belongs in front of a person.
+    private async Task<McpToolResult> AccountsAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var user = Optional(arguments, "user");
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            if (!driver.Caps.UserManagement)
+                return new McpToolResult($"{driver.Info.Label} has no accounts to list", IsError: true);
+
+            if (user is { Length: > 0 })
+                return Ok(new
+                {
+                    user,
+                    granted = (await Security.GrantsAsync(driver, session, user, ct))
+                        .Select(grant => new { grant.Object, grant.Privilege, grant.Grantable }),
+                });
+
+            var principals = await Security.ListAsync(driver, session, ct);
+
+            return Ok(new
+            {
+                accounts = principals.Select(one => new
+                {
+                    one.Name, one.IsRole, one.CanLogin, one.Superuser, one.ValidUntil, one.MemberOf,
+                }),
+                note = principals.Count == 0
+                    ? "empty: listing accounts is itself a privilege, and this connection does not have it"
+                    : null,
+            });
+        }
+    }
+
     private McpToolResult Notes(JsonElement arguments)
     {
         if (!workspace.Available)

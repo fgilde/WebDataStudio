@@ -135,6 +135,9 @@ public class McpTests : IAsyncLifetime
 
         Assert.Contains("list_connections", tools);
         Assert.Contains("run_query", tools);
+        // Reading who exists is a read; creating an account is a password in a statement, and that
+        // belongs in front of a person rather than in a tool.
+        Assert.Contains("list_accounts", tools);
         // Read-only by default, so the two writing tools are not even offered.
         Assert.DoesNotContain("apply_script", tools);
     }

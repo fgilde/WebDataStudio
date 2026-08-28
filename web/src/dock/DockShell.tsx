@@ -53,13 +53,17 @@ import {
 import {
   applyDdl, archiveUrl, deleteObject, describeObject, listConnections, loadTabs, objectUrl,
   previewObject,
-  previewRename, refreshStatement, saveTabs, uploadObject,
-  type Connection, type ForeignKeyDto,
+  previewRename, previewComment, previewDrop, previewSchemaChange, previewTriggerState,
+  refreshStatement, saveTabs, uploadObject,
+  type Connection, type ForeignKeyDto, type DependencyReportDto,
 } from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
 import { NewTableDialog } from "../import/NewTableDialog";
 import { SubsetDialog } from "../export/SubsetDialog";
+import { ScriptConfirm, type PendingScript } from "../ddl/ScriptConfirm";
+import { ObjectEditor, type ObjectEditorTarget, type EditableKind } from "../ddl/ObjectEditor";
+import { SequenceDialog, type SequenceTarget } from "../ddl/SequenceDialog";
 import { saveAs } from "../storage/saveAs";
 import type { DialectId } from "../sql/splitStatements";
 
@@ -350,7 +354,7 @@ function ExplorerDockPanel() {
       </Group>
 
       <div style={{ flex: 1, minHeight: 0 }}>
-        <ExplorerTree key={explorer.nonce} onSelect={explorer.select} onAction={explorer.action}
+        <ExplorerTree refresh={explorer.nonce} onSelect={explorer.select} onAction={explorer.action}
           onDropFiles={explorer.dropFiles} />
       </div>
     </div>
@@ -479,6 +483,10 @@ export function DockShell() {
     dropped?: File | null;
   } | null>(null);
   const [copySource, setCopySource] = useState<{ connectionId: string; objectRef: string; label: string } | null>(null);
+  // The three steps every object change goes through: edit it, read the statement, run it.
+  const [objectEditor, setObjectEditor] = useState<ObjectEditorTarget | null>(null);
+  const [sequenceTarget, setSequenceTarget] = useState<SequenceTarget | null>(null);
+  const [pendingScript, setPendingScript] = useState<PendingScript | null>(null);
   const [subsetTarget, setSubsetTarget] = useState<
     { connectionId: string; schema: string; table: string } | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -637,6 +645,19 @@ export function DockShell() {
       id: tab.id, component: "data", title: tableName, params: { tabId: tab.id },
       position: centerGroup.current ? { referenceGroup: centerGroup.current } : undefined,
     });
+  }, []);
+
+  /// Ask the server for the statement, then show it. Nothing has run when this returns — the
+  /// confirmation dialog is what runs it, and only on a click.
+  const preview = useCallback(async (connectionId: string, title: string,
+    build: () => Promise<{ hash: string; script: string; destructive?: boolean;
+                           dependencies?: DependencyReportDto }>) => {
+    try {
+      const built = await build();
+      setPendingScript({ connectionId, title, ...built });
+    } catch (e) {
+      notifications.show({ color: "red", message: e instanceof Error ? e.message : String(e) });
+    }
   }, []);
 
   // Following a foreign key lands on the referenced row itself, not on the whole table.
@@ -866,6 +887,97 @@ export function DockShell() {
         await navigator.clipboard.writeText(name);
         break;
 
+      case "edit-source": {
+        const kind = s.node.kind === "View" || s.node.kind === "MaterializedView"
+          ? "view"
+          : (s.node.kind.toLowerCase() as EditableKind);
+
+        setObjectEditor({
+          connectionId: s.connectionId,
+          dialect: dialectOf(s.connectionId),
+          kind,
+          schema: s.node.ref.split(":", 2)[1]?.split("/")[0] ?? "",
+          objectRef: s.node.ref,
+          name: s.node.label,
+        });
+        break;
+      }
+
+      case "new-view":
+      case "new-routine": {
+        // Which routine depends on the folder it was asked for: a procedure folder makes a
+        // procedure, a trigger folder a trigger.
+        const kind: EditableKind = action === "new-view"
+          ? "view"
+          : s.node.kind === "FunctionFolder" ? "function"
+            : s.node.kind === "TriggerFolder" ? "trigger" : "procedure";
+
+        setObjectEditor({
+          connectionId: s.connectionId,
+          dialect: dialectOf(s.connectionId),
+          kind,
+          schema: s.node.ref.split(":", 2)[1]?.split("/")[0] ?? "",
+        });
+        break;
+      }
+
+      case "new-sequence":
+        setSequenceTarget({
+          connectionId: s.connectionId,
+          schema: s.node.ref.split(":", 2)[1]?.split("/")[0] ?? "",
+        });
+        break;
+
+      case "alter-sequence":
+        setSequenceTarget({
+          connectionId: s.connectionId,
+          schema: s.node.ref.split(":", 2)[1]?.split("/")[0] ?? "",
+          name: s.node.label,
+        });
+        break;
+
+      case "new-schema": {
+        const schemaName = window.prompt("Name of the new schema");
+        if (!schemaName) break;
+
+        await preview(s.connectionId, `Create schema ${schemaName}`,
+          () => previewSchemaChange(s.connectionId, schemaName, false));
+        break;
+      }
+
+      case "drop-schema": {
+        // Whether everything in it goes too is the whole question, so it is asked rather than
+        // assumed either way.
+        const cascade = window.confirm(
+          `Drop ${s.node.label} and everything in it?\n\nCancel drops only an empty schema.`);
+
+        await preview(s.connectionId, `Drop schema ${s.node.label}`,
+          () => previewSchemaChange(s.connectionId, s.node.label, true, cascade));
+        break;
+      }
+
+      case "set-comment": {
+        const detail = await describeObject(s.connectionId, s.node.ref).catch(() => null);
+        const text = window.prompt(`Description of ${s.node.label}`, detail?.comment ?? "");
+        if (text === null) break;
+
+        await preview(s.connectionId, `Description of ${s.node.label}`,
+          () => previewComment(s.connectionId, s.node.ref, text.trim() === "" ? null : text));
+        break;
+      }
+
+      case "trigger-enable":
+      case "trigger-disable":
+        await preview(s.connectionId,
+          `${action === "trigger-enable" ? "Switch on" : "Switch off"} ${s.node.label}`,
+          () => previewTriggerState(s.connectionId, s.node.ref, action === "trigger-enable"));
+        break;
+
+      case "drop-object":
+        await preview(s.connectionId, `Drop ${s.node.label}`,
+          () => previewDrop(s.connectionId, s.node.ref));
+        break;
+
       case "rename": {
         const next = window.prompt(`Rename ${s.node.label} to`, s.node.label);
         if (!next || next === s.node.label) break;
@@ -887,8 +999,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       case "script-insert":
       case "script-update":
       case "script-delete":
-      case "script-truncate":
-      case "script-drop": {
+      case "script-truncate": {
         const detail = await describeObject(s.connectionId, s.node.ref).catch(() => null);
         const columns = detail?.columns.map(c => c.name) ?? [];
         const keys = detail?.columns.filter(c => c.isPrimaryKey).map(c => c.name) ?? [];
@@ -905,9 +1016,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
               ? `UPDATE ${name}\n   SET ${assignments}\n WHERE ${where};`
               : action === "script-delete"
                 ? `DELETE FROM ${name}\n WHERE ${where};`
-                : action === "script-truncate"
-                  ? `-- review before running\nTRUNCATE TABLE ${name};`
-                  : `-- review before running\nDROP TABLE ${name};`;
+                : `-- review before running\nTRUNCATE TABLE ${name};`;
 
         newTab(s.connectionId, script);
         break;
@@ -1346,6 +1455,15 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       )}
       <CopyTableDialog source={copySource} connections={connections}
         onClose={() => setCopySource(null)} />
+
+      <ObjectEditor target={objectEditor} onClose={() => setObjectEditor(null)}
+        onPreview={pending => { setObjectEditor(null); setPendingScript(pending); }} />
+
+      <SequenceDialog target={sequenceTarget} onClose={() => setSequenceTarget(null)}
+        onPreview={pending => { setSequenceTarget(null); setPendingScript(pending); }} />
+
+      <ScriptConfirm pending={pendingScript} onClose={() => setPendingScript(null)}
+        onApplied={() => setExplorerNonce(n => n + 1)} />
 
       <SubsetDialog target={subsetTarget} onClose={() => setSubsetTarget(null)}
         onOpenInEditor={sql => newTab(subsetTarget?.connectionId ?? activeConnection, sql)} />

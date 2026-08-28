@@ -735,6 +735,57 @@ export const previewRename = (conn: string, ref: string, newName: string):
   fetch(`${base}/ddl/${conn}/rename`, json("POST", { objectRef: ref, newName }))
     .then(r => ok<{ hash: string; script: string; dependencies: DependencyReportDto }>(r));
 
+/// What every object editor gets back: the statement, and the hash that runs it. Nothing has
+/// happened yet when this resolves.
+export interface ObjectScriptDto { hash: string; script: string; destructive: boolean }
+export interface DropScriptDto { hash: string; script: string; dependencies: DependencyReportDto }
+
+/// A view, written the way this engine spells "replace this definition".
+export const previewView = (conn: string, schema: string, name: string, select: string):
+  Promise<ObjectScriptDto> =>
+  fetch(`${base}/ddl/${conn}/view`, json("POST", { schema, name, select }))
+    .then(r => ok<ObjectScriptDto>(r));
+
+/// A procedure, function or trigger from its source. The engine decides whether that is
+/// CREATE OR REPLACE, CREATE OR ALTER, or a drop and a create.
+export const previewRoutine = (conn: string, schema: string, name: string, kind: string, body: string):
+  Promise<ObjectScriptDto> =>
+  fetch(`${base}/ddl/${conn}/routine`, json("POST", { schema, name, kind, body }))
+    .then(r => ok<ObjectScriptDto>(r));
+
+export interface SequenceInput {
+  schema: string; name: string; create: boolean;
+  start?: number | null; increment?: number | null;
+  minValue?: number | null; maxValue?: number | null;
+  cycle?: boolean; cache?: number | null; restartWith?: number | null;
+}
+
+export const previewSequence = (conn: string, input: SequenceInput): Promise<ObjectScriptDto> =>
+  fetch(`${base}/ddl/${conn}/sequence`, json("POST", input)).then(r => ok<ObjectScriptDto>(r));
+
+export const previewSchemaChange = (conn: string, name: string, drop: boolean, cascade = false):
+  Promise<ObjectScriptDto> =>
+  fetch(`${base}/ddl/${conn}/schema`, json("POST", { name, drop, cascade }))
+    .then(r => ok<ObjectScriptDto>(r));
+
+/// The description the database itself keeps — what another tool reading this database sees. The
+/// studio's own notes are the other half, and they need no rights at all.
+export const previewComment = (conn: string, ref: string, text: string | null):
+  Promise<ObjectScriptDto> =>
+  fetch(`${base}/ddl/${conn}/comment`, json("POST", { objectRef: ref, text }))
+    .then(r => ok<ObjectScriptDto>(r));
+
+/// A trigger stopped rather than dropped: the definition stays, the firing does not.
+export const previewTriggerState = (conn: string, ref: string, enabled: boolean):
+  Promise<ObjectScriptDto> =>
+  fetch(`${base}/ddl/${conn}/trigger`, json("POST", { objectRef: ref, enabled }))
+    .then(r => ok<ObjectScriptDto>(r));
+
+/// Dropping anything the tree shows, with whatever depends on it listed first.
+export const previewDrop = (conn: string, ref: string): Promise<DropScriptDto> =>
+  fetch(`${base}/ddl/${conn}/drop`, json("POST", { objectRef: ref }))
+    .then(r => ok<DropScriptDto>(r));
+
 // --- archives ----------------------------------------------------------------
 export interface ArchiveInfoDto {
   name: string;

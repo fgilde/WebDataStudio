@@ -19,7 +19,7 @@ public interface IDdlWriter
 
 /// The parts every engine shares. Subclasses override only what their syntax actually differs on,
 /// which keeps each engine's file short enough to read in one sitting.
-public abstract class DdlWriterBase(SqlDialect dialect) : IDdlWriter
+public abstract partial class DdlWriterBase(SqlDialect dialect) : IDdlWriter
 {
     protected SqlDialect Dialect { get; } = dialect;
 
@@ -141,8 +141,35 @@ public abstract class DdlWriterBase(SqlDialect dialect) : IDdlWriter
     public virtual IReadOnlyList<DdlStatement> Rename(SchemaNodeRef target, string newName)
     {
         var schema = target.Path.Count > 1 ? target.Path[0] : "";
+
+        // A trigger is renamed on the table it hangs on.
+        if (target.Kind == SchemaNodeKind.Trigger)
+        {
+            var (triggerSchema, table) = TableOf(target);
+            return [new DdlStatement(
+                $"ALTER TRIGGER {Dialect.QuoteIdentifier(target.Name)} ON {Qualify(triggerSchema, table)} " +
+                $"RENAME TO {Dialect.QuoteIdentifier(newName)};",
+                false, $"rename trigger {target.Name} to {newName}")];
+        }
+
+        // A routine is identified by its argument types, which the tree does not carry. Writing
+        // ALTER FUNCTION without them produces a statement no engine can resolve.
+        if (target.Kind is SchemaNodeKind.Procedure or SchemaNodeKind.Function)
+            throw new NotSupportedException(
+                "a routine is renamed by its signature, which the tree does not carry - edit the "
+                + "source and create it under the new name instead");
+
+        var keyword = target.Kind switch
+        {
+            SchemaNodeKind.View => "VIEW",
+            SchemaNodeKind.MaterializedView => "MATERIALIZED VIEW",
+            SchemaNodeKind.Sequence => "SEQUENCE",
+            SchemaNodeKind.Index => "INDEX",
+            _ => "TABLE",
+        };
+
         return [new DdlStatement(
-            $"ALTER TABLE {Qualify(schema, target.Name)} RENAME TO {Dialect.QuoteIdentifier(newName)};",
+            $"ALTER {keyword} {Qualify(schema, target.Name)} RENAME TO {Dialect.QuoteIdentifier(newName)};",
             false, $"rename {target.Name} to {newName}")];
     }
 

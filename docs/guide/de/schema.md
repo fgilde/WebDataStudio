@@ -31,20 +31,69 @@ Auch Index-Änderungen laufen durch dieselbe Vorschau wie jede andere Schema-Än
 
 ## Skripte aus dem Kontextmenü
 
-`Script: INSERT`, `UPDATE`, `DELETE`, `TRUNCATE` und `DROP` öffnen einen Abfrage-Tab mit dem fertig
+`Script: INSERT`, `UPDATE`, `DELETE` und `TRUNCATE` öffnen einen Abfrage-Tab mit dem fertig
 geschriebenen Statement für das gewählte Objekt. Spalten, Indizes und Fremdschlüssel haben eigene:
-`DROP COLUMN`, `DROP INDEX`, ein Rebuild, `DROP CONSTRAINT`. Destruktive Statements laufen nie aus einem Menü —
-sie landen im Editor, wo du sie liest und selbst `F5` drückst.
+`DROP COLUMN`, `DROP INDEX`, ein Rebuild, `DROP CONSTRAINT`. Destruktive Statements laufen nie aus
+einem Menü — sie landen im Editor, wo du sie liest und selbst `F5` drückst.
 
 ## Umbenennen
 
 **Rename…** zeigt das Statement zusammen mit dem, was vom Objekt abhängt. Eine Umbenennung, die
-einen View zerlegen würde, ist damit eine Entscheidung und keine Überraschung.
+einen View zerlegen würde, ist damit eine Entscheidung und keine Überraschung. Welches Statement es
+wird, hängt davon ab, was umbenannt wird: `ALTER VIEW`, `ALTER SEQUENCE`, `ALTER TRIGGER … ON`, auf
+SQL Server `sp_rename`. Eine Routine wird über ihre Argumenttypen identifiziert, die der Baum nicht
+mitführt — dort sagt das Studio das, statt ein Statement zu schreiben, das keine Engine auflösen
+kann.
 
 ## Views, Prozeduren, Funktionen, Trigger
 
-Ihr Quelltext wird gezeigt und lässt sich bearbeiten, wo die Engine ihn preisgibt. Es gilt dieselbe
-Regel: erst Vorschau, dann Anwenden.
+**Edit source…** öffnet die Definition in einem Editor, mit dem Text der Engine darin. Beim Speichern
+kommt erst das Statement, genau wie beim Tabellen-Designer:
+
+- ein **View** öffnet als sein `SELECT` — das `CREATE` schreibt das Studio darum, denn jede Engine
+  buchstabiert „ersetze diese Definition“ anders (`CREATE OR REPLACE` bei PostgreSQL und MySQL,
+  `CREATE OR ALTER` bei SQL Server, bei SQLite ein Drop und ein Create, beides sichtbar);
+- eine **Prozedur, Funktion oder ein Trigger** öffnet als ganzes Statement — das erwartet zurück,
+  wer so etwas geschrieben hat. SQL Server bekommt es als `CREATE OR ALTER`, egal was im Quelltext
+  steht, damit das Speichern einer bestehenden Routine nicht an „there is already an object named …“
+  scheitert; MySQL kann nicht ersetzen, dort stehen Drop und Create zusammen in der Vorschau.
+
+**New view…**, **New procedure…**, **New function…** und **New trigger…** liegen auf dem Ordner, der
+sie hält, und starten mit einer Vorlage statt mit einem leeren Feld.
+
+Ein Trigger lässt sich außerdem **abschalten** statt löschen — `ALTER TABLE … DISABLE TRIGGER`, auf
+SQL Server `DISABLE TRIGGER … ON`. MySQL und SQLite können das nicht und sagen es.
+
+## Sequenzen
+
+**Change…** auf einer Sequenz schreibt das `ALTER`: Schrittweite, Minimum, Maximum, Cache, Cycle —
+und **Restart**, weswegen man eigentlich kommt. Ein Import, der eigene Ids geschrieben hat, lässt die
+Sequenz dort weiterzählen, wo sie war, und der nächste Insert kollidiert; sie über die größte
+vergebene Id zu setzen, erledigt das in einem Statement. Ein Restart ist als destruktiv markiert,
+denn er kann Ids vergeben, die es schon gibt.
+
+**New sequence…** liegt auf dem Sequenzen-Ordner. MySQL und SQLite haben keine Sequenzen und sagen,
+was man stattdessen nimmt (`AUTO_INCREMENT`, `INTEGER PRIMARY KEY`).
+
+## Schemas, Beschreibungen und Löschen
+
+**New schema…** liegt auf der Datenbank, **Drop schema…** auf dem Schema — der Drop fragt, ob alles
+darin mitgeht (`CASCADE`), denn das ist die eigentliche Frage. In MySQL ist ein Schema eine
+Datenbank, dort verweist das Studio auf **New database…**.
+
+**Description…** schreibt die Beschreibung, die die Datenbank selbst führt (`COMMENT ON`) — das, was
+ein anderes Werkzeug an dieser Datenbank sieht. Bei PostgreSQL für Tabellen, Views, Spalten,
+Sequenzen und Routinen, bei MySQL für Tabellen. SQL Server führt Beschreibungen als Extended
+Properties, SQLite gar keine; dort sind die eigenen [Notizen](explorer.md) des Studios der Platz
+dafür — die brauchen weder Rechte noch Migration.
+
+**Drop…** ersetzt bei jeder Objektart das frühere „Script: DROP“: das Statement steht da, daneben
+alles, was von dem Objekt abhängt, und erst ein Klick führt es aus. Denselben Weg nimmt eine
+Tabellenänderung — deshalb ist ein Drop, der einen View zerlegen würde, eine Entscheidung und keine
+Überraschung.
+
+Die Objekt-Editoren sind ausgeblendet, wo das Studio kein DDL schreibt: PostgreSQL, MySQL, SQL Server
+und SQLite haben einen Writer, alles andere nimmt ein Statement im Abfrage-Tab.
 
 ## Was das Struktur-Panel beantwortet
 

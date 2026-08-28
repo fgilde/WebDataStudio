@@ -144,6 +144,79 @@ public sealed class MySqlDdlWriter() : DdlWriterBase(new MySqlDialect())
         [new DdlStatement(
             $"DROP INDEX {Dialect.QuoteIdentifier(name)} ON {Qualify(schema, table)};",
             true, $"drop index {name}")];
+
+    // --- objects other than tables ----------------------------------------------------------------
+
+    protected override bool HasSchemas => false;
+
+    /// MySQL has no sequences, and no schemas of its own — a schema is a database there, and the
+    /// studio already has a dialog for those.
+    public override IReadOnlyList<DdlStatement> CreateSequence(SequenceDefinition sequence) =>
+        throw new NotSupportedException("MySQL has no sequences; an AUTO_INCREMENT column is the equivalent");
+
+    public override IReadOnlyList<DdlStatement> AlterSequence(SequenceDefinition sequence) =>
+        CreateSequence(sequence);
+
+    public override IReadOnlyList<DdlStatement> CreateSchema(string name) =>
+        throw new NotSupportedException("in MySQL a schema is a database - use New database...");
+
+    public override IReadOnlyList<DdlStatement> DropSchema(string name, bool cascade) =>
+        throw new NotSupportedException("in MySQL a schema is a database - use Drop database...");
+
+    /// A routine cannot be replaced in place, so it is dropped and written again. Both statements
+    /// are in the preview, which is the point of previewing.
+    public override IReadOnlyList<DdlStatement> CreateOrReplaceRoutine(RoutineDefinition routine)
+    {
+        var keyword = routine.Kind.Equals("function", StringComparison.OrdinalIgnoreCase)
+            ? "FUNCTION"
+            : routine.Kind.Equals("trigger", StringComparison.OrdinalIgnoreCase) ? "TRIGGER" : "PROCEDURE";
+
+        return
+        [
+            new DdlStatement($"DROP {keyword} IF EXISTS {Qualify(routine.Schema, routine.Name)};",
+                true, $"drop {keyword.ToLowerInvariant()} {routine.Name}"),
+            new DdlStatement(Body(routine.Body) + ";", false,
+                $"create {keyword.ToLowerInvariant()} {routine.Name}"),
+        ];
+    }
+
+    /// Only a table carries a description here, and it is part of ALTER TABLE rather than a
+    /// statement of its own.
+    public override IReadOnlyList<DdlStatement> Comment(SchemaNodeRef target, string? text)
+    {
+        if (target.Kind != SchemaNodeKind.Table)
+            throw new NotSupportedException(
+                "MySQL keeps a description on tables only - the studio's own notes cover the rest");
+
+        var schema = target.Path.Count > 1 ? target.Path[0] : "";
+
+        return [new DdlStatement(
+            $"ALTER TABLE {Qualify(schema, target.Name)} COMMENT = {Dialect.QuoteLiteral(text ?? "")};",
+            false, $"comment on {target.Name}")];
+    }
+
+    public override IReadOnlyList<DdlStatement> SetTriggerEnabled(SchemaNodeRef trigger, bool enabled) =>
+        throw new NotSupportedException("MySQL cannot switch a trigger off; drop it or guard its body");
+
+    /// `DROP TRIGGER x` - the table it hangs on is not part of it.
+    public override IReadOnlyList<DdlStatement> DropObject(SchemaNodeRef target) =>
+        target.Kind == SchemaNodeKind.Trigger
+            ? [new DdlStatement(
+                $"DROP TRIGGER IF EXISTS {Qualify(target.Path.Count > 2 ? target.Path[0] : "", target.Name)};",
+                true, $"drop trigger {target.Name}")]
+            : base.DropObject(target);
+
+    /// A view is renamed with RENAME TABLE, like everything else in that namespace.
+    public override IReadOnlyList<DdlStatement> Rename(SchemaNodeRef target, string newName)
+    {
+        if (target.Kind != SchemaNodeKind.View) return base.Rename(target, newName);
+
+        var schema = target.Path.Count > 1 ? target.Path[0] : "";
+        return [new DdlStatement(
+            $"RENAME TABLE {Qualify(schema, target.Name)} TO {Qualify(schema, newName)};",
+            false, $"rename {target.Name} to {newName}")];
+    }
+
 }
 
 public sealed class SqlServerDdlWriter() : DdlWriterBase(new SqlServerDialect())
@@ -208,6 +281,71 @@ public sealed class SqlServerDdlWriter() : DdlWriterBase(new SqlServerDialect())
     public override IReadOnlyList<DdlStatement> DropIndex(string schema, string table, string name) =>
         [new DdlStatement($"DROP INDEX {Dialect.QuoteIdentifier(name)} ON {Qualify(schema, table)};",
             true, $"drop index {name}")];
+
+    // --- objects other than tables ----------------------------------------------------------------
+
+    /// SQL Server replaces a definition with CREATE OR ALTER rather than CREATE OR REPLACE.
+    public override IReadOnlyList<DdlStatement> CreateOrReplaceView(string schema, string name, string select) =>
+    [
+        new DdlStatement($"CREATE OR ALTER VIEW {Qualify(schema, name)} AS\n{Body(select)};",
+            false, $"create or alter view {name}"),
+    ];
+
+    /// The same for a routine: whatever the source in the editor says, it is sent as CREATE OR
+    /// ALTER, so saving an existing procedure does not fail with "there is already an object named".
+    public override IReadOnlyList<DdlStatement> CreateOrReplaceRoutine(RoutineDefinition routine) =>
+    [
+        new DdlStatement(CreateOrAlter(Body(routine.Body)) + ";", false,
+            $"create or alter {routine.Kind} {routine.Name}"),
+    ];
+
+    private static string CreateOrAlter(string body) =>
+        System.Text.RegularExpressions.Regex.Replace(body,
+            CreateHead, "CREATE OR ALTER $1",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private const string CreateHead = @"^\s*CREATE\s+(?:OR\s+ALTER\s+)?(PROC|PROCEDURE|FUNCTION|VIEW|TRIGGER)\b";
+
+    /// A sequence needs a type; BIGINT is the one that does not run out.
+    public override IReadOnlyList<DdlStatement> CreateSequence(SequenceDefinition sequence) =>
+    [
+        new DdlStatement(
+            $"CREATE SEQUENCE {Qualify(sequence.Schema, sequence.Name)} AS BIGINT{Clauses(sequence, restart: false)};",
+            false, $"create sequence {sequence.Name}"),
+    ];
+
+    /// There is no CASCADE here: a schema is dropped once it is empty, and saying so beats a
+    /// statement the server rejects.
+    public override IReadOnlyList<DdlStatement> DropSchema(string name, bool cascade) =>
+        cascade
+            ? throw new NotSupportedException(
+                "SQL Server drops a schema only once it is empty; move or drop what is in it first")
+            : base.DropSchema(name, cascade);
+
+    /// A description lives in an extended property here, which is a procedure call rather than DDL
+    /// and needs to know whether one is already there.
+    public override IReadOnlyList<DdlStatement> Comment(SchemaNodeRef target, string? text) =>
+        throw new NotSupportedException(
+            "SQL Server keeps descriptions as extended properties; the studio's own notes are the "
+            + "simpler place for one");
+
+    public override IReadOnlyList<DdlStatement> SetTriggerEnabled(SchemaNodeRef trigger, bool enabled)
+    {
+        var (schema, table) = TableOf(trigger);
+
+        return [new DdlStatement(
+            $"{(enabled ? "ENABLE" : "DISABLE")} TRIGGER {Dialect.QuoteIdentifier(trigger.Name)} " +
+            $"ON {Qualify(schema, table)};",
+            !enabled, $"{(enabled ? "enable" : "disable")} trigger {trigger.Name}")];
+    }
+
+    public override IReadOnlyList<DdlStatement> DropObject(SchemaNodeRef target) =>
+        target.Kind == SchemaNodeKind.Trigger
+            ? [new DdlStatement(
+                $"DROP TRIGGER IF EXISTS {Qualify(target.Path.Count > 2 ? target.Path[0] : "", target.Name)};",
+                true, $"drop trigger {target.Name}")]
+            : base.DropObject(target);
+
 }
 
 public sealed class SqliteDdlWriter() : DdlWriterBase(new SqliteDialect())
@@ -328,4 +466,51 @@ public sealed class SqliteDdlWriter() : DdlWriterBase(new SqliteDialect())
 
         return before with { Columns = columns, Constraints = constraints, Indexes = indexes };
     }
+
+    // --- objects other than tables ----------------------------------------------------------------
+
+    protected override bool HasSchemas => false;
+
+    /// SQLite cannot replace a view, so it is dropped and written again - both in the preview.
+    public override IReadOnlyList<DdlStatement> CreateOrReplaceView(string schema, string name, string select) =>
+    [
+        new DdlStatement($"DROP VIEW IF EXISTS {Qualify(schema, name)};", true, $"drop view {name}"),
+        new DdlStatement($"CREATE VIEW {Qualify(schema, name)} AS\n{Body(select)};", false,
+            $"create view {name}"),
+    ];
+
+    public override IReadOnlyList<DdlStatement> CreateSequence(SequenceDefinition sequence) =>
+        throw new NotSupportedException(
+            "SQLite has no sequences; an INTEGER PRIMARY KEY counts up by itself");
+
+    public override IReadOnlyList<DdlStatement> AlterSequence(SequenceDefinition sequence) =>
+        CreateSequence(sequence);
+
+    public override IReadOnlyList<DdlStatement> CreateSchema(string name) =>
+        throw new NotSupportedException("a SQLite file has no schemas");
+
+    public override IReadOnlyList<DdlStatement> DropSchema(string name, bool cascade) =>
+        throw new NotSupportedException("a SQLite file has no schemas");
+
+    public override IReadOnlyList<DdlStatement> Comment(SchemaNodeRef target, string? text) =>
+        throw new NotSupportedException(
+            "SQLite keeps no descriptions of its own; the studio's own notes cover it");
+
+    public override IReadOnlyList<DdlStatement> SetTriggerEnabled(SchemaNodeRef trigger, bool enabled) =>
+        throw new NotSupportedException("SQLite cannot switch a trigger off; drop it instead");
+
+    public override IReadOnlyList<DdlStatement> DropObject(SchemaNodeRef target) =>
+        target.Kind == SchemaNodeKind.Trigger
+            ? [new DdlStatement($"DROP TRIGGER IF EXISTS {Dialect.QuoteIdentifier(target.Name)};",
+                true, $"drop trigger {target.Name}")]
+            : base.DropObject(target);
+
+    /// Only a table or an index can be renamed; the rest is created under the new name.
+    public override IReadOnlyList<DdlStatement> Rename(SchemaNodeRef target, string newName) =>
+        target.Kind is SchemaNodeKind.Table or SchemaNodeKind.Index
+            ? base.Rename(target, newName)
+            : throw new NotSupportedException(
+                $"SQLite cannot rename a {target.Kind.ToString().ToLowerInvariant()}; create it under "
+                + "the new name and drop the old one");
+
 }

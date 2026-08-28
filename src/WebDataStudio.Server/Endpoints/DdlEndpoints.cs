@@ -28,6 +28,13 @@ public static class DdlEndpoints
     }
     public record RenameRequest(string ObjectRef, string NewName);
     public record RoutineRequest(string Schema, string Name, string Kind, string Body);
+    public record ViewRequest(string Schema, string Name, string Select);
+    public record SequenceRequest(string Schema, string Name, bool Create, long? Start, long? Increment,
+        long? MinValue, long? MaxValue, bool? Cycle, long? Cache, long? RestartWith);
+    public record SchemaRequest(string Name, bool Drop, bool? Cascade);
+    public record CommentRequest(string ObjectRef, string? Text);
+    public record TriggerStateRequest(string ObjectRef, bool Enabled);
+    public record DropRequest(string ObjectRef);
 
     /// Writers are stateless; one per engine is enough.
     private static readonly Dictionary<string, DdlWriterBase> Writers = new(StringComparer.OrdinalIgnoreCase)
@@ -279,7 +286,47 @@ public static class DdlEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
-        app.MapPost("/api/ddl/{conn}/routine", async (string conn, RoutineRequest body,
+        // A view, written the way the engine spells "replace this definition".
+        app.MapPost("/api/ddl/{conn}/view", (string conn, ViewRequest body, SessionFactory factory,
+            IMemoryCache cache, CancellationToken ct) =>
+            ScriptAsync(conn, factory, cache, ct,
+                (writer, _) => writer.CreateOrReplaceView(body.Schema, body.Name, body.Select)));
+
+        // A sequence created, or changed — including the restart that follows an import which
+        // wrote its own ids.
+        app.MapPost("/api/ddl/{conn}/sequence", (string conn, SequenceRequest body,
+            SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
+            ScriptAsync(conn, factory, cache, ct, (writer, _) =>
+            {
+                var definition = new SequenceDefinition(body.Schema, body.Name, body.Start,
+                    body.Increment, body.MinValue, body.MaxValue, body.Cycle == true, body.Cache,
+                    body.RestartWith);
+
+                return body.Create ? writer.CreateSequence(definition) : writer.AlterSequence(definition);
+            }));
+
+        app.MapPost("/api/ddl/{conn}/schema", (string conn, SchemaRequest body, SessionFactory factory,
+            IMemoryCache cache, CancellationToken ct) =>
+            ScriptAsync(conn, factory, cache, ct, (writer, _) => body.Drop
+                ? writer.DropSchema(body.Name, body.Cascade == true)
+                : writer.CreateSchema(body.Name)));
+
+        // The description the database itself keeps — what another tool reading this database sees.
+        // The studio's own notes are the other half, and they need no rights at all.
+        app.MapPost("/api/ddl/{conn}/comment", (string conn, CommentRequest body,
+            SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
+            ScriptAsync(conn, factory, cache, ct,
+                (writer, _) => writer.Comment(SchemaEndpoints.ParseObjectRef(body.ObjectRef), body.Text)));
+
+        // A trigger stopped rather than dropped: the definition stays, the firing does not.
+        app.MapPost("/api/ddl/{conn}/trigger", (string conn, TriggerStateRequest body,
+            SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
+            ScriptAsync(conn, factory, cache, ct, (writer, _) => writer.SetTriggerEnabled(
+                SchemaEndpoints.ParseObjectRef(body.ObjectRef), body.Enabled)));
+
+        // Dropping anything the tree shows, the same way a table is dropped: previewed, with
+        // whatever depends on it listed first.
+        app.MapPost("/api/ddl/{conn}/drop", async (string conn, DropRequest body,
             SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
         {
             try
@@ -288,20 +335,73 @@ public static class DdlEndpoints
                 await using (session)
                 {
                     var writer = WriterFor(driver.Info.Id);
-                    if (writer is null) return Results.BadRequest(new { message = "no schema writer for this engine" });
+                    if (writer is null) return Results.BadRequest(new { message = NoWriter(driver) });
 
-                    var statements = writer.CreateOrReplaceRoutine(
-                        new RoutineDefinition(body.Schema, body.Name, body.Kind, body.Body));
-
+                    var target = SchemaEndpoints.ParseObjectRef(body.ObjectRef);
+                    var dependencies = await DependencyFinder.FindAsync(driver, session, target, ct);
+                    var statements = writer.DropObject(target);
                     var hash = Hash(statements);
                     cache.Set($"ddl:{hash}", statements, TimeSpan.FromMinutes(10));
 
-                    return Results.Ok(new { hash, script = string.Join("\n", statements.Select(s => s.Sql)) });
+                    return Results.Ok(new
+                    {
+                        hash,
+                        script = string.Join("\n", statements.Select(s => s.Sql)),
+                        dependencies,
+                    });
                 }
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
+
+        // A procedure, a function or a trigger, from the source in the editor. The engine decides
+        // whether that is CREATE OR REPLACE, CREATE OR ALTER, or a drop and a create.
+        app.MapPost("/api/ddl/{conn}/routine", (string conn, RoutineRequest body,
+            SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
+            ScriptAsync(conn, factory, cache, ct, (writer, _) => writer.CreateOrReplaceRoutine(
+                new RoutineDefinition(body.Schema, body.Name, body.Kind, body.Body))));
+    }
+
+    private static string NoWriter(IDbDriver driver) =>
+        $"the studio writes DDL for PostgreSQL, MySQL, SQL Server and SQLite; {driver.Info.Label} " +
+        "takes a statement in a query tab";
+
+    /// Every "build me this statement" endpoint has the same shape: open the connection, ask the
+    /// engine's writer, cache what it said under a hash the apply endpoint reads back. Nothing here
+    /// runs anything — that is a second, deliberate call.
+    private static async Task<IResult> ScriptAsync(string conn, SessionFactory factory,
+        IMemoryCache cache, CancellationToken ct,
+        Func<DdlWriterBase, IDbSession, IReadOnlyList<DdlStatement>> build)
+    {
+        try
+        {
+            var (driver, session) = await factory.OpenAsync(conn, ct);
+            await using (session)
+            {
+                var writer = WriterFor(driver.Info.Id);
+                if (writer is null) return Results.BadRequest(new { message = NoWriter(driver) });
+
+                var statements = build(writer, session);
+                var hash = Hash(statements);
+                cache.Set($"ddl:{hash}", statements, TimeSpan.FromMinutes(10));
+
+                return Results.Ok(new
+                {
+                    hash,
+                    script = string.Join("\n", statements.Select(s => s.Sql)),
+                    // What the person is about to do that cannot be undone by doing it again.
+                    destructive = statements.Any(s => s.Destructive),
+                });
+            }
+        }
+        catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+        // What an engine cannot do is a sentence for a person, not a 500.
+        catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
+        catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+        catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
     }
 
     private static TableDefinition MapTypes(TableDefinition table, DdlWriterBase writer) =>

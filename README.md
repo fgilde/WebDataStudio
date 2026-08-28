@@ -89,6 +89,10 @@ their expiry and their size, or a hash as field and value.
 - **Object storage** — S3, Azure Blob, Google Cloud Storage or a folder as a connection: containers
   and prefixes in the tree, an object previewed, a Parquet, CSV or JSON file — or a whole prefix —
   queried as a table through DuckDB, and a file turned into a real table in the database next to it.
+- **Schema changes, previewed** — a table designer, and editors for the objects a designer never
+  covered: a view's `SELECT`, a procedure's or trigger's source, a sequence including the restart
+  after an import wrote its own ids, schemas, and the description the database itself keeps. Every
+  one of them shows the statement — with what depends on the object — before anything runs.
 - **Documents** — what is actually inside a JSON or JSONB column: which paths exist, how often, with
   which types and an example, plus the `SELECT` that flattens them into columns in this engine's own
   spelling.

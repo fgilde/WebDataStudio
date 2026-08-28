@@ -62,6 +62,154 @@ public class DdlEndpointTests : IAsyncLifetime
     private static object Column(string name, string type, bool nullable) =>
         new { name, type, nullable, @default = (string?)null, identity = false, comment = (string?)null };
 
+    /// The whole point of the object editors: the statement is shown, and only a second call runs
+    /// it. These go through SQLite, which is the engine with the fewest of them — so what it cannot
+    /// do has to read as a sentence rather than as a 500.
+    [Fact]
+    public async Task A_view_is_written_and_only_applied_on_purpose()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var conn = await ConnectionIdAsync(client);
+
+        var preview = await (await client.PostAsJsonAsync($"/api/ddl/{conn}/view", new
+        {
+            schema = "main", name = "recent_people", select = "SELECT id, name FROM people",
+        }, ct)).Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        Assert.Contains("CREATE VIEW", preview.GetProperty("script").GetString());
+
+        // Nothing ran yet: the view is not there to describe.
+        var before = await client.GetAsync($"/api/ddl/{conn}?ref=View%3Amain%2Frecent_people", ct);
+        Assert.NotEqual(HttpStatusCode.OK, before.StatusCode);
+
+        var applied = await client.PostAsJsonAsync($"/api/ddl/{conn}/apply", new
+        {
+            hash = preview.GetProperty("hash").GetString(),
+        }, ct);
+
+        applied.EnsureSuccessStatusCode();
+
+        var after = await client.GetFromJsonAsync<JsonElement>($"/api/ddl/{conn}?ref=View%3Amain%2Frecent_people", ct);
+        Assert.Contains("recent_people", after.GetProperty("create").GetString() ?? "");
+    }
+
+    [Fact]
+    public async Task A_view_is_dropped_with_what_depends_on_it_listed_first()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var conn = await ConnectionIdAsync(client);
+
+        var preview = await (await client.PostAsJsonAsync($"/api/ddl/{conn}/drop", new
+        {
+            objectRef = "View:main/active_people",
+        }, ct)).Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        Assert.StartsWith("DROP VIEW", preview.GetProperty("script").GetString());
+        Assert.True(preview.TryGetProperty("dependencies", out _));
+
+        (await client.PostAsJsonAsync($"/api/ddl/{conn}/apply", new
+        {
+            hash = preview.GetProperty("hash").GetString(),
+        }, ct)).EnsureSuccessStatusCode();
+
+        var gone = await client.GetAsync($"/api/ddl/{conn}?ref=View%3Amain%2Factive_people", ct);
+        Assert.NotEqual(HttpStatusCode.OK, gone.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_read_only_connection_previews_but_does_not_apply()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory(readOnly: true);
+        var client = factory.CreateClient();
+        var conn = await ConnectionIdAsync(client);
+
+        var preview = await (await client.PostAsJsonAsync($"/api/ddl/{conn}/view", new
+        {
+            schema = "main", name = "v", select = "SELECT 1",
+        }, ct)).Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        var applied = await client.PostAsJsonAsync($"/api/ddl/{conn}/apply", new
+        {
+            hash = preview.GetProperty("hash").GetString(),
+        }, ct);
+
+        Assert.Equal(HttpStatusCode.Forbidden, applied.StatusCode);
+    }
+
+    [Fact]
+    public async Task What_this_engine_cannot_do_comes_back_as_a_sentence()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var conn = await ConnectionIdAsync(client);
+
+        var sequence = await client.PostAsJsonAsync($"/api/ddl/{conn}/sequence", new
+        {
+            schema = "main", name = "s", create = true, start = 1,
+        }, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, sequence.StatusCode);
+        Assert.Contains("INTEGER PRIMARY KEY", await sequence.Content.ReadAsStringAsync(ct));
+
+        var schema = await client.PostAsJsonAsync($"/api/ddl/{conn}/schema", new
+        {
+            name = "reporting", drop = false,
+        }, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, schema.StatusCode);
+        Assert.Contains("no schemas", await schema.Content.ReadAsStringAsync(ct));
+
+        var comment = await client.PostAsJsonAsync($"/api/ddl/{conn}/comment", new
+        {
+            objectRef = "Table:main/people", text = "the people",
+        }, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, comment.StatusCode);
+        Assert.Contains("notes", await comment.Content.ReadAsStringAsync(ct));
+    }
+
+    [Fact]
+    public async Task A_trigger_is_created_from_its_source_and_then_dropped()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var conn = await ConnectionIdAsync(client);
+
+        var preview = await (await client.PostAsJsonAsync($"/api/ddl/{conn}/routine", new
+        {
+            schema = "main", name = "people_audit", kind = "trigger",
+            body = "CREATE TRIGGER people_audit AFTER INSERT ON people BEGIN SELECT 1; END",
+        }, ct)).Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        Assert.Contains("CREATE TRIGGER", preview.GetProperty("script").GetString());
+
+        (await client.PostAsJsonAsync($"/api/ddl/{conn}/apply", new
+        {
+            hash = preview.GetProperty("hash").GetString(),
+        }, ct)).EnsureSuccessStatusCode();
+
+        var drop = await (await client.PostAsJsonAsync($"/api/ddl/{conn}/drop", new
+        {
+            objectRef = "Trigger:main/people/people_audit",
+        }, ct)).Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        // SQLite drops a trigger by name alone, without naming its table.
+        Assert.StartsWith("DROP TRIGGER", drop.GetProperty("script").GetString());
+        Assert.DoesNotContain(" ON ", drop.GetProperty("script").GetString());
+
+        (await client.PostAsJsonAsync($"/api/ddl/{conn}/apply", new
+        {
+            hash = drop.GetProperty("hash").GetString(),
+        }, ct)).EnsureSuccessStatusCode();
+    }
+
     [Fact]
     public async Task Returns_the_current_definition_and_create_text()
     {

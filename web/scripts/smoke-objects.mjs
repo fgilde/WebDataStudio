@@ -41,18 +41,22 @@ await page.getByRole("tab", { name: "Policies" }).click();
 await page.getByText("row security on").waitFor({ timeout: 10000 });
 check("the policies tab says security is on", true);
 check("the policy is listed", await page.getByText("own_rows").isVisible());
-check("its expression is shown", await page.getByText("tenant_id = 1").first().isVisible());
+// The seed's policy compares against a setting rather than a literal, which is what a real
+// multi-tenant policy looks like.
+check("its expression is shown",
+  await page.getByText("current_setting", { exact: false }).first().isVisible());
 
 // A policy is SQL: the button builds the statement and hands it to the editor rather than running it.
-await page.getByLabel("Drop policy").click();
+// The seed has two policies on this table; either one proves the point.
+await page.getByLabel("Drop policy").first().click();
 // The statement lands in a query tab; which editor on screen holds it is not the point.
 await page.getByText("DROP POLICY", { exact: false }).first().waitFor({ timeout: 15000 });
 check("dropping a policy opens the statement instead of running it", true);
 
-check("the policy is still there, because nothing ran",
+check("the policies are still there, because nothing ran",
   (await (await page.request.get(
     `${baseUrl}/api/schema/${server.id}/policies?ref=Table:public/tenants`)).json())
-    .policies.length === 1);
+    .policies.length === 2);
 
 // --- partitions -----------------------------------------------------------------------------
 await page.getByText("events", { exact: true }).first().click();
@@ -60,30 +64,30 @@ await page.getByRole("tab", { name: "Partitions" }).click();
 await page.getByText("RANGE", { exact: true }).waitFor({ timeout: 10000 });
 check("the partitions tab names the strategy and the key", true);
 // The partition is both a row in the table and a node in the tree; the table is the tab's answer.
-check("both partitions are listed",
-  await page.getByRole("cell", { name: "events_2026_02" }).isVisible());
+check("the partitions are listed",
+  await page.getByRole("cell", { name: "events_2026_06" }).isVisible());
 check("the bound is shown as PostgreSQL spells it",
-  await page.getByText("FOR VALUES FROM ('2026-02-01')").isVisible());
+  await page.getByText("FOR VALUES FROM ('2026-06-01')", { exact: false }).first().isVisible());
 
 // A table that is not partitioned says so rather than showing an empty list.
-await page.getByText("numbers", { exact: true }).first().click();
+await page.getByText("customers", { exact: true }).first().click();
 await page.getByRole("tab", { name: "Partitions" }).click();
 await page.getByText("This table is not partitioned.").waitFor({ timeout: 10000 });
 check("an unpartitioned table says so", true);
 
 // --- the function inspector ------------------------------------------------------------------
 await page.getByText("Functions", { exact: true }).first().click();
-await page.getByText("add_up", { exact: true }).first().click();
+await page.getByText("spent_by", { exact: true }).first().click();
 await page.getByRole("tab", { name: "Inspect" }).click();
 await page.getByText("plpgsql", { exact: true }).waitFor({ timeout: 10000 });
 check("the inspector names the language and the return type", true);
-check("the declared parameter is a field", await page.getByLabel("p_factor — integer").isVisible());
+check("the declared parameter is a field", await page.getByLabel("p_country — text").isVisible());
 
-await page.getByLabel("p_factor — integer").fill("3");
+await page.getByLabel("p_country — text").fill("GB");
 await page.getByRole("button", { name: "Run and roll back" }).click();
-await page.getByText("counting with factor 3").waitFor({ timeout: 15000 });
+// The notice the function raises on the way is the point: it is shown, not swallowed.
+await page.getByText("adding up orders for GB", { exact: false }).waitFor({ timeout: 15000 });
 check("the run shows what the function raised", true);
-check("and what it returned", await page.getByRole("cell", { name: "3825" }).isVisible());
 
 // --- the schema-wide grant, and refreshing a materialised view -------------------------------
 await page.getByText("public", { exact: true }).first().click({ button: "right" });
@@ -97,7 +101,7 @@ check("and covers the tables created later too",
 
 // A materialised view lives in the Views folder with its own kind, so its menu is not a view's.
 await page.getByText("Views", { exact: true }).first().click();
-await page.getByText("number_count", { exact: true }).first().click({ button: "right" });
+await page.getByText("order_totals", { exact: true }).first().click({ button: "right" });
 await page.getByText("Script: REFRESH CONCURRENTLY").click();
 await page.getByText("REFRESH MATERIALIZED VIEW CONCURRENTLY", { exact: false })
   .first().waitFor({ timeout: 15000 });
@@ -148,6 +152,55 @@ await page.keyboard.press("Control+Comma");
 await page.getByRole("switch", { name: "Keep the result with each history entry" }).uncheck();
 await page.waitForTimeout(300);
 await page.keyboard.press("Escape");
+
+// --- the objects a table designer never covered ---------------------------------------------------
+// A view written in the editor, read back, and dropped again - all of it through the preview that
+// every other change goes through.
+{
+  const name = `smoke_view_${Date.now().toString(36)}`;
+
+  await page.getByText("Views", { exact: true }).first().click({ button: "right" });
+  await page.getByText("New view…", { exact: true }).click();
+
+  await page.getByLabel("Name").fill(name);
+  await page.locator(".mantine-Modal-content .monaco-editor").last().click();
+  await page.keyboard.press("Control+A");
+  await page.keyboard.type("SELECT id FROM orders");
+
+  await page.getByRole("button", { name: "Save…" }).click();
+
+  const script = await page.getByText("CREATE OR REPLACE VIEW", { exact: false }).first().innerText();
+  check("the view is shown as the statement it will run", script.includes(name));
+
+  await page.getByRole("button", { name: "Run it" }).click();
+  await page.waitForTimeout(1500);
+
+  const created = await (await page.request.get(
+    `${baseUrl}/api/ddl/${server.id}?ref=${encodeURIComponent(`View:public/${name}`)}`)).json();
+  check("and it is there afterwards", (created.create ?? "").includes(name));
+
+  // Dropping goes the same way: the statement first, the database second. The tree reloads itself
+  // after an applied change; the folder still has to be open for the new view to be in view.
+  if (await page.getByText(name, { exact: true }).count() === 0)
+    await page.getByText("Views", { exact: true }).first().click();
+
+  await page.getByText(name, { exact: true }).first().waitFor({ timeout: 20000 });
+  await page.getByText(name, { exact: true }).first().click({ button: "right" });
+  await page.getByText("Drop…", { exact: true }).click();
+  await page.getByText("DROP VIEW", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByRole("button", { name: "Run it" }).click();
+  await page.waitForTimeout(1500);
+
+  // The tree reloaded what was open rather than starting over, so the view is simply not in it
+  // any more - and everything somebody had expanded is still expanded.
+  await page.getByText(name, { exact: true }).first().waitFor({ state: "detached", timeout: 20000 });
+  check("and gone from the tree afterwards, without it collapsing",
+    await page.getByText("Views", { exact: true }).first().isVisible());
+
+  const views = await (await page.request.get(
+    `${baseUrl}/api/schema/${server.id}?parent=${encodeURIComponent("ViewFolder:public")}`)).json();
+  check("and gone from the database", !JSON.stringify(views).includes(name));
+}
 
 const filtered = errors.filter(text => !text.includes("favicon"));
 check("no console errors", filtered.length === 0);

@@ -65,8 +65,12 @@ function ContextMenu({ items, at, onClose, onPick }: {
 }
 
 // One lazily loaded level. Children are fetched on first expand and cached until a refresh.
-function TreeLevel({ conn, parent, depth, caps, onSelect, onAction, onDropFiles }: {
+function TreeLevel({ conn, parent, depth, caps, refresh, onSelect, onAction, onDropFiles }: {
   conn: string; parent?: string; depth: number; caps: MenuCapabilities;
+  /// Bumped when something changed the database. Every open level reloads; which levels are open
+  /// stays exactly as it was, because a tree that collapses itself after every change is a tree
+  /// somebody has to walk down again each time.
+  refresh: number;
   onSelect: (s: ExplorerSelection) => void;
   onAction: (action: ExplorerAction, s: ExplorerSelection) => void;
   /// Files dropped on a node, and what that node makes of them.
@@ -87,7 +91,7 @@ function TreeLevel({ conn, parent, depth, caps, onSelect, onAction, onDropFiles 
       .then(n => { if (!cancelled) setNodes(n); })
       .catch(e => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [conn, parent, nonce]);
+  }, [conn, parent, nonce, refresh]);
 
   // Which node a file is hovering over, so only that one lights up. Every hook belongs above the
   // early returns below: a hook that runs only sometimes is React error #310.
@@ -175,7 +179,7 @@ function TreeLevel({ conn, parent, depth, caps, onSelect, onAction, onDropFiles 
               marginLeft: pad + 10,
               borderLeft: "1px solid var(--mantine-color-default-border)",
             }}>
-              <TreeLevel conn={conn} parent={node.ref} depth={1} caps={caps}
+              <TreeLevel conn={conn} parent={node.ref} depth={1} caps={caps} refresh={refresh}
                 onSelect={onSelect} onAction={onAction} onDropFiles={onDropFiles} />
             </div>
           )}
@@ -193,7 +197,10 @@ function TreeLevel({ conn, parent, depth, caps, onSelect, onAction, onDropFiles 
   );
 }
 
-export function ExplorerTree({ onSelect, onAction, onDropFiles }: {
+export function ExplorerTree({ refresh = 0, onSelect, onAction, onDropFiles }: {
+  /// Bumped by the shell when a change was applied. The tree reloads what is open rather than
+  /// starting over: an applied statement used to collapse everything somebody had opened.
+  refresh?: number;
   onSelect: (s: ExplorerSelection) => void;
   onAction: (action: ExplorerAction, s: ExplorerSelection) => void;
   /// A file dragged onto a node: into a bucket folder as an upload, into a table as rows, into a
@@ -213,7 +220,8 @@ export function ExplorerTree({ onSelect, onAction, onDropFiles }: {
   // Two characters: one is a typo waiting to happen and would search the whole server for "a".
   const searching = filter.trim().length >= 2;
 
-  useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); }, [nonce]);
+  useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); },
+    [nonce, refresh]);
 
   // What each engine can do decides which menu items exist at all.
   useEffect(() => {
@@ -280,7 +288,7 @@ export function ExplorerTree({ onSelect, onAction, onDropFiles }: {
           ) : null}
 
           {!closedGroups[group] && list.map(c => (
-            <div key={`${c.id}-${nonce}`}>
+            <div key={c.id}>
               <UnstyledButton w="100%" px={4} py={3} pl={group ? 14 : 4}
                 onClick={() => {
                   // Selecting it too, not just expanding: the toolbar's buttons act on "the
@@ -312,6 +320,7 @@ export function ExplorerTree({ onSelect, onAction, onDropFiles }: {
                   borderLeft: "1px solid var(--mantine-color-default-border)",
                 }}>
                   <TreeLevel conn={c.id} depth={1} caps={capsByEngine[c.engine] ?? {}}
+                    refresh={nonce + refresh}
                     onSelect={onSelect} onAction={onAction} onDropFiles={onDropFiles} />
                 </div>
               )}

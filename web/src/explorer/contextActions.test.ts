@@ -7,7 +7,7 @@ describe("actionsFor", () => {
   it("offers a table everything a table can do", () => {
     const table = ids("Table");
 
-    for (const action of ["open-data", "design", "manage-indexes", "export", "script-drop"])
+    for (const action of ["open-data", "design", "manage-indexes", "export", "drop-object"])
       expect(table).toContain(action as ExplorerAction);
   });
 
@@ -75,9 +75,36 @@ describe("actionsFor", () => {
     expect(ids("TableFolder")).not.toContain("open-data");
   });
 
+  it("lets the folders that hold an object kind create one", () => {
+    expect(ids("ViewFolder")).toEqual(["new-view", "refresh"]);
+    expect(ids("SequenceFolder")).toEqual(["new-sequence", "refresh"]);
+    expect(ids("ProcedureFolder")).toEqual(["new-routine", "refresh"]);
+    expect(ids("FunctionFolder")).toEqual(["new-routine", "refresh"]);
+  });
+
   it("keeps folders that only list things down to a refresh", () => {
-    expect(ids("ViewFolder")).toEqual(["refresh"]);
-    expect(ids("SequenceFolder")).toEqual(["refresh"]);
+    expect(ids("TypeFolder")).toEqual(["refresh"]);
+    expect(ids("ExtensionFolder")).toEqual(["refresh"]);
+  });
+
+  it("offers the objects a table designer never covered their own source", () => {
+    expect(ids("View")).toContain("edit-source");
+    expect(ids("Procedure")).toContain("edit-source");
+    expect(ids("Function")).toContain("edit-source");
+
+    // A trigger is stopped rather than dropped, which is a thing only a trigger can do.
+    expect(ids("Trigger")).toContain("trigger-disable");
+    expect(ids("Sequence")).toContain("alter-sequence");
+
+    // And all of them drop through the preview a table drops through.
+    for (const kind of ["View", "Procedure", "Function", "Sequence", "Trigger", "Table"])
+      expect(ids(kind)).toContain("drop-object");
+  });
+
+  it("hides the object editors on an engine without DDL", () => {
+    expect(ids("View", { ddl: false })).not.toContain("edit-source");
+    expect(ids("View", { ddl: false })).not.toContain("drop-object");
+    expect(ids("ViewFolder", { ddl: false })).toEqual(["refresh"]);
   });
 
   it("hides everything that writes on an engine without DDL", () => {
@@ -94,7 +121,7 @@ describe("actionsFor", () => {
   });
 
   it("marks the destructive items", () => {
-    const drop = actionsFor("Table").find(item => item.action === "script-drop");
+    const drop = actionsFor("Table").find(item => item.action === "drop-object");
     const open = actionsFor("Table").find(item => item.action === "open-data");
 
     expect(drop?.danger).toBe(true);

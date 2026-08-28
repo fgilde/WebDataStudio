@@ -48,7 +48,8 @@ public sealed record AlertOptions(
 /// never open.
 public sealed class HealthAlerts(
     AlertOptions options, ConnectionRegistry registry, SessionFactory factory,
-    HealthAlertSink sink, ILogger<HealthAlerts> log) : BackgroundService
+    HealthAlertSink sink, Analysis.QualityRunner quality, ILogger<HealthAlerts> log)
+    : BackgroundService
 {
     /// Findings already reported, as "connection|category|title". Kept in memory: after a restart
     /// one repeat is better than a store to keep in sync.
@@ -100,6 +101,19 @@ public sealed class HealthAlerts(
                     foreach (var finding in report.Findings.Where(f => options.Reportable(f.Severity)))
                         if (_seen.Add($"{spec.Id}|{finding.Category}|{finding.Title}"))
                             fresh.Add(finding);
+                }
+
+                // The rules somebody wrote about the data belong in the same sweep: the schema being
+                // fine and the rows being wrong are both worth one message.
+                foreach (var result in await quality.RunAsync(spec.Id, ct))
+                {
+                    if (result.Passed) continue;
+
+                    var finding = Analysis.QualityRules.AsFinding(result);
+
+                    if (options.Reportable(finding.Severity)
+                        && _seen.Add($"{spec.Id}|{finding.Category}|{finding.Title}|{result.Violations}"))
+                        fresh.Add(finding);
                 }
             }
             catch (Exception e)

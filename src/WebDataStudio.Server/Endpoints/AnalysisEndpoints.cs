@@ -120,6 +120,52 @@ public static class AnalysisEndpoints
 
     /// Describes only the tables the statement actually mentions, so the advisor never walks a
     /// whole catalogue to answer one query.
+    /// Rules about the data rather than about the schema, and the results of running them.
+    public static void MapQualityEndpoints(this WebApplication app)
+    {
+        app.MapGet("/api/quality/{conn}", (string conn, QualityRunner rules) =>
+            Results.Ok(rules.For(conn)));
+
+        app.MapPut("/api/quality/{conn}", (string conn, QualityRule body, QualityRunner rules) =>
+        {
+            if (body.Table.Trim().Length == 0)
+                return Results.BadRequest(new { message = "a rule needs a table" });
+
+            var rule = body with
+            {
+                ConnectionId = conn,
+                Id = body.Id is { Length: > 0 } id ? id : Guid.NewGuid().ToString("N")[..12],
+            };
+
+            rules.Save(rule);
+            return Results.Ok(rule);
+        });
+
+        app.MapDelete("/api/quality/{conn}/{id}", (string conn, string id, QualityRunner rules) =>
+        {
+            rules.Delete(id);
+            return Results.NoContent();
+        });
+
+        app.MapPost("/api/quality/{conn}/run", async (string conn, QualityRunner rules,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var results = await rules.RunAsync(conn, ct);
+
+                return Results.Ok(new
+                {
+                    ran = results.Count,
+                    failing = results.Count(result => !result.Passed),
+                    results,
+                });
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+    }
+
     /// The tables a statement mentions. The walk itself lives in Analysis/TableLoader.cs, because
     /// the capture's advice needs exactly the same thing.
     private static Task<Dictionary<string, ObjectDetail>> LoadTablesAsync(IDbDriver driver,

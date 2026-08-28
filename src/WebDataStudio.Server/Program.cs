@@ -144,6 +144,8 @@ builder.Services.AddSingleton<SchemaScope>();
 builder.Services.AddSingleton<EntraSignIn>();
 builder.Services.AddSingleton<SessionFactory>();
 builder.Services.AddSingleton<StatementCapture>();
+// Rules about the data rather than about the schema: each one counts the rows that break it.
+builder.Services.AddSingleton<WebDataStudio.Server.Analysis.QualityRunner>();
 // A file becomes a table: DuckDB reads it, the target engine's DDL writer creates it.
 builder.Services.AddSingleton<WebDataStudio.Server.Import.ImportService>();
 builder.Services.AddSingleton<WebDataStudio.Server.Import.FileTableImport>();
@@ -301,6 +303,7 @@ app.MapExportEndpoints();
 app.MapArchiveEndpoints();
 app.MapImportEndpoints();
 app.MapDataEndpoints();
+app.MapQualityEndpoints();
 app.MapStorageEndpoints();
 app.MapAnalysisEndpoints();
 app.MapDdlEndpoints();

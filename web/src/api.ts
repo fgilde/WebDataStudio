@@ -1312,3 +1312,40 @@ export const uploadObject = (conn: string, ref: string, file: File): Promise<{ k
 export const deleteObject = (conn: string, ref: string): Promise<{ key: string }> =>
   fetch(`${base}/storage/${conn}?${refQuery(ref)}`, { method: "DELETE" })
     .then(r => ok<{ key: string }>(r));
+
+/// One rule somebody wrote about their data. The kind decides what `argument` means: a range is
+/// `0..100`, a reference `other_table.column`, a freshness `24h`, an expression the condition a bad
+/// row satisfies.
+export interface QualityRuleDto {
+  id: string;
+  connectionId: string;
+  schema: string;
+  table: string;
+  column: string;
+  kind: "NotNull" | "Unique" | "Range" | "Referential" | "Freshness" | "Expression";
+  argument: string | null;
+  message: string | null;
+  enabled: boolean;
+}
+export interface QualityResultDto {
+  rule: QualityRuleDto;
+  violations: number;
+  statement: string;
+  ranAt: string;
+  error: string | null;
+}
+
+export const qualityRules = (conn: string): Promise<QualityRuleDto[]> =>
+  fetch(`${base}/quality/${conn}`).then(r => ok<QualityRuleDto[]>(r));
+
+export const saveQualityRule = (conn: string, rule: QualityRuleDto): Promise<QualityRuleDto> =>
+  fetch(`${base}/quality/${conn}`, json("PUT", rule)).then(r => ok<QualityRuleDto>(r));
+
+export const deleteQualityRule = (conn: string, id: string): Promise<void> =>
+  fetch(`${base}/quality/${conn}/${id}`, { method: "DELETE" }).then(r => ok<void>(r));
+
+/// Runs every enabled rule and answers with what each one counted.
+export const runQualityRules = (conn: string):
+  Promise<{ ran: number; failing: number; results: QualityResultDto[] }> =>
+  fetch(`${base}/quality/${conn}/run`, { method: "POST" })
+    .then(r => ok<{ ran: number; failing: number; results: QualityResultDto[] }>(r));

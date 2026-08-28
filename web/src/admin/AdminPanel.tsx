@@ -18,6 +18,7 @@ import { Replication } from "./Replication";
 import { Jobs } from "./Jobs";
 import { Capture } from "./Capture";
 import { Growth } from "./Growth";
+import { Quality } from "./Quality";
 import { runJob } from "../shell/jobs";
 import { formatBytes } from "../redis/format";
 
@@ -503,6 +504,7 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor, tab }:
         <Tabs.Tab value="sessions">Sessions</Tabs.Tab>
         <Tabs.Tab value="jobs">Jobs</Tabs.Tab>
         <Tabs.Tab value="capture">Capture</Tabs.Tab>
+        <Tabs.Tab value="quality">Data quality</Tabs.Tab>
         <Tabs.Tab value="databases">Databases</Tabs.Tab>
         <Tabs.Tab value="users">Users</Tabs.Tab>
         <Tabs.Tab value="studio-users">Studio users</Tabs.Tab>
@@ -517,6 +519,9 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor, tab }:
       <Tabs.Panel value="sessions"><Sessions connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="capture">
         <Capture connectionId={connectionId} onOpenInEditor={onOpenInEditor} />
+      </Tabs.Panel>
+      <Tabs.Panel value="quality">
+        <Quality key={connectionId} connectionId={connectionId} onOpenInEditor={onOpenInEditor} />
       </Tabs.Panel>
       <Tabs.Panel value="jobs">
         <Jobs connectionId={connectionId} onOpenInEditor={onOpenInEditor} />

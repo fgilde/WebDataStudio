@@ -150,7 +150,7 @@ public static class ExportEndpoints
 
             await using (session)
             {
-                List<(string Name, string Sql)> sources;
+                List<ExportSource> sources;
                 try
                 {
                     sources = await ResolveSourcesAsync(driver, session, body, scope, ctx.RequestAborted);
@@ -171,6 +171,15 @@ public static class ExportEndpoints
 
                 var request = new ScriptRequest("", body.MaxRows ?? defaultMaxRows, timeout, body.Schema);
 
+                // An engine with no SQL exports the same page the data tab reads: a MongoDB
+                // collection through a find, a Redis key space through its keys. Everything else
+                // runs the statement it was given, as before.
+                IAsyncEnumerable<ResultChunk> Read(ExportSource source) =>
+                    source.Paged is { } paged
+                        ? PagesAsync(driver, session, paged, request.MaxRows, ctx.RequestAborted)
+                        : driver.ExecuteAsync(session, request with { Sql = source.Sql! },
+                            ctx.RequestAborted);
+
                 if (exporter.RequiresSeekableStream)
                 {
                     // Staged on disk rather than in memory: these writers seek, and a large export
@@ -183,9 +192,7 @@ public static class ExportEndpoints
                         {
                             foreach (var source in sources)
                                 await exporter.WriteAsync(file,
-                                    Masking.Stream(
-                                        driver.ExecuteAsync(session, request with { Sql = source.Sql }, ctx.RequestAborted),
-                                        policy, ctx.RequestAborted),
+                                    Masking.Stream(Read(source), policy, ctx.RequestAborted),
                                     options with { TableName = source.Name }, ctx.RequestAborted);
                         }
 
@@ -202,9 +209,7 @@ public static class ExportEndpoints
                 {
                     foreach (var source in sources)
                         await exporter.WriteAsync(ctx.Response.Body,
-                            Masking.Stream(
-                                driver.ExecuteAsync(session, request with { Sql = source.Sql }, ctx.RequestAborted),
-                                policy, ctx.RequestAborted),
+                            Masking.Stream(Read(source), policy, ctx.RequestAborted),
                             options with { TableName = source.Name }, ctx.RequestAborted);
                 }
 
@@ -215,26 +220,70 @@ public static class ExportEndpoints
     }
 
     /// One entry for a query or a single table, one per table for a whole schema.
-    private static async Task<List<(string Name, string Sql)>> ResolveSourcesAsync(
+    /// What one file in the export is read from: a statement, or an object the driver pages itself.
+    private sealed record ExportSource(string Name, string? Sql, SchemaNodeRef? Paged);
+
+    private static async Task<List<ExportSource>> ResolveSourcesAsync(
         IDbDriver driver, IDbSession session, ExportRequest body, string scope, CancellationToken ct)
     {
         switch (scope)
         {
             case "table" when body.ObjectRef is not null:
-            {
-                var target = SchemaNodeRef.Parse(body.ObjectRef);
-                return [(target.Name, $"SELECT * FROM {Qualify(driver, target)}")];
-            }
+                return [Source(driver, SchemaNodeRef.Parse(body.ObjectRef))];
 
             case "schema":
             {
                 var tables = await FindTablesAsync(driver, session, body.Schema, ct);
-                return tables.Select(t => (t.Name, $"SELECT * FROM {Qualify(driver, t)}")).ToList();
+                return tables.Select(table => Source(driver, table)).ToList();
             }
 
             default:
-                return body.Sql is { Length: > 0 } ? [(body.Options?.TableName ?? "result", body.Sql)] : [];
+                return body.Sql is { Length: > 0 }
+                    ? [new ExportSource(body.Options?.TableName ?? "result", body.Sql, null)]
+                    : [];
         }
+    }
+
+    /// A SELECT where there is SQL to write one in, and the object itself where there is not.
+    private static ExportSource Source(IDbDriver driver, SchemaNodeRef target) =>
+        driver.Caps.Sql
+            ? new ExportSource(target.Name, $"SELECT * FROM {Qualify(driver, target)}", null)
+            : new ExportSource(
+                target.Kind == SchemaNodeKind.Table ? target.Name : string.Join("-", target.Path),
+                null, target);
+
+    /// The driver's own pages as the chunks an exporter reads: the columns once, then the rows, until
+    /// a short page says there are no more or the row cap is reached.
+    private static async IAsyncEnumerable<ResultChunk> PagesAsync(IDbDriver driver, IDbSession session,
+        SchemaNodeRef target, int maxRows, [EnumeratorCancellation] CancellationToken ct)
+    {
+        const int size = 500;
+        var sent = 0;
+        var described = false;
+
+        while (sent < maxRows)
+        {
+            var take = Math.Min(size, maxRows - sent);
+            var page = await driver.PageAsync(session, target,
+                new PageQuery(sent, take, null, false, null, null), ct);
+
+            // No page and no SQL either: there is nothing here to export, and an empty file with a
+            // header is a better answer than an exception in the middle of a download.
+            if (page is null) break;
+
+            if (!described)
+            {
+                yield return new ResultChunk.Columns(0, page.Columns);
+                described = true;
+            }
+
+            if (page.Rows.Count > 0) yield return new ResultChunk.Rows(0, page.Rows);
+
+            sent += page.Rows.Count;
+            if (page.Rows.Count < take) break;
+        }
+
+        yield return new ResultChunk.End(0, sent, 0, false);
     }
 
     private static async Task<List<SchemaNodeRef>> FindTablesAsync(

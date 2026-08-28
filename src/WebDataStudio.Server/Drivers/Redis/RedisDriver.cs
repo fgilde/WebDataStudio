@@ -351,6 +351,7 @@ public sealed class RedisDriver : IDbDriver
         RedisType.List => await db.ListLengthAsync(key),
         RedisType.Set => await db.SetLengthAsync(key),
         RedisType.SortedSet => await db.SortedSetLengthAsync(key),
+        RedisType.Stream => await db.StreamLengthAsync(key),
         _ => null,
     };
 

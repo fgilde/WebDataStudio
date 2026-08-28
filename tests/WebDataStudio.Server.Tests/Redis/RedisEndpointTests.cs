@@ -105,6 +105,29 @@ public class RedisEndpointTests : IAsyncLifetime
         Assert.DoesNotContain("user:1", text);
     }
 
+    /// The grid says it exports like any other, so it has to. An export used to be
+    /// `SELECT * FROM key`, which Redis has no answer for.
+    [Fact]
+    public async Task The_key_space_exports_as_a_csv()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var id = await IdAsync(client, "CACHE");
+
+        var response = await client.PostAsJsonAsync("/api/export/csv", new
+        {
+            connectionId = id, objectRef = "Schema:0", scope = "table",
+        }, ct);
+
+        response.EnsureSuccessStatusCode();
+        var csv = await response.Content.ReadAsStringAsync(ct);
+
+        Assert.Contains("key,type,ttl,length,memory", csv);
+        Assert.Contains("user:1", csv);
+        Assert.Contains("profile:1", csv);
+    }
+
     [Fact]
     public async Task Keys_come_back_with_their_type_and_a_cursor()
     {

@@ -241,6 +241,50 @@ public static class SchemaEndpoints
                         : null,
                 }));
 
+        // "What do I run on the other machine": the statements that would carry a database from
+        // the snapshot's schema to this one. Nothing runs here — it lands in a query tab, and the
+        // apply endpoint is the one that executes.
+        app.MapGet("/api/schema/{conn}/drift/script", async (string conn, SchemaSnapshots snapshots,
+            SessionFactory factory, CancellationToken ct) =>
+        {
+            if (!snapshots.Configured)
+                return Results.BadRequest(new
+                {
+                    message = "no snapshot directory is configured; set WDS_SCHEMA_SNAPSHOT_DIR",
+                });
+
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var writer = DdlEndpoints.WriterFor(driver.Info.Id);
+
+                    if (writer is null)
+                        return Results.BadRequest(new
+                        {
+                            message = $"the studio writes no DDL for {driver.Info.Label}",
+                        });
+
+                    var before = snapshots.Saved(conn);
+                    var after = await snapshots.TakeAsync(conn, conn, ct);
+
+                    var script = await DriftMigration.BuildAsync(driver, session, writer, before, after, ct);
+
+                    return Results.Ok(new
+                    {
+                        before = before?.At,
+                        script = script.Text,
+                        script.Destructive,
+                        needsAPerson = script.NeedsAPerson,
+                        statements = script.Statements.Count,
+                    });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
         // Takes one now rather than waiting for the next start — the button behind "did my
         // migration do what I think it did".
         app.MapPost("/api/schema/snapshot", async (SchemaSnapshots snapshots, CancellationToken ct) =>

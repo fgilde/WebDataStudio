@@ -95,6 +95,35 @@ Tabellenänderung — deshalb ist ein Drop, der einen View zerlegen würde, eine
 Die Objekt-Editoren sind ausgeblendet, wo das Studio kein DDL schreibt: PostgreSQL, MySQL, SQL Server
 und SQLite haben einen Writer, alles andere nimmt ein Statement im Abfrage-Tab.
 
+## Snapshots und Drift
+
+Ist `WDS_SCHEMA_SNAPSHOT_DIR` gesetzt, schreibt das Studio kurz nach dem Start eine Momentaufnahme
+des Schemas jeder Verbindung und meldet, was sich seit der letzten bewegt hat: hinzugekommene und
+entfernte Tabellen, und je Tabelle, welche Spalten, Indizes und Fremdschlüssel kamen oder gingen.
+
+```bash
+WDS_SCHEMA_SNAPSHOT_DIR=/data/snapshots
+```
+
+Die erste Momentaufnahme ist eine Grundlinie, keine Änderung; jede weitere ist die Grundlinie der
+nächsten. Der Drift steht außerdem im Log und geht als Nachricht raus, wenn
+[Alerts](administration.md) konfiguriert sind.
+
+**Die Differenz als Skript.** Der Bericht sagt, was sich bewegt hat; der Knopf daneben sagt, was
+dort zu laufen hat, wo es noch nicht passiert ist. Die Statements entstehen aus dem *aktuellen*
+Schema und nicht aus der Zusammenfassung des Snapshots — der Snapshot weiß, welche Tabelle sich
+geändert hat, die Datenbank weiß, wie sie jetzt aussieht — und sie landen in einem Abfrage-Tab,
+statt zu laufen: neue Tabellen so, wie sie sind, neue Spalten, neue Indizes und die Drops für das,
+was weg ist.
+
+Eines überlässt es bewusst einem Menschen: eine Spalte, deren Typ oder Nullbarkeit sich geändert
+hat. Das steht als Kommentar oben im Skript, denn daraus ein `ALTER` zu machen hieße zu entscheiden,
+ob die Daten noch hineinpassen — und eine Migration, die still abschneidet, ist schlimmer als eine
+Zeile, die sagt „sieh dir das an“.
+
+Das Panel liegt in **Administration → Schema drift**, mit einem Knopf **Snapshot now** für den
+Moment direkt nach einer Migration.
+
 ## Was das Struktur-Panel beantwortet
 
 Neben Spalten, Indizes und Schlüsseln beantworten weitere Tabs die Fragen, die man sonst per Hand im

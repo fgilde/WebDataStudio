@@ -536,6 +536,7 @@ it works for every engine whose capability set claims support for it.
 | F30.36 | A file out of a binary cell and back into one, as the file it actually is |
 | F30.37 | A notification when a long run finishes and nobody is watching |
 | F30.38 | Timestamps read by a person, on the clock they chose, and never converted when they carry no zone |
+| F30.39 | The schema drift as a script: what to run where the change has not happened yet |
 
 ## 10. Safety behaviour
 

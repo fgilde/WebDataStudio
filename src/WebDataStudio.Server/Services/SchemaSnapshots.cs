@@ -64,6 +64,10 @@ public sealed class SchemaSnapshots(
     public SchemaDrift? DriftOf(string connectionId) =>
         _drift.TryGetValue(connectionId, out var drift) ? drift : null;
 
+    /// The snapshot on disk — where the schema was when it was last written down. Null before the
+    /// first one was taken.
+    public SchemaShape? Saved(string connectionId) => Read(connectionId);
+
     /// Snapshots every connection and records the drift. Returns how many connections moved.
     public async Task<int> SweepAsync(CancellationToken ct)
     {

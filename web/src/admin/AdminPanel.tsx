@@ -14,6 +14,7 @@ import {
 import { Overview } from "./Overview";
 import { StudioUsers } from "./StudioUsers";
 import { Security } from "./Security";
+import { SchemaDrift } from "./SchemaDrift";
 import { SizeTreemap } from "./SizeTreemap";
 import { Replication } from "./Replication";
 import { Jobs } from "./Jobs";
@@ -459,6 +460,7 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor, tab }:
         <Tabs.Tab value="backup">Backup</Tabs.Tab>
         <Tabs.Tab value="metrics">Metrics</Tabs.Tab>
         <Tabs.Tab value="slow">Slow queries</Tabs.Tab>
+        <Tabs.Tab value="schema">Schema drift</Tabs.Tab>
         <Tabs.Tab value="replication">Replication</Tabs.Tab>
         <Tabs.Tab value="logs">Log</Tabs.Tab>
       </Tabs.List>
@@ -488,6 +490,9 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor, tab }:
         </ScrollArea>
       </Tabs.Panel>
       <Tabs.Panel value="users"><Security connectionId={connectionId} /></Tabs.Panel>
+      <Tabs.Panel value="schema">
+        <SchemaDrift connectionId={connectionId} onOpenInEditor={onOpenInEditor} />
+      </Tabs.Panel>
       <Tabs.Panel value="studio-users"><StudioUsers /></Tabs.Panel>
       <Tabs.Panel value="audit"><Audit connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="backup"><Backup connectionId={connectionId} database={database} /></Tabs.Panel>

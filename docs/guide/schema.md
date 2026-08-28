@@ -103,10 +103,25 @@ WDS_SCHEMA_SNAPSHOT_DIR=/data/snapshots
 ```
 
 - `GET /api/schema/{connection}/drift` — what moved, or `no change`.
+- `GET /api/schema/{connection}/drift/script` — the statements that would carry another database
+  from the snapshot's schema to this one.
 - `POST /api/schema/snapshot` — take one now, which is the answer to "did my migration do what I
   think it did".
 - The drift is also a log line, and a message when [alerts](administration.md#alerts) are
   configured.
+
+**Script the difference.** The report says what moved; the button next to it says what to run where
+it has not happened yet. The statements come from the *live* schema rather than from the snapshot's
+summary — the snapshot knows which table changed, the database knows what it looks like now — and
+they land in a query tab rather than running: new tables as they are, new columns, new indexes, and
+the drops for what is gone.
+
+One thing it deliberately leaves to a person: a column whose type or nullability moved. That is a
+comment at the top of the script, because turning it into an `ALTER` means deciding whether the data
+still fits, and a migration that silently truncates is worse than a line saying "look at this one".
+
+The panel is **Administration → Schema drift**, with a **Snapshot now** button for the moment right
+after a migration.
 
 The first snapshot is a baseline, not a change. Each snapshot then becomes the baseline for the next
 comparison, so a change is reported once. Files are written through a temporary name, and a file

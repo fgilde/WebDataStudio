@@ -1227,6 +1227,36 @@ export const applyUserChange = (conn: string, hash: string): Promise<{ executed:
   fetch(`${base}/admin/users/${conn}/apply`, json("POST", { hash }))
     .then(r => ok<{ executed: string }>(r));
 
+/// What moved since the schema was last written down.
+export interface SchemaDriftDto {
+  before: string | null;
+  after: string;
+  summary: string;
+  added: string[];
+  removed: string[];
+  changed: string[];
+}
+
+export const schemaDrift = (conn: string): Promise<{ configured: boolean; drift: SchemaDriftDto | null }> =>
+  fetch(`${base}/schema/${conn}/drift`)
+    .then(r => ok<{ configured: boolean; drift: SchemaDriftDto | null }>(r));
+
+/// The statements that would carry another database from the snapshot's schema to this one, plus
+/// what the studio saw and will not write by itself.
+export interface DriftScriptDto {
+  before: string | null;
+  script: string;
+  destructive: boolean;
+  needsAPerson: string[];
+  statements: number;
+}
+
+export const driftScript = (conn: string): Promise<DriftScriptDto> =>
+  fetch(`${base}/schema/${conn}/drift/script`).then(r => ok<DriftScriptDto>(r));
+
+export const takeSnapshot = (): Promise<{ moved: number }> =>
+  fetch(`${base}/schema/snapshot`, json("POST", {})).then(r => ok<{ moved: number }>(r));
+
 export const serverLog = (conn: string, lines = 200): Promise<ServerLogDto> =>
   fetch(`${base}/admin/logs/${conn}?lines=${lines}`).then(r => ok<ServerLogDto>(r));
 

@@ -92,7 +92,53 @@ docker run -d -p 8080:8080 -v wds-data:/data \
       <div class="card">
         <h3>Den Daten folgen</h3>
         <p>Eine Spalte aus der Tabelle leihen, auf die ein Fremdschlüssel zeigt — oder eine Zeile in
-          alles öffnen, was mit ihr zu tun hat, so tief wie die Frage reicht.</p>
+          alles öffnen, was mit ihr zu tun hat, so tief wie die Frage reicht. Oder einer Tabelle
+          selbst folgen: die Seite liest sich getaktet neu, und was seit dem letzten Lesen dazukam,
+          ist eingefärbt.</p>
+      </div>
+      <div class="card">
+        <h3>Buckets als Verbindung</h3>
+        <p>S3, Azure Blob, Google Cloud Storage oder ein Ordner — im Baum neben den Datenbanken. Ein
+          Objekt ansehen, eine Parquet-, CSV- oder JSON-Datei (oder ein ganzes Prefix) über DuckDB
+          als Tabelle abfragen und daraus eine echte Tabelle in der Datenbank daneben machen.</p>
+      </div>
+      <div class="card">
+        <h3>Dokumente, nicht Text</h3>
+        <p>Eine JSONB-Spalte ist in den meisten Grids eine Zelle Text. Hier hat sie eine Struktur:
+          welche Pfade es gibt, wie oft, welche Typen, ein Beispiel — und das <code>SELECT</code>,
+          das sie zu Spalten macht, in der Schreibweise dieser Engine.</p>
+      </div>
+      <div class="card">
+        <h3>Was wächst, was langsamer wird</h3>
+        <p>Tabellengrößen werden gemessen, wann immer jemand hinsieht — die Historie baut sich selbst
+          auf; die größte Änderung zuerst, mit Rate pro Tag. Dazu, was dieses Studio immer wieder
+          ausführt, nach Form gruppiert und mit Trend — und eine aufgezeichnete Minute, gelesen vom
+          Index-Advisor.</p>
+      </div>
+      <div class="card">
+        <h3>Regeln über die Daten</h3>
+        <p>Der Katalog kann nicht sagen, dass ein Drittel der Bestellungen von gestern keinen Kunden
+          hat. Eine Regel kann es: hat einen Wert, keine Duplikate, in einem Bereich, zeigt auf eine
+          existierende Zeile, ist aktuell. Jede zählt die Zeilen, die sie brechen — und eine
+          fehlschlagende Regel wird ein Health-Finding.</p>
+      </div>
+      <div class="card">
+        <h3>Ein Entwicklungs-Subset, das lädt</h3>
+        <p>Diese Zeilen, die Zeilen, auf die sie zeigen, und alles Personenbezogene ersetzt — ein
+          SQL-Skript, das in eine leere Datenbank lädt. Schlüssel bleiben unangetastet, und derselbe
+          Wert wird immer zum selben Pseudonym: die Tabellen passen also weiter zusammen.</p>
+      </div>
+      <div class="card">
+        <h3>Single Sign-on, und wer was getan hat</h3>
+        <p>Mit Entra, Keycloak, Auth0 oder Okta anmelden und deren Gruppen auf die Rollen des Studios
+          abbilden — oder die Konten in der Umgebung behalten. In beiden Fällen hinterlässt jedes
+          Statement, jeder Export und jeder abgelehnte Zugriff eine Zeile, die ein Admin liest.</p>
+      </div>
+      <div class="card">
+        <h3>Für Agenten, nach den Regeln des Studios</h3>
+        <p>Ein MCP-Endpunkt mit derselben Abmachung wie für Menschen: maskierte Spalten bleiben
+          maskiert, eine nur-lesende Verbindung bleibt nur-lesend, und ein Schreibvorgang wird vorher
+          gezeigt und gehasht.</p>
       </div>
       <div class="card">
         <h3>Archive</h3>

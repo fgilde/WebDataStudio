@@ -498,6 +498,18 @@ it works for every engine whose capability set claims support for it.
 | F29.7 | Find a value in any table |
 | F29.8 | Read only the schemas somebody works in |
 | F29.9 | Export formats written as text rather than as code |
+| F30.1 | What is inside a JSON column, and the SELECT that flattens it |
+| F30.2 | A file becomes a new table |
+| F30.3 | Follow a table, with what is new tinted |
+| F30.4 | What this studio has run, and whether it is getting slower |
+| F30.5 | How much every table grew |
+| F30.6 | What the captured minute suggests |
+| F30.7 | Rules about the data rather than the schema |
+| F30.8 | A failing rule reported with the health findings |
+| F30.9 | Who did what through this studio |
+| F30.10 | Signing in with an identity provider |
+| F30.11 | A development subset that loads |
+| F30.12 | The newer capabilities as MCP tools |
 
 ## 10. Safety behaviour
 

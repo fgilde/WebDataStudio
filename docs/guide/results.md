@@ -142,6 +142,13 @@ rather than aborting the whole file.
 
 **Copy to another connection…** moves a table between two connections, including across engines.
 
+**New table from a file…** is the other import: the one for a CSV somebody was sent, where there is no
+table yet. Pick the file — an upload, or an object in a [bucket](storage.md), which is read where it
+lies — and the studio describes it first: the columns it found, the type each one becomes on the
+target engine, ten rows as they will arrive, and the `CREATE TABLE` itself. Nothing is created until
+that has been read. Parquet, CSV, TSV, JSON and NDJSON are understood, and a whole prefix of files
+with the same shape counts as one table.
+
 ## Watching a query
 
 The interval box in the query toolbar re-runs the statement every 2, 5, 10 or 30 seconds and
@@ -155,6 +162,33 @@ changed, 1 added, 1 gone".
   the wrong things.
 - The highlight is skipped while the grid sorts or filters, because then a row's position is no
   longer the row the comparison was about.
+
+## What is inside a JSON column
+
+A JSONB column is one cell of text in the grid, and reading one row of it is a guess. **What is in
+this column?** in a JSON column's header menu reads a sample of the documents and answers with the
+shape: which paths exist, how often each one is present, which types it holds, and an example value.
+
+Paths are ordered by depth and then by where they were first seen, so the shape reads like the
+document rather than like an alphabetical list. Each path carries the expression that reads it **on
+this engine** — `->>`, `JSON_VALUE`, `json_extract_string` — so nothing has to know one engine's
+spelling from another's, and there is one **Flatten** statement that turns the value paths into
+columns, ready for a query tab. Arrays and objects are left out of that statement: a column cannot
+hold a subtree.
+
+Sampling is the honest part of this. The report says how many documents it read and how many of them
+parsed; a column with a hundred shapes in it will say so rather than presenting the first one as the
+truth.
+
+## Following a table
+
+A table that is being written to can be watched from the data tab: pick a key column — an id, a
+timestamp, an auto-increment — an interval, and the page re-reads itself in that order with the newest
+first. **Rows that arrived since the last read are tinted**, so an insert is visible without diffing
+two screenshots.
+
+Only key columns are offered. Ordering by a foreign key and calling the result "newest" would be a
+lie the tint makes convincing, so the list is restricted to what actually counts up.
 
 ## Browsing a table
 

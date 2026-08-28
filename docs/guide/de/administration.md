@@ -37,6 +37,67 @@ nicht gesehen, und der Tab sagt das. Extended Events und Äquivalente sind die r
 diese Frage und brauchen Rechte, die ein Studio nicht einfordern sollte. Eine Aufzeichnung lässt sich
 früher stoppen und behält, was sie gesehen hat; eine, die schon lief, wird beim Öffnen aufgenommen.
 
+**What should I change?** — gefragt, nachdem die Aufzeichnung gestoppt hat, denn ein Ratschlag über
+eine Minute, die noch beobachtet wird, würde sich dauernd verschieben. Die zwanzig langsamsten
+Statements liest derselbe Index-Advisor, den der Health-Report benutzt, und die Vorschläge werden je
+Tabelle zusammengefasst: wie vielen Statements es hilft, wie langsam das langsamste war, und das
+`CREATE INDEX` selbst, das in einem Query-Tab landet statt hier zu laufen. „Nichts vorzuschlagen“ ist
+auch eine Antwort und wird gesagt.
+
+## Datenqualität
+
+Der Health-Report liest den Katalog: eine Tabelle ohne Primärschlüssel, ein Index, den niemand nutzt.
+Er kann nicht sagen, dass ein Drittel der Bestellungen von gestern keinen Kunden hat — das steht nicht
+im Katalog, das steht in den Zeilen. Der Tab **Data quality** ist die andere Hälfte.
+
+Eine Regel ist eine zählende Abfrage. Tabelle, Spalte und Art wählen:
+
+| Regel | Was sie zählt | Geschrieben als |
+|---|---|---|
+| Has a value | Zeilen, in denen die Spalte null ist | — |
+| No duplicates | die zusätzlichen Zeilen jeder Gruppe, die mehr als einmal vorkommt | — |
+| Between two numbers | Werte außerhalb des Bereichs | `0..100` |
+| Points at a row that exists | Werte ohne passende Zeile in einer anderen Tabelle | `customers.id` oder `sales.customers.id` |
+| Newest value is recent | eins, wenn der neueste Wert älter ist | `24h`, `30m`, `7d` |
+| My own condition | Zeilen, die sie erfüllen | `total < 0 OR status = ''` |
+
+Die Argumente werden **geparst, nicht eingesetzt**: ein Bereich sind zwei Zahlen, eine Referenz sind
+Tabelle und Spalte, ein Intervall sind Zahl und Einheit. Die Ausnahme ist der eigene Ausdruck — das
+ist eigenes SQL und wird behandelt wie das, was jemand in einen Query-Tab tippt.
+
+Zwei Entscheidungen, die man kennen sollte. `NULL` ist keine kaputte Referenz: „noch kein Kunde“ ist
+eine andere Regel, und *Has a value* ist die, die das findet. Und eine Regel, die nicht geprüft werden
+kann — eine umbenannte Spalte —, sagt warum, statt die Regeln danach zu stoppen.
+
+**Run now** führt jede aktive Regel aus und zeigt, was sie gezählt hat, Fehlschläge zuerst; das
+zählende Statement ist einen Klick entfernt in einem Query-Tab. Eine Regel lässt sich abschalten, ohne
+sie zu löschen.
+
+Eine fehlschlagende Regel wird außerdem ein **Health-Finding** — der Alert-Webhook trägt sie also
+mit: eine einmal geschriebene Regel wird von da an beobachtet, ohne dass jemand das Studio öffnet.
+
+## Wachstum
+
+Der Tab „Datenbanken“ zeichnet die Größen als Treemap und darunter dieselben Tabellen, geordnet
+danach, *wie stark sie gewachsen sind*. Gemessen wird, wann immer jemand hinsieht — die Historie baut
+sich also selbst auf, statt eine Entscheidung zu brauchen: der erste Blick ist eine Größe, der zweite
+ein Wachstum.
+
+Die größte absolute Änderung zuerst, mit Prozent, wo Prozent etwas bedeutet — eine Tabelle, die bei
+null angefangen hat, hat keinen sinnvollen Prozentwert —, und einer Rate pro Tag, damit Woche und
+Monat vergleichbar sind. Eine geschrumpfte Tabelle ist anders markiert als eine gewachsene, denn
+beides ist eine Antwort.
+
+## Audit
+
+Wer hat über dieses Studio was getan: eine Zeile pro Anfrage, die etwas geändert oder Daten aus dem
+Haus getragen hat, mit Person, Verbindung und Ergebnis. Filter nach Person, nach Verbindung oder
+danach, was passiert ist — die Suche liest auch das Statement, „wer hat das gelöscht“ ist also ein
+Tabellenname im Feld.
+
+Aufzeichnung und Aufbewahrung steuern `WDS_AUDIT` und `WDS_AUDIT_DAYS`; siehe
+[Umgebungsvariablen](environment.md#wer-was-getan-hat).
+
 ## Sitzungen
 
 Die Sitzungsliste zeigt, wer verbunden ist, was läuft, wie lange es schon dauert und wer wen

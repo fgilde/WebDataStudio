@@ -64,6 +64,22 @@ Jeder Lauf landet in einem durchsuchbaren Verlauf, der einen Neustart übersteht
 hält benannte Abfragen in Ordnern; beim Speichern wird das SQL des aktuellen Tabs vorgeschlagen und
 seine Verbindung gemerkt.
 
+## Was dieses Studio ausgeführt hat
+
+Der Verlauf beantwortet „was habe ich ausgeführt“; das Panel **Statistik** daneben beantwortet „was
+führe ich immer wieder aus, und wird es langsamer“. Statements werden nach Form gruppiert, nicht nach
+Text: Kommentare, Zeichenketten, Zahlen und Parameterlisten werden zu `?`, dieselbe Abfrage mit
+anderen Parametern ist also eine Zeile.
+
+Jede Zeile trägt, wie oft sie lief, den schnellsten, den mittleren und den langsamsten Lauf, wie viele
+Zeilen zurückkamen, wie oft sie fehlschlug — und einen Trend, der die erste Hälfte des Zeitraums mit
+der zweiten vergleicht. „Langsamer als vorher“ ist der Satz, den man braucht; ein Mittelwert über
+einen Monat ist es nicht.
+
+Gelesen wird der eigene Verlauf des Studios, es geht also um das, was **hier** ausgeführt wurde — die
+Statistiken der Engine selbst (`pg_stat_statements` und Äquivalente) stehen im Tab *Slow queries* der
+Administration und sehen alles, auch das, was eine Anwendung ausgeführt hat.
+
 ## Formatierung
 
 `Strg+Umschalt+F` formatiert den Puffer im Dialekt der Verbindung.

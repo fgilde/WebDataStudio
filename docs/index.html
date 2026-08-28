@@ -89,7 +89,49 @@ docker run -d -p 8080:8080 -v wds-data:/data \
       <div class="card">
         <h3>Following the data</h3>
         <p>Borrow a column from the table a foreign key points at, or open one row into everything
-          related to it and keep going as deep as the question does.</p>
+          related to it and keep going as deep as the question does. Or follow a table itself: the
+          page re-read on a timer with the rows that are new since the last read tinted.</p>
+      </div>
+      <div class="card">
+        <h3>Buckets as a connection</h3>
+        <p>S3, Azure Blob, Google Cloud Storage or a folder in the tree beside the databases.
+          Preview an object, query a Parquet, CSV or JSON file — or a whole prefix — as a table
+          through DuckDB, and make a real table out of it in the database next to it.</p>
+      </div>
+      <div class="card">
+        <h3>Documents, not text</h3>
+        <p>A JSONB column is one cell of text in most grids. Here it has a shape: which paths exist,
+          how often, which types, an example — and the <code>SELECT</code> that flattens them into
+          columns, written in this engine's own spelling.</p>
+      </div>
+      <div class="card">
+        <h3>What is growing, what is getting slower</h3>
+        <p>Table sizes sampled every time somebody looks, so the history builds itself; the biggest
+          change first with a per-day rate. Plus what this studio keeps running, grouped by shape,
+          with a trend — and a captured minute read by the index advisor.</p>
+      </div>
+      <div class="card">
+        <h3>Rules about the data</h3>
+        <p>The catalogue cannot say that a third of yesterday's orders have no customer. A rule can:
+          has a value, no duplicates, in a range, points at a row that exists, is recent. Each one
+          counts the rows that break it, and a failing rule joins the health findings.</p>
+      </div>
+      <div class="card">
+        <h3>A development subset that loads</h3>
+        <p>These rows, the rows they point at, and what is about people replaced — one SQL script
+          that loads into an empty database. Keys are never touched, and the same value always
+          becomes the same pseudonym, so the tables still agree with each other.</p>
+      </div>
+      <div class="card">
+        <h3>Single sign-on, and a record of who did what</h3>
+        <p>Sign in with Entra, Keycloak, Auth0 or Okta and map its groups to the studio's roles — or
+          keep the accounts in the environment. Either way, every statement, export and refused
+          request leaves one line an admin can read.</p>
+      </div>
+      <div class="card">
+        <h3>For agents, on the studio's rules</h3>
+        <p>An MCP endpoint with the same deal a person gets: masked columns stay masked, a read-only
+          connection stays read-only, and a write is previewed and hashed before it runs.</p>
       </div>
       <div class="card">
         <h3>Archives</h3>

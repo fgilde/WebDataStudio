@@ -107,6 +107,73 @@ signed in as an admin:
 curl -sX POST http://localhost:8080/api/admin/studio-users/hash -H 'content-type: application/json' -d '{"password":"the password"}'
 ```
 
+## Signing in with an identity provider
+
+`WDS_USERS` is a list of accounts in a container's environment: fine for one team, wrong for an
+organisation that already decides who works there somewhere else. With an authority and a client id
+configured, the login screen offers that provider instead — Entra, Keycloak, Auth0, Okta, anything
+that speaks OpenID Connect — and the studio never sees a password.
+
+```bash
+WDS_OIDC_AUTHORITY=https://login.microsoftonline.com/<tenant>/v2.0
+WDS_OIDC_CLIENT_ID=00000000-0000-0000-0000-000000000000
+WDS_OIDC_CLIENT_SECRET=...
+WDS_OIDC_LABEL='Sign in with Entra'
+```
+
+The flow is the authorization code flow with PKCE, the callback is `/signin-oidc`, and what comes
+back becomes the same three claims a password sign-in writes: the name, the role, and which
+connections that account may see. Everything downstream is therefore unchanged — roles, per-account
+connections, masking, and the line in the audit trail.
+
+**The role stays the studio's own.** A provider knows its groups; it does not know what an admin may
+do here.
+
+| Variable | Meaning |
+|---|---|
+| `WDS_OIDC_ADMINS` | groups, roles or addresses that get the admin role |
+| `WDS_OIDC_EDITORS` | the same, for `editor` |
+| `WDS_OIDC_VIEWERS` | the same, for `viewer` |
+| `WDS_OIDC_DEFAULT_ROLE` | what somebody who matched none of them gets, `viewer` by default |
+
+Matching reads the `roles`, `role`, `groups` and `wids` claims and the person's own name, address and
+UPN, so `WDS_OIDC_ADMINS=ada@example.com` works in a tenant with no groups. It is not case-sensitive,
+because a directory is not. Admin beats editor beats viewer, so somebody in two groups gets the one
+that was meant.
+
+Which connections a provider account may see is not something a provider can know: an account that
+signed in this way sees all of them, and `WDS_CONN_<NAME>_READONLY`, the production colour and the
+viewer role are what narrow that. A provider *and* `WDS_USERS` can both be configured — the login
+screen then shows the button and the form.
+
+`WDS_OIDC_REQUIRE_HTTPS=false` lets a provider serve its metadata over plain http. That is for a
+Keycloak on a laptop, never for a tenant on the internet. Signing out signs out of the studio; the
+provider still knows who you are, so signing in again may not ask twice.
+
+## Who did what
+
+A studio that can drop a table and export a customer list is a studio somebody will eventually be
+asked questions about. The audit trail is one line per request that **changed something or took data
+out of the building** — a statement run, an export, a change applied, a backup downloaded, a request
+refused — with who asked, against which connection, and what came of it.
+
+| Variable | Meaning |
+|---|---|
+| `WDS_AUDIT` | `false` turns the trail off, for a deployment that keeps its own record |
+| `WDS_AUDIT_DAYS` | how long a line is kept, `90` by default |
+
+The trail lives in the workspace database next to the query history and is read in the **Audit** tab
+of the administration panel, which — like everything under `/api/admin` — needs the admin role. Each
+line carries the route rather than the URL (`POST query/execute`, `DELETE storage`), so an action
+reads the same however many tables it was aimed at, and a detail the handler chose to write down: the
+statement itself for a run, the format and scope for an export.
+
+**Bodies are never recorded.** A connection body carries a password, so what lands in the trail is
+what a handler deliberately says and nothing else.
+
+Looking at something is not written down. A schema read, a page of rows, a health report — the trail
+would be nothing but those, and the question it exists to answer would be buried.
+
 ## What this is not
 
 Masking is a guard against shoulder-surfing, screenshots and careless exports — not a substitute

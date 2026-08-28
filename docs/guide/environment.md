@@ -9,6 +9,10 @@
 | `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app; the account is an admin |
 | `WDS_USERS` | several accounts: `name:role:secret[:conn,conn]` entries separated by `;` — see [Safety](safety.md) |
 | `WDS_TITLE` | a name for this studio, shown in the header, on the login screen and in the browser tab |
+| `WDS_OIDC_AUTHORITY`, `WDS_OIDC_CLIENT_ID`, `WDS_OIDC_CLIENT_SECRET` | sign in with an identity provider instead of a list of accounts — see [Safety](safety.md#signing-in-with-an-identity-provider) |
+| `WDS_OIDC_SCOPES`, `WDS_OIDC_LABEL`, `WDS_OIDC_CALLBACK_PATH`, `WDS_OIDC_REQUIRE_HTTPS` | what to ask the provider for, what the button says, where it comes back to, and whether its metadata may be plain http |
+| `WDS_OIDC_ADMINS`, `WDS_OIDC_EDITORS`, `WDS_OIDC_VIEWERS`, `WDS_OIDC_DEFAULT_ROLE` | which groups, roles or addresses get which studio role, and what everybody else gets |
+| `WDS_AUDIT`, `WDS_AUDIT_DAYS` | who did what through this studio, and for how long that is kept — see [Safety](safety.md#who-did-what) |
 | `WDS_SECRET_KEY` | AES key (base64, 32 bytes) for stored secrets; generated into `/data/.key` if absent |
 | `WDS_READONLY` | when `true`, every connection is read-only regardless of its own flag |
 | `WDS_ASSIST_ENDPOINT`, `WDS_ASSIST_KEY`, `WDS_ASSIST_MODEL` | optional assistance; without the endpoint the feature does not exist — see [Optional assistance](assistant.md) |
@@ -53,6 +57,22 @@ Roles are `admin` (everything, including the administration surface), `editor` (
 or ids; empty means all of them. The secret is either a PBKDF2 hash or a literal password. Masking
 of columns that look like secrets is on by default and has no variable — it is corrected per column
 from the data tab, which is described in [Safety](safety.md).
+
+## Signing in with a provider
+
+```bash
+WDS_OIDC_AUTHORITY=https://login.microsoftonline.com/<tenant>/v2.0
+WDS_OIDC_CLIENT_ID=00000000-0000-0000-0000-000000000000
+WDS_OIDC_CLIENT_SECRET=...
+WDS_OIDC_LABEL='Sign in with Entra'
+WDS_OIDC_ADMINS=dba-group
+WDS_OIDC_EDITORS=developers
+```
+
+Both the authority and the client id, or nothing: half a configuration would lock everybody out of a
+studio, so it is treated as no provider at all. Configuring one also closes the door — a studio with
+a provider and no `WDS_USERS` is not an open studio with a login button on it. The redirect URI to
+register with the provider is `https://<your studio>/signin-oidc`.
 
 ## Connections as URLs
 

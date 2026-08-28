@@ -196,3 +196,15 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F29.7 | Find a value in any table, server-side and type-aware | done | postgresql, mysql, sqlserver, sqlite, oracle, duckdb, clickhouse | Find data panel |
 | F29.8 | Read only the schemas somebody works in, from the environment or per studio | done | postgresql, mysql, sqlserver, oracle, clickhouse, duckdb | Explorer, connection properties |
 | F29.9 | Export formats written as text with placeholders rather than as code | done | all | Export dialog, templates |
+| F30.1 | What is inside a JSON or JSONB column: which paths exist, how often, with which types — and the SELECT that flattens them into columns | done | postgresql, mysql, sqlserver, sqlite, duckdb, clickhouse, oracle | Data tab, column menu |
+| F30.2 | A file becomes a new table: an upload or an object in a bucket, described, previewed and created before anything is loaded | done | postgresql, mysql, sqlserver, sqlite, duckdb, clickhouse | Explorer, New table from file |
+| F30.3 | Follow a table: the page re-read on a timer, ordered by a key column, with the rows that are new since the last read tinted | done | all | Data tab |
+| F30.4 | What this studio has run, grouped by statement shape: how often, how long, and whether it is getting slower | done | all | Query area, statement statistics |
+| F30.5 | How much every table grew: sizes sampled whenever somebody looks, the biggest absolute change first, with a per-day rate | done | postgresql, mysql, sqlserver, clickhouse | Admin panel, databases tab |
+| F30.6 | What the captured minute suggests: the slowest statements read by the index advisor, aggregated per table | done | sqlserver, postgresql, mysql | Admin panel, capture tab |
+| F30.7 | Rules about the data rather than the schema: has a value, no duplicates, in a range, points at a row that exists, is recent, or a condition of one's own — each one counting the rows that break it | done | all | Admin panel, data quality tab |
+| F30.8 | A failing quality rule reported with the health findings, so a rule written once is watched from then on | done | all | Health panel, alert webhook |
+| F30.9 | Who did what through this studio: one line per request that changed something or took data out, with who asked, against which connection and what came of it | done | all | Admin panel, audit tab, `WDS_AUDIT` |
+| F30.10 | Signing in to the studio with an identity provider — Entra, Keycloak, Auth0, Okta — with the studio's roles mapped from the groups it sends | done | all | Login screen, `WDS_OIDC_*` |
+| F30.11 | A development subset: rows from one table, the rows they point at, what is about people replaced, written as one loadable SQL script | done | postgresql, mysql, sqlserver, sqlite, oracle, clickhouse | Explorer, development subset |
+| F30.12 | The newer capabilities as MCP tools: find a value, a document column's shape, growth, what this studio ran, a statement read before it runs, and the data quality rules | done | all | MCP endpoint, assistant |

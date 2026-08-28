@@ -82,6 +82,21 @@ SELECT count(*) FROM orders WHERE created_at > current_date - 7;
   so a restart does not grow the list. Editing a query in the studio and restarting brings the file's
   version back — the folder is the source of truth for what it holds.
 
+## What this studio has run
+
+The history answers "what did I run"; the **statistics** panel next to it answers "what do I keep
+running, and is it getting slower". Statements are grouped by shape rather than by text: comments,
+string literals, numbers and parameter lists are replaced by `?`, so the same query with different
+parameters is one row.
+
+Each row carries how often it ran, the fastest, the median and the slowest run, how many rows it
+returned, how often it failed — and a trend, which compares the first half of the window with the
+second. "Slower than it was" is the sentence somebody actually needs; a mean over a month is not.
+
+It reads the studio's own history, so it is about what people ran **here** — the engine's own
+statistics (`pg_stat_statements` and its equivalents) are in the administration panel's *Slow
+queries* tab and see everything, including what an application ran.
+
 ## Formatting
 
 `Ctrl+Shift+F` formats the buffer in the dialect of the connection.

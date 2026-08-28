@@ -83,6 +83,42 @@ einzeln gemeldet, statt die ganze Datei abzubrechen.
 **Copy to another connection…** verschiebt eine Tabelle zwischen zwei Verbindungen, auch über
 Engine-Grenzen hinweg.
 
+## Was in einer JSON-Spalte steht
+
+Eine JSONB-Spalte ist im Grid eine Zelle Text, und eine Zeile davon zu lesen ist geraten. **What is
+in this column?** im Menü einer JSON-Spalte liest eine Stichprobe der Dokumente und antwortet mit der
+Struktur: welche Pfade es gibt, wie oft jeder vorkommt, welche Typen er hält, und ein Beispielwert.
+
+Die Pfade sind nach Tiefe und dann nach erstem Auftreten geordnet — die Struktur liest sich also wie
+das Dokument und nicht wie eine alphabetische Liste. Zu jedem Pfad gehört der Ausdruck, der ihn **auf
+dieser Engine** liest (`->>`, `JSON_VALUE`, `json_extract_string`), und es gibt ein
+**Flatten**-Statement, das die Wertpfade zu Spalten macht, fertig für einen Query-Tab. Arrays und
+Objekte fehlen darin: eine Spalte kann keinen Teilbaum halten.
+
+Die Stichprobe ist der ehrliche Teil daran. Der Bericht sagt, wie viele Dokumente er gelesen hat und
+wie viele davon geparst haben; eine Spalte mit hundert Strukturen darin sagt das, statt die erste als
+Wahrheit auszugeben.
+
+## Eine Tabelle verfolgen
+
+Eine Tabelle, in die geschrieben wird, lässt sich im Daten-Tab beobachten: Schlüsselspalte wählen —
+eine Id, ein Zeitstempel, ein Auto-Increment —, dazu ein Intervall, und die Seite liest sich in dieser
+Reihenfolge neu, das Neueste zuerst. **Zeilen, die seit dem letzten Lesen dazugekommen sind, werden
+eingefärbt**, ein Insert ist also sichtbar, ohne zwei Screenshots zu vergleichen.
+
+Angeboten werden nur Schlüsselspalten. Nach einem Fremdschlüssel zu sortieren und das Ergebnis
+„neueste“ zu nennen wäre eine Lüge, die die Färbung glaubhaft macht — die Liste bleibt also bei dem,
+was tatsächlich hochzählt.
+
+## Aus einer Datei eine neue Tabelle
+
+**New table from a file…** ist der andere Import: der für die CSV, die jemand geschickt hat, wo es noch
+keine Tabelle gibt. Datei wählen — ein Upload oder ein Objekt in einem [Bucket](storage.md), das dort
+gelesen wird, wo es liegt — und das Studio beschreibt sie zuerst: die gefundenen Spalten, welcher Typ
+daraus auf der Ziel-Engine wird, zehn Zeilen so, wie sie ankommen werden, und das `CREATE TABLE`
+selbst. Erzeugt wird nichts, bevor das gelesen ist. Verstanden werden Parquet, CSV, TSV, JSON und
+NDJSON; ein ganzes Prefix aus Dateien derselben Form gilt als eine Tabelle.
+
 ## Eine Tabelle durchsehen
 
 Eine mit Doppelklick geöffnete Tabelle hat dieselben Aktionen **Copy** und **Export** wie ein

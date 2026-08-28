@@ -79,16 +79,33 @@ offering a button that fails.
   dependencies, its `CREATE` statement, row-level security policies, and the partitions of a
   partitioned table.
 - **Following the data** — a column borrowed from the table a foreign key points at, shown next to
-  the id; and a perspective panel that opens one row into everything related to it, as deep as you
-  care to look.
+  the id; a perspective panel that opens one row into everything related to it, as deep as you care
+  to look; and a table followed on a timer, with the rows that are new since the last read tinted.
+- **Object storage** — S3, Azure Blob, Google Cloud Storage or a folder as a connection: containers
+  and prefixes in the tree, an object previewed, a Parquet, CSV or JSON file — or a whole prefix —
+  queried as a table through DuckDB, and a file turned into a real table in the database next to it.
+- **Documents** — what is actually inside a JSON or JSONB column: which paths exist, how often, with
+  which types and an example, plus the `SELECT` that flattens them into columns in this engine's own
+  spelling.
+- **Data quality** — rules about the rows rather than the catalogue: has a value, no duplicates, in
+  a range, points at a row that exists, is recent, or a condition of your own. Each one counts the
+  rows that break it, and a failing rule joins the health findings and the alert webhook.
+- **A development subset** — rows from one table, the rows they point at, and what is about people
+  replaced, written as one SQL script that loads into an empty database. Keys are never touched and
+  the same value always becomes the same pseudonym, so the tables still agree with each other.
 - **Analysis** — estimated and actual execution plans with a cost heat map, an index advisor that
   writes the `CREATE INDEX` for you, a deep analyze for missing, unused and duplicate indexes,
   table statistics, slow queries and server metrics.
 - **Comparison** — schema and data diffs between two connections, with a sync script in a diff
   editor.
 - **Administration** — maintenance commands, sessions, databases, users and privileges, server
-  logs, a dashboard that draws its numbers over half an hour rather than only the last reading, and
-  backup and restore through the engines' own tools with the format and flags they offer.
+  logs, scheduled jobs, a captured minute of what the server runs and what the index advisor makes
+  of it, how much every table grew since the studio last looked, a dashboard that draws its numbers
+  over half an hour rather than only the last reading, and backup and restore through the engines'
+  own tools with the format and flags they offer.
+- **Who may, and who did** — accounts in the environment, or a sign-in with the identity provider
+  you already have (Entra, Keycloak, Auth0, Okta) with its groups mapped to the studio's roles; and
+  an audit trail of every statement, export and refused request, readable by an admin.
 - **Diagrams** — an ER diagram per schema with automatic layout, a table picker, and PNG and SVG
   export.
 - **The shell** — a command palette on Ctrl+K, keyboard shortcuts with a help overlay and a new
@@ -124,6 +141,9 @@ Everything optional is off until it is configured, one group at a time:
 | Variables | What they turn on |
 |---|---|
 | `WDS_USERS` | several accounts, each with a role and the connections it may see |
+| `WDS_OIDC_AUTHORITY`, `WDS_OIDC_CLIENT_ID`, `WDS_OIDC_CLIENT_SECRET` | sign in with an identity provider instead |
+| `WDS_OIDC_ADMINS`, `WDS_OIDC_EDITORS`, `WDS_OIDC_VIEWERS`, `WDS_OIDC_DEFAULT_ROLE` | which of its groups get which studio role |
+| `WDS_AUDIT`, `WDS_AUDIT_DAYS` | who did what through this studio, and for how long that is kept |
 | `WDS_MASK_EXTRA`, `WDS_MASK_NEVER`, `WDS_MASK_DEFAULT` | which columns are masked before they leave the server |
 | `WDS_ASSIST_ENDPOINT`, `WDS_ASSIST_KEY`, `WDS_ASSIST_MODEL`, `WDS_ASSIST_TOOLS` | the optional assistant |
 | `WDS_MCP_ENABLED`, `WDS_MCP_PATH`, `WDS_MCP_KEY`, `WDS_MCP_ALLOW_WRITE`, `WDS_MCP_TOOLS` | the studio as an MCP server |

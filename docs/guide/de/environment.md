@@ -8,6 +8,10 @@
 | `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | Flags für die gleichnamige Verbindung |
 | `WDS_USER`, `WDS_PASSWORD` | sind **beide** gesetzt, schützt ein Login-Bildschirm die Anwendung |
 | `WDS_TITLE` | ein Name für dieses Studio; steht in der Kopfleiste, auf dem Login-Bildschirm und im Browser-Tab |
+| `WDS_OIDC_AUTHORITY`, `WDS_OIDC_CLIENT_ID`, `WDS_OIDC_CLIENT_SECRET` | Anmeldung über einen Identity-Provider statt über eine Liste von Konten |
+| `WDS_OIDC_SCOPES`, `WDS_OIDC_LABEL`, `WDS_OIDC_CALLBACK_PATH`, `WDS_OIDC_REQUIRE_HTTPS` | was beim Provider angefragt wird, was der Knopf sagt, wohin er zurückkommt, und ob seine Metadaten über einfaches http kommen dürfen |
+| `WDS_OIDC_ADMINS`, `WDS_OIDC_EDITORS`, `WDS_OIDC_VIEWERS`, `WDS_OIDC_DEFAULT_ROLE` | welche Gruppen, Rollen oder Adressen welche Studio-Rolle bekommen — und was alle anderen bekommen |
+| `WDS_AUDIT`, `WDS_AUDIT_DAYS` | wer über dieses Studio was getan hat, und wie lange das aufbewahrt wird |
 | `WDS_SECRET_KEY` | AES-Schlüssel (Base64, 32 Byte) für gespeicherte Geheimnisse; sonst wird `/data/.key` erzeugt |
 | `WDS_READONLY` | bei `true` ist jede Verbindung nur lesend, unabhängig von ihrem eigenen Flag |
 | `WDS_QUERY_TIMEOUT_SECONDS` | Standard-Timeout je Statement, Vorgabe `300` |
@@ -67,6 +71,37 @@ die Verbindung übersprungen — besser, als sie am falschen Treiber anzuhängen
 `readOnly` gilt im Treiber, nicht nur in der Oberfläche: ein Statement, das kein Lesen ist, wird
 abgelehnt, bevor es die Datenbank erreicht. `color` färbt die Zeile der Verbindung im Explorer —
 die billigste Art, einen Produktionsunfall zu verhindern.
+
+## Anmeldung über einen Provider
+
+```bash
+WDS_OIDC_AUTHORITY=https://login.microsoftonline.com/<tenant>/v2.0
+WDS_OIDC_CLIENT_ID=00000000-0000-0000-0000-000000000000
+WDS_OIDC_CLIENT_SECRET=...
+WDS_OIDC_LABEL='Mit Entra anmelden'
+WDS_OIDC_ADMINS=dba-group
+WDS_OIDC_EDITORS=developers
+```
+
+Authority und Client-Id gemeinsam — oder gar nichts: eine halbe Konfiguration würde alle aussperren,
+also gilt sie als kein Provider. Ist einer konfiguriert, ist die Tür auch zu: ein Studio mit Provider
+und ohne `WDS_USERS` ist kein offenes Studio mit einem Login-Knopf darauf. Die Redirect-URI, die beim
+Provider zu registrieren ist, lautet `https://<dein Studio>/signin-oidc`.
+
+`WDS_OIDC_ADMINS`, `WDS_OIDC_EDITORS` und `WDS_OIDC_VIEWERS` werden gegen die Claims `roles`, `role`,
+`groups` und `wids` und gegen Name, Adresse und UPN der Person geprüft — `WDS_OIDC_ADMINS=ada@example.com`
+funktioniert also auch in einem Tenant ohne Gruppen. Groß- und Kleinschreibung spielt keine Rolle;
+admin schlägt editor schlägt viewer. Wer nichts trifft, bekommt `WDS_OIDC_DEFAULT_ROLE`, per Vorgabe
+`viewer`.
+
+## Wer was getan hat
+
+`WDS_AUDIT=false` schaltet die Aufzeichnung ab, `WDS_AUDIT_DAYS` legt fest, wie lange eine Zeile
+bleibt (Vorgabe `90`). Aufgezeichnet wird eine Zeile pro Anfrage, die etwas geändert oder Daten aus
+dem Haus getragen hat — ein ausgeführtes Statement, ein Export, ein angewendeter Change, ein
+abgelehnter Zugriff — mit Person, Verbindung und Ergebnis. Zu lesen ist das im Tab **Audit** der
+Administration, der wie alles unter `/api/admin` die Admin-Rolle braucht. Anfragebodies werden nie
+mitgeschrieben: in einem Verbindungsbody steht ein Passwort.
 
 ## Geheimnisse
 

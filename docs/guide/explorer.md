@@ -88,6 +88,37 @@ the view readable while it rebuilds and needs a unique index on it; plain is fas
 Both come back as statements from the server, which knows how the engine spells it — Oracle's is
 `DBMS_MVIEW.REFRESH` — and refuses to build one for an object that is not a materialised view.
 
+## A development subset
+
+"I need production-like data" is usually answered with a full dump: too big to work with and too
+dangerous to keep on a laptop. **Development subset…** in a table's context menu answers it
+differently.
+
+It takes the rows you ask for — a few hundred, optionally with a `WHERE` — and then **follows the
+foreign keys upwards**: the customers those orders belong to, the countries those customers are in.
+That is what makes the result loadable; a subset whose foreign keys point at nothing is a text file.
+References to *children* are deliberately not followed — "every order for these customers" is a
+different and much larger question.
+
+What is about people is replaced: names, addresses, cities, phone numbers, free text. Two rules make
+that useful rather than merely safe:
+
+- **Keys are never touched.** Renaming an id would undo the work of following the references.
+- **The same value always becomes the same replacement**, so two tables that both name the customer
+  still agree. It cannot be turned back — a hash is not a cipher.
+
+Secrets — a column called `api_token`, `password`, `card_number` — are not made plausible. They are
+dropped, in a shape the column can still hold.
+
+The answer is one SQL script: `CREATE TABLE` for each table, parents before the tables that reference
+them, then the inserts. It opens in a query tab or downloads as a file, and it is exactly what
+`WDS_SEED_SQL` loads into a fresh container. What the subset could not do is written into the script
+as a comment: a multi-column foreign key it left out, a reference cycle that needs its constraints
+deferred, the table cap it stopped at.
+
+Turning the replacement off is allowed and says so, in the dialog and in the script's own header:
+that file is real data, and belongs wherever real data belongs.
+
 ## Panels
 
 Every panel is a dockview panel: drag it by its tab, drop it anywhere, split the group, and the

@@ -8,6 +8,14 @@ public sealed record HistoryEntry(long Id, string ConnectionId, string Sql,
     /// history panel would carry every snapshot it ever took.
     bool HasSnapshot);
 
+/// One line of the audit trail: who asked for what, and what came of it.
+public sealed record AuditEntry(long Id, DateTimeOffset At, string User, string Role,
+    string ConnectionId, string Action,
+    /// What the handler wanted written down — the statement, the key, the table. Empty where the
+    /// route says everything.
+    string Detail,
+    int Status, long ElapsedMs, string Address);
+
 public sealed record SavedQuery(string Id, string Name, string? Folder, string Sql,
     string? ConnectionId, DateTimeOffset UpdatedAt);
 
@@ -60,6 +68,21 @@ public sealed class WorkspaceStore
                 sampled_at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS ix_size_samples ON size_samples(connection_id, sampled_at);
+            -- Who did what through the studio. Not a second query history: one row per request that
+            -- changed something or took data out of the building.
+            CREATE TABLE IF NOT EXISTS audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                at TEXT NOT NULL,
+                user TEXT NOT NULL,
+                role TEXT NOT NULL,
+                connection_id TEXT NOT NULL,
+                action TEXT NOT NULL,
+                detail TEXT NOT NULL,
+                status INTEGER NOT NULL,
+                elapsed_ms INTEGER NOT NULL,
+                address TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_audit_time ON audit(id DESC);
             """);
 
         _connectionString = prepared.ConnectionString;
@@ -120,6 +143,72 @@ public sealed class WorkspaceStore
         cmd.Parameters.AddWithValue("$err", (object?)error ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$snap", (object?)snapshot ?? DBNull.Value);
         cmd.ExecuteNonQuery();
+    }
+
+    public void AddAudit(AuditEntry entry)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO audit (at, user, role, connection_id, action, detail, status, elapsed_ms, address)
+            VALUES ($at, $u, $r, $c, $a, $d, $s, $e, $ip)
+            """;
+        cmd.Parameters.AddWithValue("$at", entry.At.ToString("O"));
+        cmd.Parameters.AddWithValue("$u", entry.User);
+        cmd.Parameters.AddWithValue("$r", entry.Role);
+        cmd.Parameters.AddWithValue("$c", entry.ConnectionId);
+        cmd.Parameters.AddWithValue("$a", entry.Action);
+        cmd.Parameters.AddWithValue("$d", entry.Detail);
+        cmd.Parameters.AddWithValue("$s", entry.Status);
+        cmd.Parameters.AddWithValue("$e", entry.ElapsedMs);
+        cmd.Parameters.AddWithValue("$ip", entry.Address);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// The trail, newest first. `search` matches the action or the detail, which is how somebody
+    /// looks for "who dropped that" without knowing what the route was called.
+    public IReadOnlyList<AuditEntry> ListAudit(string? user, string? connectionId, string? search,
+        int limit)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, at, user, role, connection_id, action, detail, status, elapsed_ms, address
+            FROM audit
+            WHERE ($u IS NULL OR user = $u)
+              AND ($c IS NULL OR connection_id = $c)
+              AND ($q IS NULL OR action LIKE $q OR detail LIKE $q)
+            ORDER BY id DESC LIMIT $limit
+            """;
+        cmd.Parameters.AddWithValue("$u", string.IsNullOrWhiteSpace(user) ? DBNull.Value : user);
+        cmd.Parameters.AddWithValue("$c",
+            string.IsNullOrWhiteSpace(connectionId) ? DBNull.Value : connectionId);
+        cmd.Parameters.AddWithValue("$q",
+            string.IsNullOrWhiteSpace(search) ? DBNull.Value : $"%{search}%");
+        cmd.Parameters.AddWithValue("$limit", limit);
+
+        var entries = new List<AuditEntry>();
+        using var reader = cmd.ExecuteReader();
+
+        while (reader.Read())
+            entries.Add(new AuditEntry(
+                reader.GetInt64(0),
+                DateTimeOffset.Parse(reader.GetString(1)),
+                reader.GetString(2), reader.GetString(3), reader.GetString(4), reader.GetString(5),
+                reader.GetString(6), reader.GetInt32(7), reader.GetInt64(8), reader.GetString(9)));
+
+        return entries;
+    }
+
+    /// Drops what is older than the retention. A trail nobody trimmed is a file that grows until
+    /// somebody notices.
+    public int TrimAudit(int days)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "DELETE FROM audit WHERE at < $cutoff";
+        cmd.Parameters.AddWithValue("$cutoff", DateTimeOffset.UtcNow.AddDays(-days).ToString("O"));
+        return cmd.ExecuteNonQuery();
     }
 
     public IReadOnlyList<HistoryEntry> ListHistory(string? connectionId, string? search, int limit)

@@ -19,6 +19,7 @@ import { Jobs } from "./Jobs";
 import { Capture } from "./Capture";
 import { Growth } from "./Growth";
 import { Quality } from "./Quality";
+import { Audit } from "./Audit";
 import { runJob } from "../shell/jobs";
 import { formatBytes } from "../redis/format";
 
@@ -508,6 +509,7 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor, tab }:
         <Tabs.Tab value="databases">Databases</Tabs.Tab>
         <Tabs.Tab value="users">Users</Tabs.Tab>
         <Tabs.Tab value="studio-users">Studio users</Tabs.Tab>
+        <Tabs.Tab value="audit">Audit</Tabs.Tab>
         <Tabs.Tab value="backup">Backup</Tabs.Tab>
         <Tabs.Tab value="metrics">Metrics</Tabs.Tab>
         <Tabs.Tab value="slow">Slow queries</Tabs.Tab>
@@ -541,6 +543,7 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor, tab }:
       </Tabs.Panel>
       <Tabs.Panel value="users"><Users connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="studio-users"><StudioUsers /></Tabs.Panel>
+      <Tabs.Panel value="audit"><Audit connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="backup"><Backup connectionId={connectionId} database={database} /></Tabs.Panel>
       <Tabs.Panel value="overview"><Overview connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="metrics"><ServerMetrics connectionId={connectionId} /></Tabs.Panel>

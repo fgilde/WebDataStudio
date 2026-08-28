@@ -68,6 +68,12 @@ public static class ExportEndpoints
             catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
 
             var scope = body.Scope ?? "result";
+
+            // A file leaving the building is the line an audit trail is usually opened to find, so
+            // it says what left and whether the masking was asked to step aside.
+            Audit.Detail(ctx,
+                $"{format} ({scope})" + (body.IncludeSensitive == true ? ", sensitive included" : ""),
+                body.ConnectionId);
             if (scope == "schema" && !SchemaCapableFormats.Contains(format))
                 return Results.BadRequest(new
                 {

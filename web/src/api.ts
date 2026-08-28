@@ -1349,3 +1349,30 @@ export const runQualityRules = (conn: string):
   Promise<{ ran: number; failing: number; results: QualityResultDto[] }> =>
   fetch(`${base}/quality/${conn}/run`, { method: "POST" })
     .then(r => ok<{ ran: number; failing: number; results: QualityResultDto[] }>(r));
+
+/// One line of the audit trail: who asked for what, and what came of it.
+export interface AuditEntryDto {
+  id: number;
+  at: string;
+  user: string;
+  role: string;
+  connectionId: string;
+  action: string;
+  detail: string;
+  status: number;
+  elapsedMs: number;
+  address: string;
+}
+
+/// Who did what through this studio. Admin-only, like the rest of /api/admin.
+export const auditTrail = (query: { user?: string; conn?: string; search?: string; limit?: number }):
+  Promise<{ enabled: boolean; entries: AuditEntryDto[] }> => {
+  const params = new URLSearchParams();
+  if (query.user) params.set("user", query.user);
+  if (query.conn) params.set("conn", query.conn);
+  if (query.search) params.set("search", query.search);
+  if (query.limit) params.set("limit", String(query.limit));
+
+  return fetch(`${base}/admin/audit?${params}`)
+    .then(r => ok<{ enabled: boolean; entries: AuditEntryDto[] }>(r));
+};

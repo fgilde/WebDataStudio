@@ -143,6 +143,8 @@ builder.Services.AddSingleton(sp => new SessionPool(sp.GetRequiredService<IConfi
 builder.Services.AddSingleton<SchemaScope>();
 builder.Services.AddSingleton<EntraSignIn>();
 builder.Services.AddSingleton<SessionFactory>();
+builder.Services.AddSingleton(sp => AuditOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<AuditTrail>();
 builder.Services.AddSingleton<StatementCapture>();
 // Rules about the data rather than about the schema: each one counts the rows that break it.
 builder.Services.AddSingleton<WebDataStudio.Server.Analysis.QualityRunner>();
@@ -258,6 +260,10 @@ app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Before the guard rather than after it: a refused request is a line worth having, and by here it is
+// already known who was refused.
+app.UseAuditTrail();
 
 // The whole API needs a signed-in user when credentials are configured. Health and the auth
 // endpoints stay open so the SPA can load and log in; without credentials nothing is guarded.

@@ -58,6 +58,9 @@ public static class QueryEndpoints
             using var span = Telemetry.Span("query.execute");
             span?.SetTag("engine", driver.Info.Id);
 
+            // The route says a statement was run; only this knows which one and against what.
+            Audit.Detail(ctx, body.Sql, body.ConnectionId);
+
             var started = System.Diagnostics.Stopwatch.StartNew();
             var returned = 0L;
             var failed = false;

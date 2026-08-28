@@ -515,6 +515,17 @@ public static class AdminEndpoints
                     : Results.Ok(new { sql });
             }));
 
+        // --- who did what -----------------------------------------------------
+        // Under /api/admin, so the middleware that guards that prefix guards this too: a trail a
+        // viewer could read is a trail that tells them which tables are worth looking at.
+        app.MapGet("/api/admin/audit", (string? user, string? conn, string? search, int? limit,
+            AuditTrail trail) =>
+            Results.Ok(new
+            {
+                enabled = trail.Enabled,
+                entries = trail.List(user, conn, search, limit ?? 200),
+            }));
+
         // --- server logs ------------------------------------------------------
         app.MapGet("/api/admin/logs/{conn}", (string conn, int? lines, SessionFactory factory,
             CancellationToken ct) =>

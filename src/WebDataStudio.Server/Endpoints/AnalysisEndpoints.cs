@@ -120,6 +120,58 @@ public static class AnalysisEndpoints
 
     /// Describes only the tables the statement actually mentions, so the advisor never walks a
     /// whole catalogue to answer one query.
+    /// Whether a suggested index actually helps: the plan before it, the plan with it, and the index
+    /// dropped again.
+    public static void MapIndexTrialEndpoints(this WebApplication app)
+    {
+        app.MapPost("/api/analyze/{conn}/try-index", async (string conn, TryIndexRequest body,
+            HttpContext ctx, SessionFactory factory, ConnectionRegistry connections,
+            CancellationToken ct) =>
+        {
+            var spec = connections.Find(conn);
+
+            if (spec is null) return Results.NotFound(new { message = $"no connection '{conn}'" });
+
+            // Building an index takes locks and time on the table it is built over. "It was only a
+            // trial" is no comfort at 3am, so the two connections the studio refuses to write to are
+            // refused here as well.
+            if (spec.ReadOnly)
+                return Results.BadRequest(new
+                {
+                    message = "this connection is read-only, and a trial has to create the index to "
+                              + "measure it",
+                });
+
+            if (string.Equals(spec.Color, "red", StringComparison.OrdinalIgnoreCase))
+                return Results.BadRequest(new
+                {
+                    message = "this connection is marked as production. Building an index there takes "
+                              + "locks and time, so try it on a copy first.",
+                });
+
+            if (string.IsNullOrWhiteSpace(body.Sql) || string.IsNullOrWhiteSpace(body.Ddl))
+                return Results.BadRequest(new
+                {
+                    message = "give both the statement to plan and the CREATE INDEX to try",
+                });
+
+            Audit.Detail(ctx, $"tried an index: {body.Ddl}", conn);
+
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                    return Results.Ok(await IndexTrial.RunAsync(driver, session, body.Sql, body.Ddl, ct));
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+    }
+
+    public record TryIndexRequest(string Sql, string Ddl);
+
     /// Rules about the data rather than about the schema, and the results of running them.
     public static void MapQualityEndpoints(this WebApplication app)
     {

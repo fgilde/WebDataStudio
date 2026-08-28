@@ -519,6 +519,8 @@ it works for every engine whose capability set claims support for it.
 | F30.19 | A rule and a mask made out of the numbers |
 | F30.20 | Quality rules the deployment owns |
 | F30.21 | Which way a rule is going |
+| F30.22 | The rows kept before a statement takes all of them |
+| F30.23 | An index measured rather than claimed |
 
 ## 10. Safety behaviour
 

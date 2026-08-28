@@ -107,6 +107,34 @@ signed in as an admin:
 curl -sX POST http://localhost:8080/api/admin/studio-users/hash -H 'content-type: application/json' -d '{"password":"the password"}'
 ```
 
+## Kept before it goes
+
+The editor warns about a `DELETE` with no `WHERE` before it runs, and there is one step of undo for
+cell edits. Between those sits the case that ruins an afternoon: the statement ran, it took every
+row, and undo was never about statements.
+
+So for exactly the statements that take **everything** — a `DELETE` or an `UPDATE` with no `WHERE`, a
+`TRUNCATE` — the table is read into an [archive](results.md#archives) first, and the run says so in
+its messages:
+
+```
+3417 row(s) of orders were kept as the archive 'orders-before-20260828-141233'
+```
+
+An archive is a file the studio lists, reopens as a grid and scripts back out as inserts, which is
+what makes this a way back rather than a comfort.
+
+| Variable | Meaning |
+|---|---|
+| `WDS_SAFETY_NET` | `false` turns it off, for somebody who means it every time |
+| `WDS_SAFETY_MAX_ROWS` | how many rows are kept, default `20000` |
+
+Three decisions worth knowing. A statement **with** a `WHERE` keeps nothing: that one is somebody
+being specific, and reading a table nobody asked to read is its own kind of surprise. Masked columns
+stay masked in the copy, because the rule does not change when the reason is a good one. And a copy
+that could not be taken is said out loud before the statement runs, but it does not refuse the
+statement — `WDS_SAFETY_NET=false` is how to mean that.
+
 ## Signing in with an identity provider
 
 `WDS_USERS` is a list of accounts in a container's environment: fine for one team, wrong for an

@@ -588,6 +588,28 @@ export interface ServerStatsDto {
   blocking: { sessionId: string; blockedBy: string; query: string; waitMs: number }[];
 }
 
+/// What a suggested index did to the plan, measured with the index actually there and then dropped
+/// again.
+export interface IndexTrialDto {
+  index: string;
+  created: string;
+  before: PlanNodeDto;
+  after: PlanNodeDto;
+  costBefore: number | null;
+  costAfter: number | null;
+  /// "cheaper by 96%, and it stopped scanning the table", "no real difference — this index is not
+  /// the answer".
+  verdict: string;
+  /// The index the trial could not remove again. Null is the normal case.
+  leftBehind: string | null;
+}
+
+/// Creates the index, asks for the plan again, drops it. Refused on a read-only connection and on
+/// one marked as production, because building an index takes locks and time on the real table.
+export const tryIndex = (conn: string, sql: string, ddl: string): Promise<IndexTrialDto> =>
+  fetch(`${base}/analyze/${conn}/try-index`, json("POST", { sql, ddl }))
+    .then(r => ok<IndexTrialDto>(r));
+
 export const analyzeQuery = (connectionId: string, sql: string, actual = false): Promise<AnalyzeResultDto> =>
   fetch(`${base}/query/analyze`, json("POST", { connectionId, sql, actual }))
     .then(r => ok<AnalyzeResultDto>(r));

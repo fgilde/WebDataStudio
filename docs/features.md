@@ -217,3 +217,5 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F30.19 | A rule made out of what the numbers say is true today, and a column masked because its values gave it away | done | all | Profile tab |
 | F30.20 | Data quality rules the deployment owns, as JSON in the repository: they run, they report, and the studio cannot change them | done | all | `WDS_QUALITY_FILE`, data quality tab |
 | F30.21 | Which way a rule is going: every run kept as a measurement, and the direction rather than a mean | done | all | Data quality tab |
+| F30.22 | The rows kept as an archive before a statement that takes all of them, so a DELETE with no WHERE has a way back | done | all | Query editor, `WDS_SAFETY_NET` |
+| F30.23 | A suggested index measured rather than claimed: created, the plan asked again, and dropped | done | postgresql, mysql, sqlserver, sqlite, oracle, clickhouse | Plan panel, findings |

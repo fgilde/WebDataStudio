@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import {
-  ActionIcon, Badge, Button, Card, Code, Group, Loader, Modal, ScrollArea, SegmentedControl, Stack,
-  Tabs, Text, Tooltip,
+  ActionIcon, Alert, Badge, Button, Card, Code, Group, Loader, Modal, ScrollArea, SegmentedControl,
+  Stack, Tabs, Text, Tooltip,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { IconAlertTriangle, IconCopy, IconPlayerPlay, IconRefresh } from "@tabler/icons-react";
 import {
-  analyzeQuery, applyScript, previewScript,
-  type AnalyzeResultDto, type DdlPreviewDto, type PlanNodeDto,
+  analyzeQuery, applyScript, previewScript, tryIndex,
+  type AnalyzeResultDto, type DdlPreviewDto, type IndexTrialDto, type PlanNodeDto,
 } from "../api";
 import { heatColor } from "./heat";
 
@@ -19,6 +20,9 @@ export function PlanPanel({ connectionId, sql, onRunStatement }: {
   const [result, setResult] = useState<AnalyzeResultDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The suggested index being measured, and what the measurement said.
+  const [trying, setTrying] = useState<string | null>(null);
+  const [trial, setTrial] = useState<IndexTrialDto | null>(null);
 
   const load = async (next = mode) => {
     if (!sql.trim()) return;
@@ -88,6 +92,25 @@ export function PlanPanel({ connectionId, sql, onRunStatement }: {
             <ScrollArea h="100%">
               <Stack gap={6} p={6}>
                 {result.findings.length === 0 && <Text size="xs" c="dimmed">Nothing to report.</Text>}
+
+                {trial && (
+                  <Alert variant="light" p={8}
+                    color={trial.verdict.startsWith("cheaper") ? "green"
+                      : trial.verdict.startsWith("more expensive") ? "orange" : "gray"}>
+                    <Text size="xs" fw={600}>{trial.verdict}</Text>
+                    <Text size="xs" c="dimmed">
+                      {trial.before.operation} → {trial.after.operation}
+                      {trial.costBefore != null && trial.costAfter != null
+                        && `, cost ${Math.round(trial.costBefore)} → ${Math.round(trial.costAfter)}`}
+                    </Text>
+                    <Text size="10px" c="dimmed">
+                      The index was created as {trial.index} and dropped again.
+                    </Text>
+                    {trial.leftBehind && (
+                      <Text size="xs" c="red">{trial.leftBehind}</Text>
+                    )}
+                  </Alert>
+                )}
                 {result.findings.map((f, i) => (
                   <Card key={i} withBorder padding={8}>
                     <Group gap={6} mb={2}>
@@ -115,6 +138,21 @@ export function PlanPanel({ connectionId, sql, onRunStatement }: {
                               <IconPlayerPlay size={12} />
                             </ActionIcon>
                           </Tooltip>
+                        )}
+                        {/* An advisor claims; a trial measures. The index is created, the plan is
+                            asked again, and the index is dropped. */}
+                        {/CREATE\s+(UNIQUE\s+)?INDEX/i.test(f.statement) && (
+                          <Button size="compact-xs" variant="subtle" loading={trying === f.statement}
+                            onClick={() => {
+                              setTrying(f.statement!);
+                              setTrial(null);
+                              tryIndex(connectionId, sql, f.statement!)
+                                .then(setTrial)
+                                .catch(e => notifications.show({ color: "red", message: e.message }))
+                                .finally(() => setTrying(null));
+                            }}>
+                            Try it
+                          </Button>
                         )}
                       </Group>
                     )}

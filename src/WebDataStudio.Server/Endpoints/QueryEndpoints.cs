@@ -38,7 +38,8 @@ public static class QueryEndpoints
         });
 
         app.MapPost("/api/query/execute", async (ExecuteRequest body, HttpContext ctx,
-            SessionFactory factory, QueryRunner runner, MaskPolicyStore policies) =>
+            SessionFactory factory, QueryRunner runner, MaskPolicyStore policies,
+            Archives archives, SafetyOptions safety) =>
         {
             IDbDriver driver;
             IDbSession session;
@@ -81,6 +82,39 @@ public static class QueryEndpoints
 
             await using (session)
             {
+                // A statement that takes every row gets a copy of them first: the archive is a file
+                // the studio can list, reopen and script back out as inserts, which is the only
+                // undo a DELETE has ever had. Read on this session before the statement runs, so
+                // the order is "keep, then take" whatever happens next.
+                var kept = new List<KeptRows>();
+
+                if (safety.Enabled && archives.Available)
+                    try
+                    {
+                        var sweeping = SafetyNet.Sweeping(body.Sql, driver.Dialect);
+
+                        kept.AddRange(await SafetyNet.KeepAsync(driver, session, archives, policy,
+                            sweeping, safety, body.TimeoutSeconds ?? defaultTimeout, source.Token));
+
+                        foreach (var one in kept)
+                            await WriteAsync(ctx,
+                                Wire(new ResultChunk.Message(0, "info", one.Describe()), masked),
+                                source.Token);
+                    }
+                    catch (Exception e)
+                    {
+                        // A copy that could not be taken is worth saying so, and worth saying before
+                        // the statement runs — but it is not a reason to refuse a statement somebody
+                        // asked for. WDS_SAFETY_NET=false is how to mean it every time.
+                        await WriteAsync(ctx, Wire(new ResultChunk.Message(0, "warning",
+                            $"the rows could not be kept first: {e.Message}"), masked), source.Token);
+                    }
+
+                if (kept.Count > 0)
+                    Audit.Detail(ctx,
+                        body.Sql + "\n-- kept first: " + string.Join(", ", kept.Select(k => k.Archive)),
+                        body.ConnectionId);
+
                 try
                 {
                     await foreach (var chunk in driver.ExecuteAsync(session, request, source.Token))

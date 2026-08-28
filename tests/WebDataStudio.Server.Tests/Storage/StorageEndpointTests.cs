@@ -31,6 +31,12 @@ public class StorageEndpointTests : IAsyncLifetime
         // A PNG header: nothing about it should come back as text.
         await using (var image = new MemoryStream([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 1]))
             await store.WriteAsync("exports/logo.png", image, "image/png", Ct);
+
+        // A PDF is ASCII near the front, so the NUL test alone called it text and offered its object
+        // headers as a preview.
+        await using (var pdf = new MemoryStream(Encoding.ASCII.GetBytes(
+            "%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Size 1 >>\n%%EOF\n")))
+            await store.WriteAsync("docs/handbook.pdf", pdf, "application/pdf", Ct);
     }
 
     public async ValueTask DisposeAsync()
@@ -119,6 +125,21 @@ public class StorageEndpointTests : IAsyncLifetime
         Assert.Equal("name,age\nada,36\n", await response.Content.ReadAsStringAsync(Ct));
         Assert.Equal("people.csv", response.Content.Headers.ContentDisposition?.FileNameStar
                                    ?? response.Content.Headers.ContentDisposition?.FileName);
+    }
+
+    [Fact]
+    public async Task A_pdf_is_shown_rather_than_read_as_text()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var preview = JsonDocument.Parse(await client.GetStringAsync(
+            $"/api/storage/{id}/preview?ref=StorageObject:{Bucket}/docs/handbook.pdf", Ct)).RootElement;
+
+        Assert.True(preview.GetProperty("binary").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, preview.GetProperty("text").ValueKind);
+        Assert.Equal("application/pdf", preview.GetProperty("contentType").GetString());
     }
 
     [Fact]

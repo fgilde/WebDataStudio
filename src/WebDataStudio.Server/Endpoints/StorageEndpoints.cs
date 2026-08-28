@@ -244,9 +244,16 @@ public static class StorageEndpoints
             foreach (var textual in new[] { "json", "csv", "xml", "yaml", "javascript", "sql" })
                 if (contentType.Contains(textual, StringComparison.OrdinalIgnoreCase)) return true;
 
+            // Shown or downloaded, never read as text: a PDF is mostly ASCII near the front, and
+            // the NUL test below let its object headers through as a "preview" nobody wants.
             if (contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
                 || contentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase)
-                || contentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
+                || contentType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase)
+                || contentType.StartsWith("font/", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("pdf", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("zip", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("parquet", StringComparison.OrdinalIgnoreCase)
+                || contentType.Contains("octet-stream", StringComparison.OrdinalIgnoreCase))
                 return false;
         }
 

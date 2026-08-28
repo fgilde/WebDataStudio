@@ -794,6 +794,31 @@ export const searchData = (
   return fetch(`${base}/search/${conn}/data?${query}`).then(r => ok<DataSearchDto>(r));
 };
 
+export interface StatementStatsDto {
+  fingerprint: string;
+  example: string;
+  runs: number;
+  failures: number;
+  averageMs: number;
+  slowestMs: number;
+  fastestMs: number;
+  firstSeen: string;
+  lastSeen: string;
+  /// Recent runs against older ones, as a factor. Null where there is not enough history.
+  trend: number | null;
+}
+
+export const historyStats = (options?: { connectionId?: string; days?: number; top?: number }):
+  Promise<{ days: number; runs: number; statements: StatementStatsDto[] }> => {
+  const query = new URLSearchParams();
+  if (options?.connectionId) query.set("connectionId", options.connectionId);
+  if (options?.days) query.set("days", String(options.days));
+  if (options?.top) query.set("top", String(options.top));
+
+  return fetch(`${base}/history/stats?${query}`)
+    .then(r => ok<{ days: number; runs: number; statements: StatementStatsDto[] }>(r));
+};
+
 export interface ImportColumnDto { name: string; sourceType: string; targetType: string }
 
 export interface ImportPlanDto {

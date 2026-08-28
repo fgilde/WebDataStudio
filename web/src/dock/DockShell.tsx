@@ -201,8 +201,12 @@ function HistoryDockPanel() {
   const shell = useShell();
   const connectionId = shell.selection?.connectionId ?? shell.tabs[0]?.connectionId ?? "";
 
-  return <HistoryPanel onOpen={entry =>
-    shell.runStatement(entry.connectionId || connectionId, entry.sql)} />;
+  return (
+    <HistoryPanel connectionId={connectionId || undefined}
+      onOpen={entry => shell.runStatement(entry.connectionId || connectionId, entry.sql)}
+      // A statement from the statistics opens as a query rather than running by itself.
+      onOpenSql={sql => shell.runStatement(connectionId, sql)} />
+  );
 }
 
 function SavedQueriesDockPanel() {

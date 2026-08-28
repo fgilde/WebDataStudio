@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import {
-  ActionIcon, Group, Modal, ScrollArea, Text, TextInput, Tooltip, UnstyledButton,
+  ActionIcon, Group, Modal, ScrollArea, Tabs, Text, TextInput, Tooltip, UnstyledButton,
 } from "@mantine/core";
 import { IconAlertTriangle, IconPhoto, IconSearch } from "@tabler/icons-react";
 import { historySnapshot, listHistory, type HistoryEntryDto, type ResultSnapshot } from "../api";
 import { ResultGrid } from "../grid/ResultGrid";
+import { StatementStatsPanel } from "./StatementStatsPanel";
 
-export function HistoryPanel({ onOpen }: { onOpen: (entry: HistoryEntryDto) => void }) {
+export function HistoryPanel({ onOpen, connectionId, onOpenSql }: {
+  onOpen: (entry: HistoryEntryDto) => void;
+  /// Which connection the statistics are about. Absent means every connection.
+  connectionId?: string;
+  /// Opens one of the statements in a query tab.
+  onOpenSql?: (sql: string) => void;
+}) {
   const [entries, setEntries] = useState<HistoryEntryDto[]>([]);
   const [search, setSearch] = useState("");
   const [shown, setShown] = useState<{ entry: HistoryEntryDto; snapshot: ResultSnapshot } | null>(null);
@@ -28,6 +35,20 @@ export function HistoryPanel({ onOpen }: { onOpen: (entry: HistoryEntryDto) => v
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      {/* The runs themselves, and what they add up to: where the time goes and what got slower. */}
+      <Tabs defaultValue="runs" keepMounted={false} style={{ display: "flex", flexDirection: "column",
+        height: "100%", minHeight: 0 }}>
+        <Tabs.List>
+          <Tabs.Tab value="runs">Runs</Tabs.Tab>
+          <Tabs.Tab value="statistics">Statistics</Tabs.Tab>
+        </Tabs.List>
+
+        <Tabs.Panel value="statistics" style={{ flex: 1, minHeight: 0 }}>
+          <StatementStatsPanel connectionId={connectionId} onOpen={onOpenSql} />
+        </Tabs.Panel>
+
+        <Tabs.Panel value="runs" style={{ flex: 1, minHeight: 0, display: "flex",
+          flexDirection: "column" }}>
       <TextInput size="xs" m={4} placeholder="Search history" leftSection={<IconSearch size={13} />}
         value={search} onChange={e => setSearch(e.currentTarget.value)} />
 
@@ -58,6 +79,8 @@ export function HistoryPanel({ onOpen }: { onOpen: (entry: HistoryEntryDto) => v
         ))}
         {failure && <Text size="10px" c="red" p="xs">{failure}</Text>}
       </ScrollArea>
+        </Tabs.Panel>
+      </Tabs>
 
       <Modal opened={shown !== null} onClose={() => setShown(null)} size="90%"
         title={`Result kept ${shown ? new Date(shown.entry.executedAt).toLocaleString() : ""}`}>

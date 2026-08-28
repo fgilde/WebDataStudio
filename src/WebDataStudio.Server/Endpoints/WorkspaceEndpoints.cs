@@ -16,6 +16,29 @@ public static class WorkspaceEndpoints
         app.MapGet("/api/history", (string? connectionId, string? search, int? limit, WorkspaceStore store) =>
             Results.Ok(store.ListHistory(connectionId, search, Math.Clamp(limit ?? 200, 1, 2000))));
 
+        // What this connection actually spends its time on, and what changed. The history holds
+        // every run with its elapsed time and nobody reads it as a whole, because two thousand
+        // statements answer no question; grouped by fingerprint they answer two.
+        app.MapGet("/api/history/stats", (string? connectionId, int? days, int? top,
+            WorkspaceStore store) =>
+        {
+            var window = Math.Clamp(days ?? 30, 1, 365);
+            var since = DateTimeOffset.UtcNow.AddDays(-window);
+
+            // The window is applied here rather than in SQL: the history is bounded and the store's
+            // list is the one place that reads it.
+            var entries = store.ListHistory(connectionId, null, 5000)
+                .Where(entry => entry.ExecutedAt >= since)
+                .ToList();
+
+            return Results.Ok(new
+            {
+                days = window,
+                runs = entries.Count,
+                statements = QueryStats.Report(entries, top ?? 50),
+            });
+        });
+
         app.MapPost("/api/history", (HistoryRequest body, WorkspaceStore store) =>
         {
             if (body.Snapshot is { Length: > MaxSnapshotChars })

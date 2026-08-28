@@ -57,6 +57,7 @@ import {
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
 import { NewTableDialog } from "../import/NewTableDialog";
+import { SubsetDialog } from "../export/SubsetDialog";
 import type { DialectId } from "../sql/splitStatements";
 
 interface TabState {
@@ -469,6 +470,8 @@ export function DockShell() {
     source?: { storageConnection: string; objectRef: string; name: string };
   } | null>(null);
   const [copySource, setCopySource] = useState<{ connectionId: string; objectRef: string; label: string } | null>(null);
+  const [subsetTarget, setSubsetTarget] = useState<
+    { connectionId: string; schema: string; table: string } | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [snippetsOpen, setSnippetsOpen] = useState(false);
@@ -927,6 +930,12 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         });
         break;
 
+      case "dev-subset":
+        setSubsetTarget({
+          connectionId: s.connectionId, schema: schemaOf(s.node.ref), table: s.node.label,
+        });
+        break;
+
       case "grant-schema":
         setGrantTarget({ connectionId: s.connectionId, schema: s.node.label });
         break;
@@ -1252,6 +1261,9 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       )}
       <CopyTableDialog source={copySource} connections={connections}
         onClose={() => setCopySource(null)} />
+
+      <SubsetDialog target={subsetTarget} onClose={() => setSubsetTarget(null)}
+        onOpenInEditor={sql => newTab(subsetTarget?.connectionId ?? activeConnection, sql)} />
 
       <Modal opened={indexTarget !== null} onClose={() => setIndexTarget(null)} size="xl"
         title={indexTarget ? `Indexes of ${indexTarget.label}` : ""}>

@@ -11,6 +11,12 @@ public static class ExportEndpoints
         string ConnectionId, string? Sql, string? ObjectRef, string? Scope, string? Schema,
         int? MaxRows, ExportOptionsDto? Options, bool? IncludeSensitive = null);
 
+    /// What the browser sends for a subset. Everything but the table has a default, because a
+    /// person who only knows the table should still get a script.
+    public record SubsetRequestDto(
+        string Table, string? Schema, string? Where, int? Rows, bool? IncludeSchema,
+        bool? Anonymise, int? Depth);
+
     public record ExportOptionsDto(
         string? Delimiter, string? Encoding, bool? Header, string? NullText,
         string? DateFormat, bool? QuoteAll, string? TableName);
@@ -58,6 +64,40 @@ public static class ExportEndpoints
                     contentType = e.ContentType,
                     supportsSchemaScope = SchemaCapableFormats.Contains(e.Format),
                 })));
+
+        // A small, loadable, anonymised copy of a real database — the thing people ask a DBA for
+        // when they say "I need production-like data". It lives under /api/export because that is
+        // what it is: data leaving the building, audited and masked like every other export.
+        app.MapPost("/api/export/subset/{conn}", async (string conn, SubsetRequestDto body,
+            HttpContext ctx, SessionFactory factory, MaskPolicyStore policies, SubsetBuilder builder,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Table))
+                return Results.BadRequest(new { message = "which table should the subset start from?" });
+
+            Audit.Detail(ctx,
+                $"subset of {body.Table} ({body.Rows ?? 200} rows"
+                + (body.Anonymise == false ? ", NOT anonymised" : "") + ")", conn);
+
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var schema = await CompareEndpoints.ReadSchemaAsync(driver, session, body.Schema, ct);
+
+                    var result = await builder.BuildAsync(driver, session, schema,
+                        new SubsetRequest(body.Table, body.Schema, body.Where, body.Rows ?? 200,
+                            body.IncludeSchema ?? true, body.Anonymise ?? true, body.Depth ?? 4),
+                        policies.For(conn), ct);
+
+                    return Results.Ok(result);
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
 
         app.MapPost("/api/export/{format}", async (string format, ExportRequest body, HttpContext ctx,
             ExporterRegistry registry, SessionFactory factory, ConnectionRegistry connections,

@@ -204,6 +204,7 @@ builder.Services.AddSingleton<EntraSignIn>();
 builder.Services.AddSingleton<SessionFactory>();
 builder.Services.AddSingleton(sp => AuditOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<AuditTrail>();
+builder.Services.AddSingleton<SubsetBuilder>();
 builder.Services.AddSingleton<StatementCapture>();
 // Rules about the data rather than about the schema: each one counts the rows that break it.
 builder.Services.AddSingleton<WebDataStudio.Server.Analysis.QualityRunner>();

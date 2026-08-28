@@ -10,7 +10,7 @@ export type ExplorerAction =
   | "script-drop-index" | "script-reindex"
   | "script-drop-constraint"
   | "script-execute" | "script-refresh-matview" | "script-refresh-matview-live"
-  | "grant-schema" | "archive-table"
+  | "grant-schema" | "archive-table" | "dev-subset"
   // Object storage: the object itself rather than the rows in it.
   | "download-object" | "upload-object" | "delete-object" | "query-as-table" | "copy-uri"
   | "import-object";
@@ -44,6 +44,7 @@ const TABLE: ContextItem[] = [
   { action: "script-delete", label: "Script: DELETE" },
   { action: "export", label: "Export…", divider: true },
   { action: "archive-table", label: "Keep as archive…" },
+  { action: "dev-subset", label: "Development subset…" },
   { action: "import", label: "Import into this table…" },
   { action: "copy-table", label: "Copy to another connection…" },
   { action: "copy-name", label: "Copy name", divider: true },

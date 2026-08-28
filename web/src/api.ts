@@ -1379,3 +1379,23 @@ export const auditTrail = (query: { user?: string; conn?: string; search?: strin
   return fetch(`${base}/admin/audit?${params}`)
     .then(r => ok<{ enabled: boolean; entries: AuditEntryDto[] }>(r));
 };
+
+/// One table in a development subset.
+export interface SubsetTableDto {
+  schema: string; name: string; rows: number; statement: string;
+}
+export interface SubsetResultDto {
+  script: string;
+  tables: SubsetTableDto[];
+  rows: number;
+  /// What the subset could not do, in its own words: a multi-column foreign key it left out, a
+  /// cycle it had to break, a table it stopped at.
+  notes: string[];
+}
+
+/// A small, loadable, anonymised copy of a real database: these rows and the rows they point at.
+export const buildSubset = (conn: string, request: {
+  table: string; schema?: string; where?: string; rows?: number;
+  includeSchema?: boolean; anonymise?: boolean; depth?: number;
+}): Promise<SubsetResultDto> =>
+  fetch(`${base}/export/subset/${conn}`, json("POST", request)).then(r => ok<SubsetResultDto>(r));

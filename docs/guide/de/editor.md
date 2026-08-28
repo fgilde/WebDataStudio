@@ -35,6 +35,37 @@ Der Schalter **single transaction** in der Werkzeugleiste legt eine Transaktion 
 Skript: Commit, wenn jedes Statement erfolgreich war, Rollback beim ersten Fehler. Ausgeschaltet
 committet jedes Statement für sich, so wie die Engine es standardmäßig tut.
 
+## Eine Transaktion offen halten
+
+Der Schalter oben deckt ein Skript ab. **Begin** deckt den anderen Fall ab — den, in dem man sehen
+will, was ein Statement getan hat, *bevor* man sich entscheidet, es zu behalten.
+
+Auf **Begin** hält der Tab eine Transaktion auf einer eigenen Sitzung offen. Alles, was der Tab von
+da an ausführt, passiert darin: die Zeilen sind für dich geändert und für sonst niemanden, eine
+zweite Verbindung sieht weiterhin die alten. Die Werkzeugleiste zeigt `transaction · n run`, solange
+sie offen ist; **Commit** oder **Rollback** beenden sie. Das ist der Sicherheitsgurt für ein `UPDATE`
+ohne `WHERE`: ausführen, ansehen, was zurückkam, und zurückrollen, wenn die Zahl nicht stimmt.
+
+Drei Dinge, die man wissen sollte:
+
+- Die Transaktion hält eine Sitzung aus dem Pool fern, solange sie lebt, und sie hält die Sperren,
+  die ihre Statements genommen haben. Eine Transaktion, die niemand anfasst, rollt der Server nach
+  fünfzehn Minuten zurück — `WDS_TRANSACTION_IDLE_SECONDS` verschiebt diese Grenze. Ein einfach
+  geschlossener Browser endet genauso, und das ist besser als Sperren, die niemand findet.
+- Den Browser-Tab zu schließen, während eine offen ist, fragt vorher nach.
+- Engines ohne Transaktionen haben keinen Begin-Knopf: MongoDB, Redis und Objektspeicher.
+
+## Nach einem Fehler weitermachen
+
+**keep going on error** führt den Rest des Skripts auch dann aus, wenn ein Statement scheitert, und
+meldet jeden Fehler dort, wo er passiert ist. Aus — die Voreinstellung — hört beim ersten Fehler
+auf, was eine Migration will. An ist für das Skript mit hundert Inserts, bei dem zwei Duplikate
+nicht die anderen achtundneunzig kosten sollen.
+
+Innerhalb einer Transaktion gilt es nicht: ein gescheitertes Statement vergiftet die Transaktion bei
+den meisten Engines, PostgreSQL lehnt danach ohnehin alles ab — eine Transaktion hört deshalb immer
+auf.
+
 ## Parameter
 
 Bind-Variablen so schreiben, wie die Engine sie kennt — `:name` bei PostgreSQL und Oracle, `@name`

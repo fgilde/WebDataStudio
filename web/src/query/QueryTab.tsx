@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActionIcon, Group, Select, Switch, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Button, Group, Select, Switch, Text, Tooltip } from "@mantine/core";
 import {
-  IconPlayerPlay, IconPlayerStop, IconPlayerTrackNext, IconSparkles,
+  IconLock, IconPlayerPlay, IconPlayerStop, IconPlayerTrackNext, IconSparkles,
 } from "@tabler/icons-react";
+import { notifications } from "@mantine/notifications";
 import { AssistModal } from "../assist/AssistModal";
 import { QueryEditor } from "../editor/QueryEditor";
 import { describeDiff, diffRows } from "../grid/diffRows";
@@ -15,6 +16,9 @@ import { findParameters } from "../editor/parameters";
 import { ParameterDialog } from "../editor/ParameterDialog";
 import { InspectionDialog } from "./InspectionDialog";
 import { useUserSnippets } from "../editor/SnippetManager";
+import {
+  beginTransaction, commitTransaction, rollbackTransaction, type OpenTransactionDto,
+} from "./transaction";
 import type { DialectId } from "../sql/splitStatements";
 
 export interface QueryTabState { connectionId: string; dialect: DialectId; sql: string }
@@ -42,6 +46,11 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   const [snippets] = useUserSnippets();
   // Off means the engine's own auto-commit; on wraps the whole script in one transaction.
   const [transactional, setTransactional] = useState(false);
+  // A transaction this tab is holding open: BEGIN now, commit or roll back later, by hand.
+  const [held, setHeld] = useState<OpenTransactionDto | null>(null);
+  const [holding, setHolding] = useState(false);
+  // Keep running the rest of a script after one statement failed.
+  const [continueOnError, setContinueOnError] = useState(false);
   // Watch mode: re-run every N seconds and say what moved. Null is off.
   const [watchSeconds, setWatchSeconds] = useState<number | null>(null);
   const [changed, setChanged] = useState<ReadonlySet<string> | undefined>(undefined);
@@ -70,7 +79,10 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
     const started = performance.now();
 
     let state = createResultState();
-    const active = runQuery({ connectionId, sql: text, parameters, transactional }, chunk => {
+    const active = runQuery({
+      connectionId, sql: text, parameters, transactional, continueOnError,
+      transactionId: held?.id ?? null,
+    }, chunk => {
       state = applyChunk(state, chunk);
       setResult(state);
     });
@@ -117,7 +129,47 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
         snapshot,
       }).catch(() => {});
     }
-  }, [connectionId, transactional]);
+  }, [connectionId, transactional, continueOnError, held]);
+
+  /// Open a transaction, or close the one this tab holds. Both are deliberate: the whole point of
+  /// this mode is that nothing is written until somebody says so.
+  const hold = useCallback(async (what: "begin" | "commit" | "rollback") => {
+    setHolding(true);
+
+    try {
+      if (what === "begin") {
+        setHeld(await beginTransaction(connectionId));
+        notifications.show({ message: "transaction open — nothing is written until you commit" });
+        return;
+      }
+
+      if (!held) return;
+
+      if (what === "commit") await commitTransaction(held.id);
+      else await rollbackTransaction(held.id);
+
+      setHeld(null);
+      notifications.show({
+        color: what === "commit" ? "green" : "yellow",
+        message: what === "commit" ? "committed" : "rolled back",
+      });
+    } catch (e) {
+      notifications.show({ color: "red", message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setHolding(false);
+    }
+  }, [connectionId, held]);
+
+  // A tab that holds a transaction must not be closed by accident, and a browser that is closed
+  // outright leaves the server to roll it back on its own idle sweep.
+  useEffect(() => {
+    if (!held) return;
+
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [held]);
 
   // One run at a time: the next is scheduled when the previous finished, so a slow query cannot
   // pile up behind its own interval. An error stops the watch and says so.
@@ -192,8 +244,33 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
         </Tooltip>
         <Tooltip label="Run the whole script in one transaction and roll it back on the first error">
           <Switch size="xs" ml={6} label="single transaction" checked={transactional}
+            disabled={held !== null}
             onChange={e => setTransactional(e.currentTarget.checked)} />
         </Tooltip>
+        <Tooltip label="Keep running the rest of the script after a statement fails">
+          <Switch size="xs" ml={6} label="keep going on error" checked={continueOnError}
+            onChange={e => setContinueOnError(e.currentTarget.checked)} />
+        </Tooltip>
+
+        {/* The seatbelt: BEGIN now, look at what the statements did, then commit or roll back. */}
+        {held === null ? (
+          <Tooltip label="Open a transaction: nothing is written until you commit it">
+            <Button size="compact-xs" variant="default" ml={6} loading={holding}
+              leftSection={<IconLock size={13} />} onClick={() => hold("begin")}>
+              Begin
+            </Button>
+          </Tooltip>
+        ) : (
+          <Group gap={4} ml={6}>
+            <Badge size="sm" color="orange" variant="light">
+              transaction · {held.statements} run
+            </Badge>
+            <Button size="compact-xs" color="green" loading={holding}
+              onClick={() => hold("commit")}>Commit</Button>
+            <Button size="compact-xs" color="red" variant="light" loading={holding}
+              onClick={() => hold("rollback")}>Rollback</Button>
+          </Group>
+        )}
         {assistAvailable && (
           <Tooltip label="Explain this statement, or draft one from a question">
             <ActionIcon variant="subtle" aria-label="Ask about this query"

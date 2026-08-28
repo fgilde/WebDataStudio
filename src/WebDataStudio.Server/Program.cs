@@ -198,6 +198,10 @@ builder.Services.AddHttpClient("assist", client => client.Timeout = TimeSpan.Fro
 builder.Services.AddSingleton<DriverRegistry>();
 builder.Services.AddSingleton<TunnelManager>();
 builder.Services.AddSingleton(sp => new SessionPool(sp.GetRequiredService<IConfiguration>()));
+// Transactions a query tab holds open across requests. Singleton, because the session they
+// hold has to survive the request that opened it.
+builder.Services.AddSingleton(sp => new OpenTransactions(
+    sp.GetRequiredService<IConfiguration>(), sp.GetRequiredService<ILogger<OpenTransactions>>()));
 // An interactive Entra sign-in is per studio, not per request: the token it ends up with is what
 // the next connection uses.
 builder.Services.AddSingleton<SchemaScope>();

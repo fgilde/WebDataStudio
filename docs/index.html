@@ -105,6 +105,12 @@ docker run -d -p 8080:8080 -v wds-data:/data \
           columns, written in this engine's own spelling.</p>
       </div>
       <div class="card">
+        <h3>A seatbelt for the editor</h3>
+        <p>Hold a transaction open across statements: run the <code>UPDATE</code>, look at what it
+          did while nobody else can see it, then commit — or roll it back. The studio ends one
+          nobody came back to, so a closed browser never leaves locks behind.</p>
+      </div>
+      <div class="card">
         <h3>MongoDB and Redis in the same grid</h3>
         <p>No SQL, no problem: a collection is paged, sorted and filtered by the server with a
           <code>find</code>, and a Redis database is its keys with type, TTL, length and memory — a

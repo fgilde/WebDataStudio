@@ -8,6 +8,13 @@ public interface IDbSession : IAsyncDisposable
 {
     ConnectionSpec Spec { get; }
     DbConnection Connection { get; }
+
+    /// A transaction somebody opened on this session and will close themselves — the query tab's
+    /// transaction mode. A driver enlists its statements in it instead of opening one of its own,
+    /// and never commits or rolls it back: that is the caller's to do.
+    ///
+    /// Null on every engine that has no transactions, which is what the default says.
+    DbTransaction? Ambient { get => null; set { } }
 }
 
 /// A session that stands in front of another one — the pool and the SSH tunnel both do that.

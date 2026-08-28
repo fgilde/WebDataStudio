@@ -89,6 +89,10 @@ their expiry and their size, or a hash as field and value.
 - **Object storage** — S3, Azure Blob, Google Cloud Storage or a folder as a connection: containers
   and prefixes in the tree, an object previewed, a Parquet, CSV or JSON file — or a whole prefix —
   queried as a table through DuckDB, and a file turned into a real table in the database next to it.
+- **A seatbelt for the editor** — hold a transaction open across statements: run the `UPDATE`, look
+  at what it did while nobody else can see it, then commit or roll it back. Plus "keep going on
+  error" for the script of a hundred inserts, a pivot over the rows on screen, and the plan of a
+  statement held against the plan of its previous run.
 - **Schema changes, previewed** — a table designer, and editors for the objects a designer never
   covered: a view's `SELECT`, a procedure's or trigger's source, a sequence including the restart
   after an import wrote its own ids, schemas, and the description the database itself keeps. Every

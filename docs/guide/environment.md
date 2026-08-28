@@ -10,6 +10,7 @@
 | `WDS_USERS` | several accounts: `name:role:secret[:conn,conn]` entries separated by `;` — see [Safety](safety.md) |
 | `WDS_TITLE` | a name for this studio, shown in the header, on the login screen and in the browser tab |
 | `WDS_THEME` | the theme the studio comes up in, by id (`ocean`, `aspire`, `nord`, …). A person who picks another one keeps their choice; an id the studio does not have is ignored |
+| `WDS_TRANSACTION_IDLE_SECONDS` | how long a transaction a query tab holds open may sit untouched before the server rolls it back (default 900). A closed browser ends the same way |
 | `WDS_OIDC_AUTHORITY`, `WDS_OIDC_CLIENT_ID`, `WDS_OIDC_CLIENT_SECRET` | sign in with an identity provider instead of a list of accounts — see [Safety](safety.md#signing-in-with-an-identity-provider) |
 | `WDS_OIDC_SCOPES`, `WDS_OIDC_LABEL`, `WDS_OIDC_CALLBACK_PATH`, `WDS_OIDC_REQUIRE_HTTPS` | what to ask the provider for, what the button says, where it comes back to, and whether its metadata may be plain http |
 | `WDS_OIDC_ADMINS`, `WDS_OIDC_EDITORS`, `WDS_OIDC_VIEWERS`, `WDS_OIDC_DEFAULT_ROLE` | which groups, roles or addresses get which studio role, and what everybody else gets |

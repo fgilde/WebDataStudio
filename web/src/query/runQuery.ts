@@ -17,6 +17,12 @@ export interface QueryRequest {
   parameters?: Record<string, string | null>;
   /// Wraps the whole script in one transaction: commit at the end, rollback on the first error.
   transactional?: boolean;
+  /// A transaction this tab is holding open. The statements run inside it and nothing is committed
+  /// until somebody says so.
+  transactionId?: string | null;
+  /// Keep going after a statement fails. Off stops at the first error, which is what a migration
+  /// wants.
+  continueOnError?: boolean;
 }
 
 export interface QueryRun {

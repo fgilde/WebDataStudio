@@ -530,6 +530,9 @@ it works for every engine whose capability set claims support for it.
 | F30.30 | The theme a deployment starts in, without taking a person's own choice away |
 | F30.31 | Editors for the objects a table designer never covered: views, routines, triggers, sequences, schemas, descriptions |
 | F30.32 | Accounts and roles: who exists, who is in which role, what each may do, and every change as a statement first |
+| F30.33 | A transaction a query tab holds open: begin, look at what it did, commit or roll back |
+| F30.34 | Keep going after a failed statement, when that is what was asked for |
+| F30.35 | A pivot over the result on screen, and two plans of the same statement held against each other |
 
 ## 10. Safety behaviour
 

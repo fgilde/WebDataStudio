@@ -8,7 +8,15 @@ namespace WebDataStudio.Server.Endpoints;
 public static class QueryEndpoints
 {
     public record ExecuteRequest(string ConnectionId, string Sql, int? MaxRows, int? TimeoutSeconds,
-        string? Schema, Dictionary<string, string?>? Parameters, bool? Transactional = null);
+        string? Schema, Dictionary<string, string?>? Parameters, bool? Transactional = null,
+        /// A transaction this tab is holding open — see OpenTransactions. The statements run inside
+        /// it, and nothing is committed until somebody says so.
+        string? TransactionId = null,
+        /// Keep going after a statement fails, and report what failed at the end. Off by default:
+        /// stopping at the first error is what a migration wants.
+        bool? ContinueOnError = null);
+
+    public record BeginRequest(string ConnectionId);
 
     public record PlanRequest(string ConnectionId, string Sql, string Mode);
 
@@ -39,21 +47,40 @@ public static class QueryEndpoints
 
         app.MapPost("/api/query/execute", async (ExecuteRequest body, HttpContext ctx,
             SessionFactory factory, QueryRunner runner, MaskPolicyStore policies,
-            Archives archives, SafetyOptions safety) =>
+            Archives archives, SafetyOptions safety, OpenTransactions transactions) =>
         {
             IDbDriver driver;
             IDbSession session;
-            try
+
+            // A tab holding a transaction open runs on that session, and it is not disposed here:
+            // the transaction outlives the request, and closing it is a deliberate second call.
+            var held = body.TransactionId is { Length: > 0 } id ? transactions.Use(id, body.Sql) : null;
+
+            if (body.TransactionId is { Length: > 0 } && held is null)
+                return Results.Json(new
+                {
+                    message = "this transaction is not open any more; it was committed, rolled back "
+                              + "or timed out",
+                }, statusCode: StatusCodes.Status409Conflict);
+
+            if (held is { } open)
             {
-                (driver, session) = await factory.OpenAsync(body.ConnectionId, ctx.RequestAborted);
+                (driver, session) = (open.Driver, open.Session);
             }
-            catch (UnknownConnectionException e)
+            else
             {
-                return Results.NotFound(new { message = e.Message });
-            }
-            catch (Exception e)
-            {
-                return Results.Json(new { message = e.Message }, statusCode: 502);
+                try
+                {
+                    (driver, session) = await factory.OpenAsync(body.ConnectionId, ctx.RequestAborted);
+                }
+                catch (UnknownConnectionException e)
+                {
+                    return Results.NotFound(new { message = e.Message });
+                }
+                catch (Exception e)
+                {
+                    return Results.Json(new { message = e.Message }, statusCode: 502);
+                }
             }
 
             using var span = Telemetry.Span("query.execute");
@@ -72,7 +99,9 @@ public static class QueryEndpoints
 
             var request = new ScriptRequest(body.Sql, body.MaxRows ?? defaultMaxRows,
                 body.TimeoutSeconds ?? defaultTimeout, body.Schema, body.Parameters,
-                body.Transactional ?? false);
+                // A held transaction is already open, so the per-script one would nest.
+                body.Transactional == true && held is null,
+                body.ContinueOnError ?? false);
 
             // A query is the other way into the same data as the data tab, so it cannot be the way
             // around the mask policy. The columns chunk decides which indexes are hidden; the row
@@ -80,7 +109,8 @@ public static class QueryEndpoints
             var policy = policies.For(body.ConnectionId);
             var masked = new HashSet<int>();
 
-            await using (session)
+            // `await using` on a held session would hand it back to the pool mid-transaction.
+            await using (held is null ? session : null)
             {
                 // A statement that takes every row gets a copy of them first: the archive is a file
                 // the studio can list, reopen and script back out as inserts, which is the only
@@ -150,6 +180,59 @@ public static class QueryEndpoints
 
             return Results.Empty;
         });
+
+        // --- transactions somebody holds open ----------------------------------------------------
+        // Auto-commit stays the default. This is the other mode: BEGIN, look at what the statements
+        // did, then commit or roll the whole thing back.
+        app.MapPost("/api/tx/begin", async (BeginRequest body, SessionFactory factory,
+            OpenTransactions transactions, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(body.ConnectionId, ct);
+
+                try
+                {
+                    return Results.Ok(await transactions.BeginAsync(body.ConnectionId, driver, session, ct));
+                }
+                catch
+                {
+                    // Nothing was held, so the session goes straight back rather than leaking a slot.
+                    await session.DisposeAsync();
+                    throw;
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        app.MapPost("/api/tx/{id}/commit", async (string id, HttpContext ctx,
+            OpenTransactions transactions) =>
+        {
+            Audit.Detail(ctx, $"commit transaction {id}", transactions.Find(id)?.ConnectionId);
+
+            return await transactions.CommitAsync(id)
+                ? Results.Ok(new { committed = true })
+                : Results.NotFound(new { message = "this transaction is not open any more" });
+        });
+
+        app.MapPost("/api/tx/{id}/rollback", async (string id, HttpContext ctx,
+            OpenTransactions transactions) =>
+        {
+            Audit.Detail(ctx, $"roll back transaction {id}", transactions.Find(id)?.ConnectionId);
+
+            return await transactions.RollbackAsync(id)
+                ? Results.Ok(new { rolledBack = true })
+                : Results.NotFound(new { message = "this transaction is not open any more" });
+        });
+
+        // What is open right now, so a transaction cannot be forgotten quietly.
+        app.MapGet("/api/tx", (OpenTransactions transactions) => Results.Ok(new
+        {
+            idleTimeoutSeconds = (int)transactions.IdleTimeout.TotalSeconds,
+            open = transactions.All(),
+        }));
 
         // The schedule, what it last did, and a way to run one now. Absent state rather than an
         // error when no schedule file is configured: the UI can ask without knowing.

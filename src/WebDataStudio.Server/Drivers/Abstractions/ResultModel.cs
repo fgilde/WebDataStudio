@@ -25,7 +25,11 @@ public sealed record ScriptRequest(
     IReadOnlyDictionary<string, string?>? Parameters = null,
     /// Runs the whole script inside one transaction: it commits when every statement
     /// succeeded and rolls back on the first failure. Off is the engines' own auto-commit.
-    bool Transactional = false);
+    bool Transactional = false,
+    /// Keep running the statements after one of them fails. Off — the default — stops at the first
+    /// error, which is what a migration wants; on is for the script of a hundred inserts where two
+    /// duplicates should not cost the other ninety-eight.
+    bool ContinueOnError = false);
 
 public enum PlanMode { Estimated, Actual }
 

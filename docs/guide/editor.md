@@ -33,6 +33,36 @@ The **single transaction** switch in the toolbar wraps a whole script in one tra
 commits when every statement succeeded and rolls back on the first failure. Off, each statement
 commits on its own, the way the engine does by default.
 
+## Holding a transaction open
+
+The switch above covers one script. **Begin** covers the other case — the one where you want to see
+what a statement did *before* deciding to keep it.
+
+Press **Begin** and the tab holds a transaction open on its own session. Everything the tab runs
+from then on happens inside it: the rows are changed for you and for nobody else, and a second
+connection still sees the old ones. The toolbar says `transaction · n run` while it is open, and
+**Commit** or **Rollback** ends it. That is the seatbelt for `UPDATE` without a `WHERE`: run it,
+look at what came back, and roll it back when the number is wrong.
+
+Three things worth knowing:
+
+- The transaction keeps a session out of the pool while it lives, and it holds whatever locks its
+  statements took. A transaction nobody touches for fifteen minutes is rolled back by the server —
+  `WDS_TRANSACTION_IDLE_SECONDS` moves that line. A browser that is closed outright ends the same
+  way, which is better than locks nobody can find.
+- Closing the browser tab while one is open asks first.
+- Engines without transactions have no Begin button. MongoDB, Redis and object storage are those.
+
+## Keeping going after an error
+
+**keep going on error** runs the rest of the script after a statement fails, and reports each
+failure where it happened. Off — the default — stops at the first error, which is what a migration
+wants. On is for the script of a hundred inserts where two duplicates should not cost the other
+ninety-eight.
+
+Inside a transaction it does not apply: a failed statement poisons the transaction on most engines,
+and PostgreSQL refuses everything after it outright, so a transaction always stops.
+
 ## Parameters
 
 Write bind variables the way your engine spells them — `:name` for PostgreSQL and Oracle, `@name`

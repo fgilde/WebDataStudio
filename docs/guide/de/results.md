@@ -201,6 +201,20 @@ Das Spaltenmenü der Tabellenansicht listet außerdem die **vorhandenen Werte mi
 Checkboxen, häufigste zuerst. Angehakte Werte landen als `=a,=b` im Filterfeld — eine Art zu tippen,
 kein zweites Filter. Eine maskierte Spalte hat keine Liste: ihre Werte sind genau das Geheimnis.
 
+## Pivot
+
+Das Gitter beantwortet „was ist hier drin“, das Gruppieren „wie viele je Status“. **Pivot** ist die
+dritte Frage — „wie viele je Status *und Monat*“ — und sie wird über die Zeilen beantwortet, die
+schon auf dem Schirm sind, statt über ein `GROUP BY`, das man erst schreiben müsste.
+
+Eine Spalte für die Zeilen wählen, eine für die Spalten, und was mit den Zahlen passieren soll:
+Anzahl, Summe, Durchschnitt, kleinster, größter Wert. `Anzahl` braucht gar keine Wertspalte,
+deshalb ist es die Voreinstellung. Ein Wert, der keine Zahl ist, wird weggelassen statt als Null
+gezählt — ein Durchschnitt über „die mit einer Zahl“ ist eine Antwort, einer mit eingefalteten
+Nulls nicht. Null bekommt einen eigenen Namen, `(none)`, denn danach zu gruppieren ist eine echte
+Frage. Bei sechzig verschiedenen Spaltenwerten ist Schluss, und das steht da: ein Pivot mit
+neunhundert Spalten ist ein Scrollbalken, keine Antwort.
+
 ## Karte
 
 ![Die Kartenansicht](../../assets/screenshots/map-dark.png)

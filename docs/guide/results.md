@@ -73,6 +73,19 @@ common first, as checkboxes — the Excel-style filter. Ticking values writes th
 as `=a,=b`, so it is a way of typing rather than a second kind of filter, and it can be edited
 afterwards. A masked column has no list: the distinct values of a column of secrets are the secrets.
 
+## Pivot
+
+The grid answers "what is in here" and grouping answers "how many per status". **Pivot** is the
+third question — "how many per status *per month*" — and it is answered over the rows already on
+screen rather than by writing a `GROUP BY` first.
+
+Pick a column for the rows, one for the columns, and what to do with the numbers: how many, sum,
+average, smallest, largest. `count` needs no value column at all, which is why it is the default.
+A value that is not a number is left out rather than counted as zero — an average over "the ones
+that had a number" is an answer, one that folded nulls in is not. Null gets a name of its own,
+`(none)`, because grouping by it is a real question. The column field stops at sixty distinct
+values and says so: a pivot with nine hundred columns is a scroll bar, not an answer.
+
 ## Geography
 
 ![The map view](../assets/screenshots/map-dark.png)

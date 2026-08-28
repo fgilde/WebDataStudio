@@ -52,6 +52,20 @@ try {
 
 // --- create an index through the designer's index tab --------------------------------------
 const indexName = `ix_smoke_${Date.now()}`;
+
+// A run that failed part-way leaves its index behind, and a second index over the same column is
+// nothing to change — which would fail this check for the wrong reason. So every index this smoke
+// ever made is dropped first.
+{
+  const id = await connectionId();
+  const children = await (await page.request.get(
+    `${baseUrl}/api/schema/${id}?parent=${encodeURIComponent("Table:main/orders")}`)).json();
+
+  for (const leftover of children.filter(node => node.label.startsWith("ix_smoke_")))
+    await page.request.post(`${baseUrl}/api/query/execute`, {
+      data: { connectionId: id, sql: `DROP INDEX "${leftover.label}"` },
+    });
+}
 try {
   await page.getByText("Indexes…").first().click();
   await page.getByText(/^Indexes of/).waitFor({ timeout: 15000 });
@@ -90,7 +104,11 @@ if (!labels.includes(indexName)) {
 
 async function connectionId() {
   const response = await page.request.get(`${baseUrl}/api/connections`);
-  return (await response.json())[0].id;
+  const connections = await response.json();
+
+  // The demo database, not whichever connection happens to be first: a studio with a bucket attached
+  // lists that one too, and a bucket has no tables to index.
+  return (connections.find(c => c.name === "DEMO") ?? connections[0]).id;
 }
 
 await page.screenshot({ path: "smoke-tree.png" });

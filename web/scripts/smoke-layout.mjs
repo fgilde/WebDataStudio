@@ -38,12 +38,25 @@ check("the explorer has a tab of its own", await explorerTab.count() === 1);
 
 // The context menu belongs at the pointer, not at the right edge of the row that was clicked.
 {
-  const row = await page.getByText("DEMO", { exact: true }).boundingBox();
-  const x = Math.round(row.x + 20);
-  const y = Math.round(row.y + 5);
-  await page.mouse.click(x, y, { button: "right" });
-  await page.waitForTimeout(300);
-  const menu = await page.locator(".mantine-Popover-dropdown").first().boundingBox();
+  // A row that is still being drawn has no box, and the layout was reset a moment ago.
+  const demo = page.getByText("DEMO", { exact: true }).first();
+  await demo.waitFor({ state: "visible", timeout: 15000 });
+
+  const row = await demo.boundingBox();
+  // Playwright clicks the middle of the element, so that is the pointer this check compares against
+  // — a hand-picked offset lands on the edge of the row once the explorer has been dragged around.
+  const x = Math.round(row.x + row.width / 2);
+  const y = Math.round(row.y + row.height / 2);
+  await demo.click({ button: "right" });
+
+  // The dropdown is positioned after it mounts, so a box read too early is null.
+  // The one that is open: the app keeps other popovers mounted and hidden, and a hidden one has no
+  // position to compare against.
+  const dropdown = page.locator(".mantine-Popover-dropdown:visible").first();
+  await dropdown.waitFor({ state: "visible", timeout: 10000 });
+  await page.waitForTimeout(200);
+
+  const menu = await dropdown.boundingBox();
   check(`the menu opens at the pointer (${Math.round(menu.x)},${Math.round(menu.y)} vs ${x},${y})`,
     Math.abs(menu.x - x) < 30 && Math.abs(menu.y - y) < 40);
   await page.keyboard.press("Escape");

@@ -129,6 +129,35 @@ docker run -d -p 8080:8080 -v wds-data:/data \
           request leaves one line an admin can read.</p>
       </div>
       <div class="card">
+        <h3>What is in this column, counted</h3>
+        <p>Rows, empty values, distinct values, smallest and largest — per column, in one statement.
+          Plus the columns whose <em>values</em> look like an IBAN, a card number or an address,
+          which is how <code>col_17</code> gets found and masked.</p>
+      </div>
+      <div class="card">
+        <h3>An index measured, not claimed</h3>
+        <p>The advisor writes the <code>CREATE INDEX</code>; <b>Try it</b> creates it, asks the engine
+          for the plan again, and drops it. "The planner would probably use it" is the part everybody
+          gets wrong.</p>
+      </div>
+      <div class="card">
+        <h3>A way back from a DELETE</h3>
+        <p>A statement that takes every row reads the table into an archive first — a file the studio
+          can reopen and script back out as inserts. Undo was never about statements; now it is.</p>
+      </div>
+      <div class="card">
+        <h3>A saved query as a form</h3>
+        <p>Bind parameters become boxes, the link carries the values and runs by itself. "The numbers
+          for last month" is something to send rather than to explain — and it is reading only,
+          whatever the query says.</p>
+      </div>
+      <div class="card">
+        <h3>Notes where the object is</h3>
+        <p><code>COMMENT ON</code> needs a DDL right and a migration, so what somebody works out ends
+          up in a chat message. A note here has a name and a date and sits next to the table, the
+          view or the function it is about.</p>
+      </div>
+      <div class="card">
         <h3>For agents, on the studio's rules</h3>
         <p>An MCP endpoint with the same deal a person gets: masked columns stay masked, a read-only
           connection stays read-only, and a write is previewed and hashed before it runs.</p>

@@ -113,7 +113,15 @@ try {
   await page.keyboard.press("Escape");
   await page.getByText(/sorted by UserName/).waitFor({ timeout: 10000 });
 
-  const descending = (await firstUserName()).trim();
+  // "sorted by UserName" appears as soon as the sort is set; the rows arrive after it. Waiting for
+  // the value to change is the difference between a check and a coin flip.
+  let descending = ascending;
+
+  for (let attempt = 0; attempt < 20 && descending === ascending; attempt++) {
+    await page.waitForTimeout(250);
+    descending = (await firstUserName()).trim();
+  }
+
   if (ascending === descending)
     throw new Error(`sorting changed nothing: still ${descending}`);
 

@@ -89,6 +89,10 @@ function TreeLevel({ conn, parent, depth, caps, onSelect, onAction, onDropFiles 
     return () => { cancelled = true; };
   }, [conn, parent, nonce]);
 
+  // Which node a file is hovering over, so only that one lights up. Every hook belongs above the
+  // early returns below: a hook that runs only sometimes is React error #310.
+  const [dropOn, setDropOn] = useState<string | null>(null);
+
   const pad = depth * INDENT;
 
   if (error) return <Text c="red" size="xs" pl={pad + 8}>{error}</Text>;
@@ -98,9 +102,6 @@ function TreeLevel({ conn, parent, depth, caps, onSelect, onAction, onDropFiles 
   // schemas, folders or database numbers depending on the engine — never the tables somebody is
   // typing the name of.
   const visible = nodes;
-
-  // Which node a file is hovering over, so only that one lights up.
-  const [dropOn, setDropOn] = useState<string | null>(null);
 
   const act = (action: ExplorerAction, node: SchemaNodeDto) => {
     // Refreshing is this level's own business; everything else goes up to the shell.

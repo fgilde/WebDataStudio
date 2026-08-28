@@ -22,6 +22,11 @@ await page.request.put(`${baseUrl}/api/workspace/tabs`, { data: [] });
 await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByText("DEMO", { exact: true }).waitFor({ timeout: 20000 });
 
+// The demo database, said out loud: a studio with a bucket attached lists that one too, and the
+// panels open for whichever connection is active.
+await page.getByText("DEMO", { exact: true }).first().click();
+await page.waitForTimeout(400);
+
 // The tools live in one menu now, rendered by the header and by the explorer from the same
 // registry — the explorer's icon row was cut off at any sensible width.
 await page.getByRole("banner").getByRole("button", { name: "Tools" }).click();

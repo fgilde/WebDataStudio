@@ -23,6 +23,11 @@ await page.request.put(`${baseUrl}/api/workspace/tabs`, { data: [] });
 await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByText("DEMO", { exact: true }).waitFor({ timeout: 20000 });
 
+// The demo database, said out loud: a studio with a bucket attached lists that one too, and the
+// panels open for whichever connection is active.
+await page.getByText("DEMO", { exact: true }).first().click();
+await page.waitForTimeout(400);
+
 check(`version badge reads ${await page.getByLabel("Version").innerText()}`,
   /^v\d+\.\d+\./.test(await page.getByLabel("Version").innerText()));
 

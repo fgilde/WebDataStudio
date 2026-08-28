@@ -135,6 +135,36 @@ docker run -d -p 8080:8080 -v wds-data:/data \
           Statement, jeder Export und jeder abgelehnte Zugriff eine Zeile, die ein Admin liest.</p>
       </div>
       <div class="card">
+        <h3>Was in dieser Spalte steht, gezählt</h3>
+        <p>Zeilen, leere Werte, verschiedene Werte, kleinster und größter — je Spalte, in einem
+          Statement. Dazu die Spalten, deren <em>Werte</em> wie IBAN, Kartennummer oder Adresse
+          aussehen: so wird <code>col_17</code> gefunden und maskiert.</p>
+      </div>
+      <div class="card">
+        <h3>Ein Index gemessen, nicht behauptet</h3>
+        <p>Der Advisor schreibt das <code>CREATE INDEX</code>; <b>Try it</b> legt es an, fragt die
+          Engine erneut nach dem Plan und wirft es weg. „Der Planner würde ihn wohl nutzen" ist genau
+          der Teil, den alle falsch einschätzen.</p>
+      </div>
+      <div class="card">
+        <h3>Ein Weg zurück nach einem DELETE</h3>
+        <p>Ein Statement, das alle Zeilen nimmt, liest die Tabelle vorher in ein Archiv — eine Datei,
+          die das Studio wieder öffnen und als Inserts ausschreiben kann. Undo galt nie für
+          Statements; jetzt schon.</p>
+      </div>
+      <div class="card">
+        <h3>Eine gespeicherte Abfrage als Formular</h3>
+        <p>Bind-Parameter werden Felder, der Link trägt die Werte und läuft von selbst. „Die Zahlen
+          vom letzten Monat" ist damit etwas zum Verschicken statt zum Erklären — und es liest nur,
+          was auch immer die Abfrage sagt.</p>
+      </div>
+      <div class="card">
+        <h3>Notizen dort, wo das Objekt ist</h3>
+        <p><code>COMMENT ON</code> braucht ein DDL-Recht und eine Migration, also landet Erarbeitetes
+          in einer Chat-Nachricht. Eine Notiz hier hat Namen und Datum und steht neben der Tabelle,
+          dem View oder der Funktion, um die es geht.</p>
+      </div>
+      <div class="card">
         <h3>Für Agenten, nach den Regeln des Studios</h3>
         <p>Ein MCP-Endpunkt mit derselben Abmachung wie für Menschen: maskierte Spalten bleiben
           maskiert, eine nur-lesende Verbindung bleibt nur-lesend, und ein Schreibvorgang wird vorher

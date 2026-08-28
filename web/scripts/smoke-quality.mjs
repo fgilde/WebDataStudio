@@ -60,6 +60,11 @@ check("each result carries its counting statement",
 // --- the panel itself ----------------------------------------------------------------------------
 await page.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
 
+// The panel opens for whichever connection is active, and this studio may have several — so the one
+// the rules were written for is selected first.
+await page.getByText(demo.name, { exact: true }).first().click();
+await page.waitForTimeout(500);
+
 // The tools menu opens the administration panel; the tab is picked once it is open. Both the header
 // and the explorer carry the menu — the same registry rendered twice — so the header's is named.
 await page.getByRole("banner").getByRole("button", { name: "Tools" }).click();

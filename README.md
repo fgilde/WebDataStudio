@@ -89,7 +89,19 @@ offering a button that fails.
   spelling.
 - **Data quality** — rules about the rows rather than the catalogue: has a value, no duplicates, in
   a range, points at a row that exists, is recent, or a condition of your own. Each one counts the
-  rows that break it, and a failing rule joins the health findings and the alert webhook.
+  rows that break it, a failing rule joins the health findings and the alert webhook, every run is
+  kept so a rule says "worse by 7" rather than only today's count, and the rules a deployment owns
+  live in the repository as JSON.
+- **Profiling** — what a table actually holds, counted in one statement: rows, empty values, distinct
+  values, smallest and largest per column. Plus the columns whose values look like an email address,
+  an IBAN, a card number or a street address, which is how a column nobody named helpfully gets
+  masked — and one click turns any of it into a data quality rule.
+- **A way back** — a statement that takes every row reads the table into an archive first, and a
+  suggested index can be measured rather than trusted: created, the plan asked again, dropped.
+- **Reports** — a saved query with a connection is a form: its bind parameters are the boxes, the
+  link carries the values and runs by itself, and the answer downloads as a CSV. Reading only.
+- **Notes** — what somebody worked out about a table, kept next to the table: a name, a date and a
+  sentence, with no DDL right and no migration.
 - **A development subset** — rows from one table, the rows they point at, and what is about people
   replaced, written as one SQL script that loads into an empty database. Keys are never touched and
   the same value always becomes the same pseudonym, so the tables still agree with each other.

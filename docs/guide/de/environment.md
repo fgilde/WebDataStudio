@@ -8,6 +8,7 @@
 | `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | Flags für die gleichnamige Verbindung |
 | `WDS_USER`, `WDS_PASSWORD` | sind **beide** gesetzt, schützt ein Login-Bildschirm die Anwendung |
 | `WDS_TITLE` | ein Name für dieses Studio; steht in der Kopfleiste, auf dem Login-Bildschirm und im Browser-Tab |
+| `WDS_THEME` | das Theme, mit dem das Studio startet, per Id (`ocean`, `aspire`, `nord`, …). Wer selbst eines wählt, behält seine Wahl; eine unbekannte Id wird ignoriert |
 | `WDS_OIDC_AUTHORITY`, `WDS_OIDC_CLIENT_ID`, `WDS_OIDC_CLIENT_SECRET` | Anmeldung über einen Identity-Provider statt über eine Liste von Konten |
 | `WDS_OIDC_SCOPES`, `WDS_OIDC_LABEL`, `WDS_OIDC_CALLBACK_PATH`, `WDS_OIDC_REQUIRE_HTTPS` | was beim Provider angefragt wird, was der Knopf sagt, wohin er zurückkommt, und ob seine Metadaten über einfaches http kommen dürfen |
 | `WDS_OIDC_ADMINS`, `WDS_OIDC_EDITORS`, `WDS_OIDC_VIEWERS`, `WDS_OIDC_DEFAULT_ROLE` | welche Gruppen, Rollen oder Adressen welche Studio-Rolle bekommen — und was alle anderen bekommen |

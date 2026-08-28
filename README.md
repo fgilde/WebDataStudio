@@ -148,6 +148,7 @@ applies to; a test fails the build if that list falls behind.
 | `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | per-connection flags for the variable of the same name |
 | `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app; otherwise anonymous |
 | `WDS_TITLE` | a name for this studio, shown in the header and the browser tab; unset shows nothing |
+| `WDS_THEME` | the theme the studio comes up in, by id (`ocean`, `aspire`, `nord`, …); a person who picks another keeps their choice |
 | `WDS_SECRET_KEY` | AES key (base64, 32 bytes) for stored connection secrets; generated into `/data/.key` if absent |
 | `DB_PATH` | application SQLite database, default `/data/webdatastudio.db`; local storage only, never a network share |
 | `WDS_QUERY_TIMEOUT_SECONDS` | default statement timeout, default 300 |

@@ -100,7 +100,8 @@ public class AuthEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
     }
 
-    private record MeResponse(bool Anonymous, bool Authenticated, string? Username, string? Title);
+    private record MeResponse(bool Anonymous, bool Authenticated, string? Username, string? Title,
+        string? Theme);
 
     [Fact]
     public async Task Me_carries_the_studio_title_when_one_is_set()
@@ -121,6 +122,29 @@ public class AuthEndpointTests : IDisposable
 
         // Null, not an empty string: the header and the browser tab show nothing at all then.
         Assert.Null(body!.Title);
+    }
+
+    /// WithTheme in an Aspire stack, WDS_THEME anywhere else. The list of themes lives in the
+    /// client, so this only carries the id: an unknown one is the client's problem to ignore, not a
+    /// reason for the studio to refuse to start.
+    [Fact]
+    public async Task Me_carries_the_theme_the_deployment_asked_for()
+    {
+        using var factory = Factory(("WDS_THEME", "nord"));
+        var body = await factory.CreateClient()
+            .GetFromJsonAsync<MeResponse>("/api/auth/me", TestContext.Current.CancellationToken);
+
+        Assert.Equal("nord", body!.Theme);
+    }
+
+    [Fact]
+    public async Task A_blank_theme_counts_as_no_preference()
+    {
+        using var factory = Factory(("WDS_THEME", "  "));
+        var body = await factory.CreateClient()
+            .GetFromJsonAsync<MeResponse>("/api/auth/me", TestContext.Current.CancellationToken);
+
+        Assert.Null(body!.Theme);
     }
 
     [Fact]

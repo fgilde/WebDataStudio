@@ -45,6 +45,18 @@ auch die ohne Kürzel.
 begleiten dich in einen anderen Browser, statt in einem Local Storage zu wohnen: Zeilen pro Seite im
 Daten-Tab, ob ein Verlaufseintrag sein Ergebnis behält, und wie viele Zeilen davon.
 
+### Das Theme
+
+`Strg+T` schaltet durch die Themes, die Farbrolle in der Kopfleiste öffnet die ganze Liste mit
+Vorschau. Die Wahl gehört diesem Browser — zwei Leute am gleichen Studio können also Verschiedenes
+sehen.
+
+Ein Deployment kann sagen, wo es losgeht: `WDS_THEME=nord`, oder
+`WithTheme(WebDataStudioTheme.Nord)` in einem [Aspire-Stack](getting-started.md). Das ist ein
+Startpunkt, keine Festlegung: die eigene Wahl gewinnt und wird nie überschrieben, ein später
+geänderter Deployment-Standard erreicht also weiterhin alle, die nie selbst gewählt haben. Eine Id,
+die das Studio nicht hat, wird ignoriert — mit einer Zeile in der Browser-Konsole.
+
 Der Tab **Keyboard** listet jeden Befehl, den die Palette kennt. Bindung anklicken, gewünschte
 Kombination drücken, fertig; Escape behält die bisherige, und der Pfeil daneben stellt die
 eingebaute wieder her. Ein neu gebundener Befehl läuft von überall aus, und die eingebauten

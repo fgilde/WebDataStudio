@@ -59,6 +59,18 @@ to another browser rather than living in one machine's local storage.
 | Keep the result with each history entry | see [result snapshots in the history](results.md#history) |
 | Rows a snapshot keeps | how much of a result is kept when it is |
 
+### The theme
+
+`Ctrl+T` steps through the themes, and the paint-roller in the header opens the whole list with a
+preview of each. The choice is this browser's, so two people on the same studio can look at different
+things.
+
+A deployment can say where to start — `WDS_THEME=nord`, or `WithTheme(WebDataStudioTheme.Nord)` in an
+[Aspire stack](getting-started.md). It is a starting point rather than a lock: a person's own choice
+wins over it and is never overwritten, so raising the deployment's default later still reaches
+everybody who never picked one. An id the studio does not have is ignored, with a line in the
+browser's console.
+
 The **Keyboard** tab lists every command the palette knows. Click a binding, press the combination
 you want, and it is stored; Escape keeps the current one, and the arrow next to a changed binding
 puts the built-in one back. A rebound command works from anywhere in the studio, and the built-in

@@ -527,6 +527,7 @@ it works for every engine whose capability set claims support for it.
 | F30.27 | The profile and the notes as MCP tools |
 | F30.28 | The data tab on an engine with no SQL: a collection paged with a find, a key space paged as its keys |
 | F30.29 | What the engine could not do with a query, said in the footer rather than swallowed |
+| F30.30 | The theme a deployment starts in, without taking a person's own choice away |
 
 ## 10. Safety behaviour
 

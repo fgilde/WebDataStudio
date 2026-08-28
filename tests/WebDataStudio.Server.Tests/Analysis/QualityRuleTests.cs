@@ -141,6 +141,16 @@ public class QualityRuleSqlTests
         Assert.False(broken.Passed);
     }
 
+    [Theory]
+    [InlineData(5, 5, "unchanged")]
+    [InlineData(5, 0, "fixed")]
+    [InlineData(0, 3, "new")]
+    [InlineData(2, 9, "worse by 7")]
+    [InlineData(9, 2, "better by 7")]
+    public void A_count_over_time_is_a_direction(long first, long last, string expected) =>
+        // A mean over a month says nothing about the direction, which is the only thing anybody asks.
+        Assert.Equal(expected, QualityRules.Describe(first, last));
+
     [Fact]
     public void A_failing_rule_is_a_finding_the_alerts_already_understand()
     {
@@ -191,13 +201,14 @@ public class QualityRunnerTests : IAsyncLifetime
         TestDirectory.Remove(_dir);
     }
 
-    private WebApplicationFactory<Program> Factory() =>
+    private WebApplicationFactory<Program> Factory(string? rulesFile = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
             b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["DB_PATH"] = Path.Combine(_dir, "wds.db"),
+                ["DB_PATH"] = Path.Combine(_dir, $"wds-{rulesFile is null}.db"),
                 ["WDS_CONN_PG"] = _container.GetConnectionString(),
                 ["WDS_CONN_PG_ENGINE"] = "postgresql",
+                ["WDS_QUALITY_FILE"] = rulesFile,
             })));
 
     private static async Task<string> IdAsync(HttpClient client)
@@ -325,6 +336,94 @@ public class QualityRunnerTests : IAsyncLifetime
 
         var rules = JsonDocument.Parse(await client.GetStringAsync($"/api/quality/{id}", Ct));
         Assert.Empty(rules.RootElement.EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Every_run_is_a_measurement_the_history_keeps()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        await SaveAsync(client, id, new
+        {
+            id = "", connectionId = id, schema = "public", table = "orders",
+            column = "customer_id", kind = "NotNull", argument = (string?)null,
+            message = (string?)null, enabled = true,
+        });
+
+        // Twice, with a row fixed in between: the direction is the point of keeping the numbers.
+        await client.PostAsync($"/api/quality/{id}/run", null, Ct);
+
+        await using (var db = new NpgsqlConnection(_container.GetConnectionString()))
+        {
+            await db.OpenAsync(Ct);
+            await using var fix = db.CreateCommand();
+            fix.CommandText = "UPDATE orders SET customer_id = 1 WHERE customer_id IS NULL";
+            await fix.ExecuteNonQueryAsync(Ct);
+        }
+
+        await client.PostAsync($"/api/quality/{id}/run", null, Ct);
+
+        var history = await client.GetFromJsonAsync<JsonElement>($"/api/quality/{id}/history", Ct);
+        var rule = history.GetProperty("rules").EnumerateArray().First();
+
+        Assert.Equal(2, rule.GetProperty("runs").GetInt32());
+        Assert.Equal(1, rule.GetProperty("first").GetInt64());
+        Assert.Equal(0, rule.GetProperty("last").GetInt64());
+        Assert.Equal("fixed", rule.GetProperty("trend").GetString());
+        Assert.Equal("orders", rule.GetProperty("table").GetString());
+    }
+
+    [Fact]
+    public async Task A_rule_the_deployment_ships_runs_and_cannot_be_changed_here()
+    {
+        var rules = Path.Combine(_dir, "rules.json");
+
+        // The file names the connection the way a person does; the studio resolves it.
+        await File.WriteAllTextAsync(rules, """
+            [
+              {
+                "connection": "PG",
+                "schema": "public",
+                "table": "orders",
+                "column": "total",
+                "kind": "Range",
+                "argument": "0..1000",
+                "message": "an order total is never negative"
+              },
+              {
+                "connection": "NOT_HERE",
+                "table": "orders",
+                "column": "id",
+                "kind": "NotNull"
+              }
+            ]
+            """, Ct);
+
+        using var factory = Factory(rules);
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var listed = JsonDocument.Parse(await client.GetStringAsync($"/api/quality/{id}", Ct))
+            .RootElement.EnumerateArray().ToList();
+
+        // The rule for a connection this studio does not have is skipped, not fatal.
+        var shipped = Assert.Single(listed);
+        Assert.True(shipped.GetProperty("fromFile").GetBoolean());
+        Assert.Equal("an order total is never negative", shipped.GetProperty("message").GetString());
+
+        // And it runs like any other rule.
+        var report = await (await client.PostAsync($"/api/quality/{id}/run", null, Ct))
+            .Content.ReadFromJsonAsync<JsonElement>(Ct);
+
+        Assert.Equal(1, report.GetProperty("ran").GetInt32());
+        Assert.Equal(1, report.GetProperty("failing").GetInt32());
+
+        // But the studio does not own it.
+        var ruleId = shipped.GetProperty("id").GetString();
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest,
+            (await client.DeleteAsync($"/api/quality/{id}/{ruleId}", Ct)).StatusCode);
     }
 
     [Fact]

@@ -76,6 +76,35 @@ statement one click away in a query tab. A rule can be switched off without bein
 A failing rule also becomes a **health finding**, which means the [alert webhook](#alerts) carries it:
 a rule written once is watched from then on, without anybody opening the studio.
 
+**Which way it is going.** Every run is a measurement — one number per rule — so the *Since* column
+says `worse by 7`, `better by 3`, `fixed` or `unchanged` rather than only what today's count is. A
+mean over a month says nothing about the direction, which is the only thing anybody asks. The runs
+are kept in the workspace database with the rest of the studio's own state.
+
+**Rules the deployment owns.** Rules written here are workspace state; rules that belong to a
+deployment belong in the repository with the seed scripts and the export templates. `WDS_QUALITY_FILE`
+points at a JSON file, or a folder of them:
+
+```json
+[
+  {
+    "connection": "SHOP",
+    "schema": "public",
+    "table": "invoices",
+    "column": "customer_id",
+    "kind": "NotNull",
+    "message": "every invoice needs a customer"
+  }
+]
+```
+
+Each entry names its connection the way a person does — by name — and the studio resolves it. Those
+rules are marked **shipped**: they run and they report, and the studio cannot change or delete them.
+A rule for a connection this studio does not have is skipped with a line in the log rather than
+breaking the others, and a file that cannot be read leaves the rules somebody wrote here alone.
+
+From an Aspire app host that is `WithQualityRules("quality")`.
+
 ## Growth
 
 The databases tab draws the sizes as a treemap, and underneath it the same tables ordered by *how much

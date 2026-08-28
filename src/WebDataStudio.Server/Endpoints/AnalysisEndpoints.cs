@@ -143,8 +143,54 @@ public static class AnalysisEndpoints
 
         app.MapDelete("/api/quality/{conn}/{id}", (string conn, string id, QualityRunner rules) =>
         {
-            rules.Delete(id);
-            return Results.NoContent();
+            try
+            {
+                rules.Delete(id);
+                return Results.NoContent();
+            }
+            catch (InvalidOperationException e) { return Results.BadRequest(new { message = e.Message }); }
+        });
+
+        // What each rule counted, over time. A rule's answer is a count, and a count over time is the
+        // difference between "twelve rows are wrong" and "it is getting worse".
+        app.MapGet("/api/quality/{conn}/history", (string conn, int? days, QualityRunner rules,
+            WorkspaceStore workspace) =>
+        {
+            var window = Math.Clamp(days ?? 30, 1, 365);
+
+            if (!workspace.Available)
+                return Results.Ok(new { days = window, rules = Array.Empty<object>() });
+
+            var runs = workspace.ListQualityRuns(conn, DateTimeOffset.UtcNow.AddDays(-window));
+            var known = rules.For(conn).ToDictionary(rule => rule.Id);
+
+            return Results.Ok(new
+            {
+                days = window,
+                rules = runs
+                    .GroupBy(run => run.RuleId)
+                    .Select(group => new
+                    {
+                        ruleId = group.Key,
+                        table = known.TryGetValue(group.Key, out var rule) ? rule.Table : null,
+                        column = known.TryGetValue(group.Key, out var named) ? named.Column : null,
+                        kind = known.TryGetValue(group.Key, out var kind) ? kind.Kind.ToString() : null,
+                        runs = group.Count(),
+                        first = group.First().Violations,
+                        last = group.Last().Violations,
+                        worst = group.Max(run => run.Violations),
+                        // Better, worse or the same: the sentence somebody actually needs.
+                        trend = QualityRules.Describe(group.First().Violations, group.Last().Violations),
+                        points = group.Select(run => new
+                        {
+                            at = run.At,
+                            run.Violations,
+                            failed = run.Error is { Length: > 0 },
+                        }),
+                    })
+                    .OrderByDescending(entry => entry.last)
+                    .ToList(),
+            });
         });
 
         app.MapPost("/api/quality/{conn}/run", async (string conn, QualityRunner rules,

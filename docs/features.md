@@ -212,3 +212,8 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F30.14 | Save as… — the person picks the folder and the name, and the file is streamed into it rather than through memory | done | storage | Object menu, structure panel |
 | F30.15 | A whole prefix downloaded as one zip, streamed, with whatever stopped the walk written into the archive itself | done | storage | Explorer, folder menu |
 | F30.16 | A file dragged onto the tree: into a bucket folder as an upload, into a table as rows, into a schema as a new table | done | all | Explorer |
+| F30.17 | What a table actually holds, counted in one statement: rows, empty values, distinct values, smallest and largest, per column | done | all | Structure panel, profile tab |
+| F30.18 | Which columns look like they hold something personal, read from a sample of the values rather than from the column's name | done | all | Profile tab |
+| F30.19 | A rule made out of what the numbers say is true today, and a column masked because its values gave it away | done | all | Profile tab |
+| F30.20 | Data quality rules the deployment owns, as JSON in the repository: they run, they report, and the studio cannot change them | done | all | `WDS_QUALITY_FILE`, data quality tab |
+| F30.21 | Which way a rule is going: every run kept as a measurement, and the direction rather than a mean | done | all | Data quality tab |

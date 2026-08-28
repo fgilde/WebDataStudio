@@ -5,8 +5,8 @@ import {
 } from "@mantine/core";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import {
-  deleteQualityRule, qualityRules, runQualityRules, saveQualityRule,
-  type QualityResultDto, type QualityRuleDto,
+  deleteQualityRule, qualityHistory, qualityRules, runQualityRules, saveQualityRule,
+  type QualityHistoryDto, type QualityResultDto, type QualityRuleDto,
 } from "../api";
 
 /// What each kind needs written in the argument box, and what it means. The placeholder is the
@@ -36,6 +36,7 @@ export function Quality({ connectionId, onOpenInEditor }: {
   onOpenInEditor?: (sql: string) => void;
 }) {
   const [rules, setRules] = useState<QualityRuleDto[] | null>(null);
+  const [history, setHistory] = useState<QualityHistoryDto[]>([]);
   const [results, setResults] = useState<QualityResultDto[] | null>(null);
   const [draft, setDraft] = useState<QualityRuleDto>(() => empty(connectionId));
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +46,9 @@ export function Quality({ connectionId, onOpenInEditor }: {
   // and the last run go with it rather than being cleared here.
   useEffect(() => {
     qualityRules(connectionId).then(setRules).catch(e => setError(e.message));
+    // What the rules counted before today. Missing history is not an error: a rule that has never
+    // run has nothing to say about its direction.
+    qualityHistory(connectionId, 30).then(past => setHistory(past.rules)).catch(() => setHistory([]));
   }, [connectionId]);
 
   const reload = () => qualityRules(connectionId).then(setRules).catch(e => setError(e.message));
@@ -60,7 +64,11 @@ export function Quality({ connectionId, onOpenInEditor }: {
     setBusy(true);
     setError(null);
     runQualityRules(connectionId)
-      .then(report => setResults(report.results))
+      .then(report => {
+        setResults(report.results);
+        // This run is part of the history now, so the trend column moves with it.
+        return qualityHistory(connectionId, 30).then(past => setHistory(past.rules));
+      })
       .catch(e => setError(e.message))
       .finally(() => setBusy(false));
   };
@@ -128,18 +136,25 @@ export function Quality({ connectionId, onOpenInEditor }: {
           <Table.Thead>
             <Table.Tr>
               <Table.Th>Table</Table.Th><Table.Th>Column</Table.Th><Table.Th>Rule</Table.Th>
-              <Table.Th>Result</Table.Th><Table.Th w={60}>On</Table.Th><Table.Th w={40} />
+              <Table.Th>Result</Table.Th><Table.Th w={110}>Since</Table.Th>
+              <Table.Th w={60}>On</Table.Th><Table.Th w={40} />
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
             {rules?.map(rule => {
               const result = resultFor(rule.id);
+              const past = history.find(entry => entry.ruleId === rule.id);
 
               return (
                 <Table.Tr key={rule.id}>
                   <Table.Td>{rule.schema ? `${rule.schema}.${rule.table}` : rule.table}</Table.Td>
                   <Table.Td>{rule.column || "—"}</Table.Td>
                   <Table.Td>
+                    {rule.fromFile && (
+                      <Tooltip label="From the deployment's own file (WDS_QUALITY_FILE)">
+                        <Badge size="xs" color="gray" variant="light" mr={4}>shipped</Badge>
+                      </Tooltip>
+                    )}
                     {KINDS[rule.kind].label}
                     {rule.argument ? <Text span c="dimmed"> ({rule.argument})</Text> : null}
                     {/* The sentence somebody wrote is the point of the rule; a table that only
@@ -167,7 +182,21 @@ export function Quality({ connectionId, onOpenInEditor }: {
                       )}
                   </Table.Td>
                   <Table.Td>
-                    <Switch size="xs" checked={rule.enabled}
+                    {/* Where a rule has run before: better, worse or the same. A mean would say
+                        nothing about the direction, which is the only thing anybody asks. */}
+                    {past === undefined
+                      ? <Text c="dimmed">—</Text>
+                      : <Tooltip label={`${past.runs} runs, worst ${past.worst}`}>
+                          <Badge size="xs" variant="light"
+                            color={past.trend.startsWith("worse") ? "red"
+                              : past.trend === "fixed" || past.trend.startsWith("better") ? "green"
+                              : "gray"}>
+                            {past.trend}
+                          </Badge>
+                        </Tooltip>}
+                  </Table.Td>
+                  <Table.Td>
+                    <Switch size="xs" checked={rule.enabled} disabled={rule.fromFile === true}
                       aria-label={`Enable ${rule.table}.${rule.column} ${rule.kind}`}
                       onChange={e => saveQualityRule(connectionId,
                         { ...rule, enabled: e.currentTarget.checked })
@@ -175,6 +204,7 @@ export function Quality({ connectionId, onOpenInEditor }: {
                   </Table.Td>
                   <Table.Td>
                     <ActionIcon size="sm" variant="subtle" color="red"
+                      disabled={rule.fromFile === true}
                       aria-label={`Delete rule for ${rule.table}`}
                       onClick={() => deleteQualityRule(connectionId, rule.id)
                         .then(reload).catch(err => setError(err.message))}>

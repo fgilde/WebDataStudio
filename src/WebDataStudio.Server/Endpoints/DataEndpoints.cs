@@ -32,6 +32,89 @@ public static class DataEndpoints
         // Azure Container Apps, and most others — decodes %2F back to a real slash before routing.
         // The route then no longer matches and every object lookup answered 404 in the cloud while
         // working on a machine with nothing in front of it.
+        // What a table actually holds, counted rather than guessed: rows, how many of them have a
+        // value in each column, how many different ones, the smallest and the largest — and, from a
+        // sample of the values, which columns look like they hold something personal.
+        app.MapGet("/api/data/{conn}/profile", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, int? sample, SessionFactory factory,
+            MaskPolicyStore policies, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var target = SchemaEndpoints.ParseObjectRef(objectRef);
+                    var detail = await driver.DescribeAsync(session, target, ct);
+
+                    if (driver.FromClause(session, target) is not { } from)
+                        return Results.BadRequest(new { message = "this object cannot be read" });
+
+                    var columns = detail.Columns
+                        .Select(column => new ColumnMeta(column.Name, column.DataType, column.Nullable))
+                        .ToList();
+
+                    // No columns is not an empty profile: it is an object that is not there, or one
+                    // this engine cannot describe. Saying so beats a page of zeroes.
+                    if (columns.Count == 0)
+                        return Results.BadRequest(new
+                        {
+                            message = $"there is nothing to profile in {target.Name}",
+                        });
+
+                    var (stats, note) = await Analysis.ColumnProfile.ReadAsync(session, driver.Dialect,
+                        from, columns, ct);
+
+                    var hints = await Analysis.ColumnProfile.SniffAsync(session, driver.Dialect, from,
+                        columns, sample ?? Analysis.ColumnProfile.DefaultSample, ct);
+
+                    var policy = policies.For(conn);
+
+                    return Results.Ok(new
+                    {
+                        note,
+                        rows = stats.Count > 0 ? stats[0].Rows : 0,
+                        columns = stats.Select(stat => new
+                        {
+                            stat.Name,
+                            stat.DataType,
+                            stat.NonNull,
+                            stat.Nulls,
+                            stat.NullPercent,
+                            stat.Distinct,
+                            stat.Min,
+                            stat.Max,
+                            stat.Unique,
+                            stat.Constant,
+                            // What the studio already hides, so a hint about a column that is
+                            // already masked can say so instead of repeating itself.
+                            masked = SensitiveColumns.ShouldMask(stat.Name, policy),
+                        }),
+                        // Read from the values, which is what the name heuristic cannot do.
+                        hints = hints.Select(hint => new
+                        {
+                            hint.Column,
+                            hint.Looks,
+                            hint.Matches,
+                            hint.Sampled,
+                            hint.Percent,
+                            masked = SensitiveColumns.ShouldMask(hint.Column, policy),
+                        }),
+                        suggestions = Analysis.ColumnProfile.Suggest(stats).Select(suggestion => new
+                        {
+                            suggestion.Column,
+                            kind = suggestion.Kind.ToString(),
+                            suggestion.Argument,
+                            suggestion.Why,
+                        }),
+                    });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
         // What is actually inside a JSON column: which paths exist, how often, with which types.
         // A JSONB column is one cell of text in the grid otherwise, and reading one row of it is a
         // guess.

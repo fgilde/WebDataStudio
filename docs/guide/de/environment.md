@@ -22,6 +22,7 @@
 | `WDS_DUCKDB_EXTENSION_DIR` | wo DuckDBs Speicher-Erweiterungen liegen, im Image `/opt/duckdb/extensions` |
 | `WDS_CONN_<NAME>_SCHEMAS` | nur diese Schemas dieser Verbindung lesen — siehe [Objektspeicher](storage.md) und den Explorer |
 | `WDS_EXPORT_TEMPLATES_DIR` | Ordner mit Export-Templates, die die Bereitstellung mitbringt — siehe [Ergebnisse und Export](results.md) |
+| `WDS_QUALITY_FILE` | Datenqualitätsregeln, die zur Bereitstellung gehören, als JSON — siehe [Administration](administration.md) |
 | `WDS_MAX_SESSIONS` | offene Sitzungen je Verbindung, Vorgabe `8` |
 | `WDS_IDLE_TIMEOUT_SECONDS` | wie lange eine ungenutzte Sitzung offen bleibt, Vorgabe `300` |
 | `WDS_OPEN_BROWSER` | `true` öffnet beim Start einen Browser (Vorgabe der Desktop-Builds) |

@@ -208,6 +208,8 @@ builder.Services.AddSingleton<AuditTrail>();
 builder.Services.AddSingleton<SubsetBuilder>();
 builder.Services.AddSingleton<StatementCapture>();
 // Rules about the data rather than about the schema: each one counts the rows that break it.
+builder.Services.AddSingleton(sp => WebDataStudio.Server.Analysis.QualityFileOptions
+    .FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<WebDataStudio.Server.Analysis.QualityRunner>();
 // A file becomes a table: DuckDB reads it, the target engine's DDL writer creates it.
 builder.Services.AddSingleton<WebDataStudio.Server.Import.ImportService>();

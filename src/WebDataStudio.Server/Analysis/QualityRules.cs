@@ -23,6 +23,23 @@ public enum QualityKind
     Expression,
 }
 
+/// Where the rules a deployment ships live, if anywhere.
+///
+/// Rules written in the studio are workspace state. Rules that belong to a deployment belong in the
+/// repository with the seed scripts and the export templates: `WDS_QUALITY_FILE` points at a JSON
+/// file (or a folder of them), and what it holds is read-only here — the studio runs those rules and
+/// cannot change them, the same deal a mounted export template gets.
+public sealed record QualityFileOptions(bool Configured, string Path)
+{
+    public static QualityFileOptions FromConfiguration(IConfiguration config)
+    {
+        var path = config["WDS_QUALITY_FILE"]?.Trim();
+        return string.IsNullOrEmpty(path)
+            ? new QualityFileOptions(false, "")
+            : new QualityFileOptions(true, path);
+    }
+}
+
 /// One rule somebody wrote about their data.
 public sealed record QualityRule(
     string Id,
@@ -36,7 +53,9 @@ public sealed record QualityRule(
     string? Argument,
     /// What to say when it fails. A default is written where nobody said.
     string? Message,
-    bool Enabled = true);
+    bool Enabled = true,
+    /// True for a rule the deployment ships: it runs, and the studio cannot change or delete it.
+    bool FromFile = false);
 
 /// What a rule found.
 public sealed record QualityResult(
@@ -180,6 +199,18 @@ public static class QualityRules
             ? argument
             : throw new FormatException($"this rule needs {what}");
 
+    /// Better, worse or the same, in words. The first and the last measurement of a window: a mean
+    /// over a month says nothing about the direction, which is the only thing anybody asks.
+    public static string Describe(long first, long last) => last == first
+        ? "unchanged"
+        : last == 0
+            ? "fixed"
+            : first == 0
+                ? "new"
+                : last > first
+                    ? $"worse by {last - first}"
+                    : $"better by {first - last}";
+
     /// A rule as an analysis finding, so what watches the health report also watches the data.
     public static AnalyzeFinding AsFinding(QualityResult result) => new(
         "data-quality",
@@ -195,7 +226,9 @@ public static class QualityRules
 /// The rules are workspace state like a layout or an export template: text the studio keeps. Running
 /// them is one counting query each, so a hundred rules are a hundred cheap queries rather than a
 /// framework.
-public sealed class QualityRunner(WorkspaceStore workspace, SessionFactory factory)
+public sealed class QualityRunner(
+    WorkspaceStore workspace, SessionFactory factory, QualityFileOptions file,
+    ConnectionRegistry connections, ILogger<QualityRunner> log)
 {
     private const string Key = "quality-rules";
 
@@ -204,17 +237,93 @@ public sealed class QualityRunner(WorkspaceStore workspace, SessionFactory facto
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
-    public IReadOnlyList<QualityRule> All() =>
+    /// Every rule: the ones written here, and the ones the deployment ships.
+    public IReadOnlyList<QualityRule> All() => [.. Saved(), .. FromFile()];
+
+    private List<QualityRule> Saved() =>
         workspace.LoadItem(Key) is { Length: > 0 } json
             ? JsonSerializer.Deserialize<List<QualityRule>>(json, Json) ?? []
             : [];
+
+    /// What the deployment mounted, read every time rather than cached: a file that changed while
+    /// the container ran should take effect, and reading a few kilobytes is cheaper than explaining
+    /// why it did not.
+    ///
+    /// The file names connections the way a person does — by name — so each one is resolved against
+    /// the registry. A rule for a connection this studio does not have is skipped with a line in the
+    /// log rather than failing every other rule.
+    private List<QualityRule> FromFile()
+    {
+        if (!file.Configured) return [];
+
+        var rules = new List<QualityRule>();
+
+        try
+        {
+            var paths = File.Exists(file.Path)
+                ? [file.Path]
+                : Directory.Exists(file.Path)
+                    ? Directory.GetFiles(file.Path, "*.json").OrderBy(name => name).ToArray()
+                    : Array.Empty<string>();
+
+            foreach (var path in paths)
+                foreach (var entry in JsonSerializer.Deserialize<List<QualityFileRule>>(
+                             File.ReadAllText(path), Json) ?? [])
+                {
+                    if (entry.Table is null or { Length: 0 }) continue;
+
+                    var spec = connections.All().FirstOrDefault(candidate =>
+                        candidate.Id.Equals(entry.Connection, StringComparison.OrdinalIgnoreCase)
+                        || candidate.Name.Equals(entry.Connection, StringComparison.OrdinalIgnoreCase));
+
+                    if (spec is null)
+                    {
+                        log.LogWarning(
+                            "the quality rule for {Table} names connection {Connection}, "
+                            + "which this studio does not have", entry.Table, entry.Connection);
+                        continue;
+                    }
+
+                    rules.Add(new QualityRule(
+                        // Stable across restarts, so its history is one series rather than a new one
+                        // every time the container comes up.
+                        $"file:{spec.Id}:{entry.Table}:{entry.Column}:{entry.Kind}",
+                        spec.Id,
+                        entry.Schema ?? "",
+                        entry.Table,
+                        entry.Column ?? "",
+                        entry.Kind,
+                        entry.Argument,
+                        entry.Message,
+                        entry.Enabled ?? true,
+                        FromFile: true));
+                }
+        }
+        catch (Exception e)
+        {
+            // A broken file must not take the rules somebody wrote in the studio with it.
+            log.LogWarning(e, "could not read the quality rules from {Path}", file.Path);
+        }
+
+        return rules;
+    }
+
+    /// What the mounted file holds. The connection is named rather than identified, because a
+    /// deployment writes names and the studio makes the ids.
+    private sealed record QualityFileRule(
+        string Connection, string? Schema, string Table, string? Column, QualityKind Kind,
+        string? Argument, string? Message, bool? Enabled);
 
     public IReadOnlyList<QualityRule> For(string connectionId) =>
         All().Where(rule => rule.ConnectionId == connectionId).ToList();
 
     public void Save(QualityRule rule)
     {
-        var rules = All().ToList();
+        if (rule.FromFile)
+            throw new InvalidOperationException(
+                "this rule comes from the deployment's own file and cannot be changed here");
+
+        var rules = Saved().ToList();
         rules.RemoveAll(existing => existing.Id == rule.Id);
         rules.Add(rule);
 
@@ -223,7 +332,11 @@ public sealed class QualityRunner(WorkspaceStore workspace, SessionFactory facto
 
     public void Delete(string id)
     {
-        var rules = All().Where(rule => rule.Id != id).ToList();
+        if (id.StartsWith("file:", StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                "this rule comes from the deployment's own file and cannot be deleted here");
+
+        var rules = Saved().Where(rule => rule.Id != id).ToList();
         workspace.SaveItem(Key, JsonSerializer.Serialize(rules, Json));
     }
 
@@ -261,6 +374,19 @@ public sealed class QualityRunner(WorkspaceStore workspace, SessionFactory facto
                     results.Add(new QualityResult(rule, 0, statement, DateTimeOffset.UtcNow,
                         e.Message));
                 }
+            }
+
+        // Every run is a measurement: one number per rule per run, so "the violations are going up"
+        // is a question the history can answer rather than a feeling.
+        if (workspace.Available && results.Count > 0)
+            try
+            {
+                workspace.AddQualityRuns(connectionId, results.Select(result =>
+                    (result.Rule.Id, result.Violations, result.Error)));
+            }
+            catch (Exception e)
+            {
+                log.LogWarning(e, "could not record the quality run");
             }
 
         // What is broken first: a list that opens on the passes is a list nobody reads twice.

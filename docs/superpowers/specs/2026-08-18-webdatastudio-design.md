@@ -514,6 +514,11 @@ it works for every engine whose capability set claims support for it.
 | F30.14 | Save as, streamed to where it was asked for |
 | F30.15 | A folder taken with you, as one zip |
 | F30.16 | A file dropped where it belongs |
+| F30.17 | What a table actually holds, counted |
+| F30.18 | A column the values gave away |
+| F30.19 | A rule and a mask made out of the numbers |
+| F30.20 | Quality rules the deployment owns |
+| F30.21 | Which way a rule is going |
 
 ## 10. Safety behaviour
 

@@ -7,12 +7,14 @@ const qualityRules = vi.fn();
 const saveQualityRule = vi.fn();
 const deleteQualityRule = vi.fn();
 const runQualityRules = vi.fn();
+const qualityHistory = vi.fn();
 
 vi.mock("../api", () => ({
   qualityRules: (...args: unknown[]) => qualityRules(...args),
   saveQualityRule: (...args: unknown[]) => saveQualityRule(...args),
   deleteQualityRule: (...args: unknown[]) => deleteQualityRule(...args),
   runQualityRules: (...args: unknown[]) => runQualityRules(...args),
+  qualityHistory: (...args: unknown[]) => qualityHistory(...args),
 }));
 
 const { Quality } = await import("./Quality");
@@ -35,6 +37,7 @@ describe("Quality", () => {
     saveQualityRule.mockReset().mockResolvedValue(rule());
     deleteQualityRule.mockReset().mockResolvedValue(undefined);
     runQualityRules.mockReset();
+    qualityHistory.mockReset().mockResolvedValue({ days: 30, rules: [] });
   });
 
   it("says there are no rules rather than showing an empty table", async () => {
@@ -158,6 +161,41 @@ describe("Quality", () => {
 
     await waitFor(() => expect(deleteQualityRule).toHaveBeenCalledWith("c1", "r1"));
     await waitFor(() => expect(screen.getByText(/No rules yet/)).toBeTruthy());
+  });
+
+  it("marks a rule the deployment ships, and does not offer to change it", async () => {
+    qualityRules.mockResolvedValue([rule({ fromFile: true })]);
+
+    draw();
+
+    await waitFor(() => expect(screen.getByText("shipped")).toBeTruthy());
+    expect(screen.getByLabelText("Delete rule for orders").hasAttribute("disabled")).toBe(true);
+    expect(screen.getByLabelText("Enable orders.customer_id NotNull").hasAttribute("disabled"))
+      .toBe(true);
+  });
+
+  it("says which way a rule is going, where it has run before", async () => {
+    qualityRules.mockResolvedValue([rule()]);
+    qualityHistory.mockResolvedValue({
+      days: 30,
+      rules: [{
+        ruleId: "r1", table: "orders", column: "customer_id", kind: "NotNull",
+        runs: 4, first: 2, last: 9, worst: 9, trend: "worse by 7", points: [],
+      }],
+    });
+
+    draw();
+
+    await waitFor(() => expect(screen.getByText("worse by 7")).toBeTruthy());
+  });
+
+  it("and a rule that has never run says nothing about its direction", async () => {
+    qualityRules.mockResolvedValue([rule()]);
+
+    draw();
+
+    await waitFor(() => expect(screen.getByText("public.orders")).toBeTruthy());
+    expect(screen.getByText("—")).toBeTruthy();
   });
 
   it("shows why a run failed", async () => {

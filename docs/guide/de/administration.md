@@ -78,6 +78,36 @@ sie zu löschen.
 Eine fehlschlagende Regel wird außerdem ein **Health-Finding** — der Alert-Webhook trägt sie also
 mit: eine einmal geschriebene Regel wird von da an beobachtet, ohne dass jemand das Studio öffnet.
 
+**In welche Richtung es geht.** Jeder Lauf ist eine Messung — eine Zahl pro Regel —, deshalb sagt die
+Spalte *Since* `worse by 7`, `better by 3`, `fixed` oder `unchanged` und nicht nur, was heute gezählt
+wurde. Ein Mittelwert über einen Monat sagt nichts über die Richtung, und die ist das Einzige, was
+jemand fragt.
+
+**Regeln, die zur Bereitstellung gehören.** Im Studio geschriebene Regeln sind Workspace-Zustand;
+Regeln, die zur Bereitstellung gehören, gehören ins Repository — zu den Seed-Skripten und
+Export-Templates. `WDS_QUALITY_FILE` zeigt auf eine JSON-Datei oder einen Ordner davon:
+
+```json
+[
+  {
+    "connection": "SHOP",
+    "schema": "public",
+    "table": "invoices",
+    "column": "customer_id",
+    "kind": "NotNull",
+    "message": "every invoice needs a customer"
+  }
+]
+```
+
+Jeder Eintrag benennt seine Verbindung so, wie ein Mensch es tut — beim Namen —, und das Studio löst
+sie auf. Diese Regeln sind als **shipped** markiert: sie laufen und melden, und das Studio kann sie
+nicht ändern oder löschen. Eine Regel für eine Verbindung, die dieses Studio nicht hat, wird mit
+einer Zeile im Log übersprungen, statt die anderen mitzunehmen; und eine unlesbare Datei lässt die
+hier geschriebenen Regeln in Ruhe.
+
+Aus einem Aspire-AppHost ist das `WithQualityRules("quality")`.
+
 ## Wachstum
 
 Der Tab „Datenbanken“ zeichnet die Größen als Treemap und darunter dieselben Tabellen, geordnet

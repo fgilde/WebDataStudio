@@ -496,6 +496,54 @@ export const previewUndo = (conn: string, ref: string): Promise<ChangePreviewDto
 
 export interface MaskPolicyDto { maskByDefault: boolean; extra: string[]; never: string[] }
 
+/// What one column actually holds, counted rather than guessed.
+export interface ProfileColumnDto {
+  name: string;
+  dataType: string;
+  nonNull: number;
+  nulls: number;
+  nullPercent: number;
+  /// Null for a type the engine refuses to group by — a blob, a geometry.
+  distinct: number | null;
+  min: string | null;
+  max: string | null;
+  unique: boolean;
+  constant: boolean;
+  masked: boolean;
+}
+
+/// A column the sampled values gave away, whatever it is called.
+export interface ProfileHintDto {
+  column: string;
+  looks: string;
+  matches: number;
+  sampled: number;
+  percent: number;
+  masked: boolean;
+}
+
+export interface ProfileSuggestionDto {
+  column: string;
+  kind: string;
+  argument: string | null;
+  why: string;
+}
+
+export interface ProfileDto {
+  note: string | null;
+  rows: number;
+  columns: ProfileColumnDto[];
+  hints: ProfileHintDto[];
+  suggestions: ProfileSuggestionDto[];
+}
+
+/// The numbers behind a table, and what they suggest: one statement for the counts, a sample of the
+/// rows for the patterns.
+export const profileObject = (conn: string, ref: string, sample?: number): Promise<ProfileDto> =>
+  fetch(`${base}/data/${conn}/profile?${refQuery(ref,
+    sample ? new URLSearchParams({ sample: String(sample) }) : undefined)}`)
+    .then(r => ok<ProfileDto>(r));
+
 export const getMaskPolicy = (conn: string): Promise<MaskPolicyDto> =>
   fetch(`${base}/data/${conn}/mask-policy`).then(r => ok<MaskPolicyDto>(r));
 
@@ -1334,6 +1382,24 @@ export interface QualityRuleDto {
   argument: string | null;
   message: string | null;
   enabled: boolean;
+  /// True for a rule the deployment ships in WDS_QUALITY_FILE: it runs, and the studio cannot change
+  /// or delete it.
+  fromFile?: boolean;
+}
+
+/// What one rule has counted over time.
+export interface QualityHistoryDto {
+  ruleId: string;
+  table: string | null;
+  column: string | null;
+  kind: string | null;
+  runs: number;
+  first: number;
+  last: number;
+  worst: number;
+  /// unchanged, fixed, new, "worse by 7", "better by 7".
+  trend: string;
+  points: { at: string; violations: number; failed: boolean }[];
 }
 export interface QualityResultDto {
   rule: QualityRuleDto;
@@ -1351,6 +1417,13 @@ export const saveQualityRule = (conn: string, rule: QualityRuleDto): Promise<Qua
 
 export const deleteQualityRule = (conn: string, id: string): Promise<void> =>
   fetch(`${base}/quality/${conn}/${id}`, { method: "DELETE" }).then(r => ok<void>(r));
+
+/// What each rule has counted, over time: a rule's answer is a count, and a count over time is the
+/// difference between "twelve rows are wrong" and "it is getting worse".
+export const qualityHistory = (conn: string, days?: number):
+  Promise<{ days: number; rules: QualityHistoryDto[] }> =>
+  fetch(`${base}/quality/${conn}/history${days ? `?days=${days}` : ""}`)
+    .then(r => ok<{ days: number; rules: QualityHistoryDto[] }>(r));
 
 /// Runs every enabled rule and answers with what each one counted.
 export const runQualityRules = (conn: string):

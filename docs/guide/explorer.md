@@ -88,6 +88,28 @@ the view readable while it rebuilds and needs a unique index on it; plain is fas
 Both come back as statements from the server, which knows how the engine spells it — Oracle's is
 `DBMS_MVIEW.REFRESH` — and refuses to build one for an object that is not a materialised view.
 
+## What a table actually holds
+
+The **Profile** tab counts it. One statement per look: how many rows, how many of them have a value
+in each column, how many different values, the smallest and the largest. A column that is unique
+without anybody declaring it says so, and so does one that holds the same value in every row —
+usually a column somebody forgot to drop.
+
+**What the values look like** is the other half of masking. The mask heuristic reads column *names*:
+`api_key` is a secret, `password_changed_at` is a timestamp. That misses `col_17`, so this reads a
+sample of the rows instead and matches it against the shapes an email address, an IBAN, a card
+number, a phone number, a UUID and a street address have. A card number is checked against its check
+digit, which is what keeps a twelve-digit order number from being called one. **Mask this column**
+adds it to what the studio hides.
+
+**Rules these numbers suggest** turns what is true today into a rule that says it has to stay true:
+a column with no nulls becomes *has a value*, one with no duplicates becomes *no duplicates*, a
+number column becomes a range from the values that are there. Each one lands in
+[Administration → Data quality](administration.md#data-quality), where it can be changed or switched
+off — they are suggestions, not decisions.
+
+A table with more than 60 columns is counted to that point, and the answer says so.
+
 ## Dropping a file on the tree
 
 The tree knows what every node is, so a file dragged onto one can go where it obviously belongs —

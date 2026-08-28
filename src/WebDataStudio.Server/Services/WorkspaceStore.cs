@@ -83,6 +83,16 @@ public sealed class WorkspaceStore
                 address TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS ix_audit_time ON audit(id DESC);
+            -- One number per data quality rule per run. A rule's answer is a count, and a count over
+            -- time is the difference between "twelve rows are wrong" and "it is getting worse".
+            CREATE TABLE IF NOT EXISTS quality_runs (
+                connection_id TEXT NOT NULL,
+                rule_id TEXT NOT NULL,
+                violations INTEGER NOT NULL,
+                error TEXT NULL,
+                ran_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_quality_runs ON quality_runs(connection_id, ran_at);
             """);
 
         _connectionString = prepared.ConnectionString;
@@ -143,6 +153,76 @@ public sealed class WorkspaceStore
         cmd.Parameters.AddWithValue("$err", (object?)error ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$snap", (object?)snapshot ?? DBNull.Value);
         cmd.ExecuteNonQuery();
+    }
+
+    /// One run of one rule, as it happened.
+    public void AddQualityRuns(string connectionId,
+        IEnumerable<(string RuleId, long Violations, string? Error)> results)
+    {
+        using var db = Open();
+        using var transaction = db.BeginTransaction();
+        using var cmd = db.CreateCommand();
+
+        cmd.CommandText = """
+            INSERT INTO quality_runs (connection_id, rule_id, violations, error, ran_at)
+            VALUES ($c, $r, $v, $e, $at)
+            """;
+
+        var connection = cmd.Parameters.Add("$c", SqliteType.Text);
+        var rule = cmd.Parameters.Add("$r", SqliteType.Text);
+        var violations = cmd.Parameters.Add("$v", SqliteType.Integer);
+        var error = cmd.Parameters.Add("$e", SqliteType.Text);
+        var at = cmd.Parameters.Add("$at", SqliteType.Text);
+
+        var stamp = DateTimeOffset.UtcNow.ToString("O");
+
+        foreach (var result in results)
+        {
+            connection.Value = connectionId;
+            rule.Value = result.RuleId;
+            violations.Value = result.Violations;
+            error.Value = (object?)result.Error ?? DBNull.Value;
+            at.Value = stamp;
+            cmd.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
+    /// What each rule counted, oldest first, since a point in time.
+    public IReadOnlyList<(string RuleId, long Violations, string? Error, DateTimeOffset At)>
+        ListQualityRuns(string connectionId, DateTimeOffset since)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = """
+            SELECT rule_id, violations, error, ran_at FROM quality_runs
+            WHERE connection_id = $c AND ran_at >= $since
+            ORDER BY ran_at
+            """;
+        cmd.Parameters.AddWithValue("$c", connectionId);
+        cmd.Parameters.AddWithValue("$since", since.ToString("O"));
+
+        var runs = new List<(string, long, string?, DateTimeOffset)>();
+        using var reader = cmd.ExecuteReader();
+
+        while (reader.Read())
+            runs.Add((reader.GetString(0), reader.GetInt64(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                DateTimeOffset.Parse(reader.GetString(3))));
+
+        return runs;
+    }
+
+    /// Drops the runs older than the retention, so a rule that runs every minute does not become the
+    /// biggest table in the workspace.
+    public int TrimQualityRuns(int days)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "DELETE FROM quality_runs WHERE ran_at < $cutoff";
+        cmd.Parameters.AddWithValue("$cutoff", DateTimeOffset.UtcNow.AddDays(-days).ToString("O"));
+        return cmd.ExecuteNonQuery();
     }
 
     public void AddAudit(AuditEntry entry)

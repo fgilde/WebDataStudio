@@ -515,7 +515,9 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor, tab }:
 
       <Tabs.Panel value="maintenance"><Maintenance connectionId={connectionId} /></Tabs.Panel>
       <Tabs.Panel value="sessions"><Sessions connectionId={connectionId} /></Tabs.Panel>
-      <Tabs.Panel value="capture"><Capture connectionId={connectionId} /></Tabs.Panel>
+      <Tabs.Panel value="capture">
+        <Capture connectionId={connectionId} onOpenInEditor={onOpenInEditor} />
+      </Tabs.Panel>
       <Tabs.Panel value="jobs">
         <Jobs connectionId={connectionId} onOpenInEditor={onOpenInEditor} />
       </Tabs.Panel>

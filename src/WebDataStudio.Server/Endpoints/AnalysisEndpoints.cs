@@ -120,44 +120,11 @@ public static class AnalysisEndpoints
 
     /// Describes only the tables the statement actually mentions, so the advisor never walks a
     /// whole catalogue to answer one query.
-    private static async Task<Dictionary<string, ObjectDetail>> LoadTablesAsync(IDbDriver driver,
-        IDbSession session, string sql, CancellationToken ct)
-    {
-        var wanted = PredicateExtractor.Aliases(sql).Values
-            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (wanted.Count == 0) return [];
-
-        var found = new Dictionary<string, ObjectDetail>(StringComparer.OrdinalIgnoreCase);
-        var queue = new Queue<SchemaNodeRef?>();
-        queue.Enqueue(null);
-        var visited = 0;
-
-        while (queue.Count > 0 && visited++ < 100 && found.Count < wanted.Count)
-        {
-            var parent = queue.Dequeue();
-            IReadOnlyList<SchemaNode> nodes;
-            try { nodes = await driver.IntrospectAsync(session, parent, ct); }
-            catch (Exception) { continue; }
-
-            foreach (var node in nodes)
-            {
-                if (node.Ref.Kind == SchemaNodeKind.Table)
-                {
-                    if (!wanted.Contains(node.Ref.Name, StringComparer.OrdinalIgnoreCase)) continue;
-                    if (found.ContainsKey(node.Ref.Name)) continue;
-
-                    try { found[node.Ref.Name] = await driver.DescribeAsync(session, node.Ref, ct); }
-                    catch (Exception) { /* a table we cannot describe simply gets no advice */ }
-                    continue;
-                }
-
-                if (node.HasChildren && node.Ref.Kind is not (SchemaNodeKind.Table or SchemaNodeKind.View))
-                    queue.Enqueue(node.Ref);
-            }
-        }
-
-        return found;
-    }
+    /// The tables a statement mentions. The walk itself lives in Analysis/TableLoader.cs, because
+    /// the capture's advice needs exactly the same thing.
+    private static Task<Dictionary<string, ObjectDetail>> LoadTablesAsync(IDbDriver driver,
+        IDbSession session, string sql, CancellationToken ct) =>
+        TableLoader.LoadAsync(driver, session, sql, ct);
 
     private static IReadOnlyList<AnalyzeFinding> Deduplicate(IEnumerable<AnalyzeFinding> findings) =>
         findings

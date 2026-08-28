@@ -18,11 +18,13 @@ globalThis.ResizeObserver ??= class {
 const startCapture = vi.fn();
 const captureStatus = vi.fn();
 const stopCapture = vi.fn();
+const captureAdvice = vi.fn();
 
 vi.mock("../api", () => ({
   startCapture: (...args: unknown[]) => startCapture(...args),
   captureStatus: (...args: unknown[]) => captureStatus(...args),
   stopCapture: (...args: unknown[]) => stopCapture(...args),
+  captureAdvice: (...args: unknown[]) => captureAdvice(...args),
 }));
 
 const { Capture } = await import("./Capture");
@@ -49,6 +51,7 @@ describe("Capture", () => {
     startCapture.mockReset();
     captureStatus.mockReset();
     stopCapture.mockReset();
+    captureAdvice.mockReset();
   });
 
   afterEach(() => vi.useRealTimers());
@@ -119,5 +122,58 @@ describe("Capture", () => {
     fireEvent.click(screen.getByRole("button", { name: /Stop/ }));
 
     await waitFor(() => expect(stopCapture).toHaveBeenCalledWith("c1"));
+  });
+
+  it("answers \"so what should I change?\" once the capture has stopped", async () => {
+    captureStatus.mockResolvedValue({ ...idle, state: "done", samples: 60, statements: [slow] });
+    captureAdvice.mockResolvedValue({
+      state: "done", reason: null,
+      advice: [{
+        table: "events", message: "The query filters events on kind and no index leads with it",
+        sql: "CREATE INDEX ix_events_kind ON events (kind);",
+        statements: 2, samples: 8, slowestMs: 2400, example: "SELECT * FROM events WHERE kind = 'x'",
+      }],
+    });
+    const onOpenInEditor = vi.fn();
+
+    render(
+      <MantineProvider>
+        <Capture connectionId="c1" onOpenInEditor={onOpenInEditor} />
+      </MantineProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "What should I change?" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "What should I change?" }));
+
+    await waitFor(() => expect(screen.getByText(/no index leads with it/)).toBeTruthy());
+    expect(screen.getByText("2 statement(s), 2.4s")).toBeTruthy();
+
+    // The index is a statement, so it goes to a query tab rather than running from the panel.
+    fireEvent.click(screen.getByRole("button", { name: "Open the statement" }));
+    expect(onOpenInEditor).toHaveBeenCalledWith("CREATE INDEX ix_events_kind ON events (kind);");
+  });
+
+  it("says when an index would not help rather than showing nothing", async () => {
+    captureStatus.mockResolvedValue({ ...idle, state: "done", samples: 60, statements: [slow] });
+    captureAdvice.mockResolvedValue({ state: "done", reason: null, advice: [] });
+
+    draw();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "What should I change?" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "What should I change?" }));
+
+    await waitFor(() => expect(screen.getByText("nothing an index would help with")).toBeTruthy());
+  });
+
+  it("does not offer advice while the capture is still running", async () => {
+    captureStatus.mockResolvedValue({
+      ...idle, state: "running", seconds: 60, secondsLeft: 30, statements: [slow],
+    });
+
+    draw();
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /Stop/ })).toBeTruthy());
+    // Advice on a minute that is still being watched would keep moving.
+    expect(screen.queryByRole("button", { name: "What should I change?" })).toBeNull();
   });
 });

@@ -422,6 +422,31 @@ public static class AdminEndpoints
         app.MapGet("/api/admin/capture/{conn}", (string conn, StatementCapture capture) =>
             Results.Ok(capture.Status(conn)));
 
+        // "So what should I change?" — the capture and the index advisor together: the same advice
+        // asked for by several of the statements that ran, ordered by how much of the minute it
+        // would help.
+        app.MapGet("/api/admin/capture/{conn}/advice", (string conn, StatementCapture capture,
+            SessionFactory factory, CancellationToken ct) =>
+            WithSession(conn, factory, ct, async (driver, session) =>
+            {
+                var state = capture.Status(conn);
+
+                if (state.Statements.Count == 0)
+                    return Results.Ok(new
+                    {
+                        state = state.State,
+                        reason = "nothing has been captured on this connection yet",
+                        advice = Array.Empty<CaptureAdvice>(),
+                    });
+
+                return Results.Ok(new
+                {
+                    state = state.State,
+                    reason = (string?)null,
+                    advice = await CaptureAdvisor.SuggestAsync(driver, session, state.Statements, ct),
+                });
+            }));
+
         app.MapDelete("/api/admin/capture/{conn}", (string conn, StatementCapture capture) =>
         {
             capture.Stop(conn);

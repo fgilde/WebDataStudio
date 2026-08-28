@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert, Badge, Button, Group, ScrollArea, Select, Stack, Table, Text, Tooltip,
 } from "@mantine/core";
-import { captureStatus, startCapture, stopCapture, type CaptureDto } from "../api";
+import {
+  captureAdvice, captureStatus, startCapture, stopCapture,
+  type CaptureAdviceDto, type CaptureDto,
+} from "../api";
 
 const WINDOWS = ["15", "30", "60", "120", "300"];
 
@@ -12,10 +15,15 @@ const WINDOWS = ["15", "30", "60", "120", "300"];
 /// grouped by statement. A statement that starts and finishes between two samples is missed, and the
 /// panel says so — Extended Events and its equivalents are the real answer and need permissions a
 /// studio has no business arranging.
-export function Capture({ connectionId }: { connectionId: string }) {
+export function Capture({ connectionId, onOpenInEditor }: {
+  connectionId: string;
+  /// A suggested index is a statement, so it goes to a query tab rather than running from here.
+  onOpenInEditor?: (sql: string) => void;
+}) {
   const [data, setData] = useState<CaptureDto | null>(null);
   const [seconds, setSeconds] = useState("60");
   const [error, setError] = useState<string | null>(null);
+  const [advice, setAdvice] = useState<CaptureAdviceDto[] | null>(null);
   const timer = useRef<number | null>(null);
 
   const stopPolling = useCallback(() => {
@@ -56,6 +64,15 @@ export function Capture({ connectionId }: { connectionId: string }) {
 
   const running = data?.state === "running";
 
+  // "So what should I change?" — asked once the capture has stopped, because advice on a minute
+  // that is still being watched would keep moving.
+  const ask = () => {
+    setAdvice(null);
+    captureAdvice(connectionId)
+      .then(answer => setAdvice(answer.advice))
+      .catch(e => setError(e.message));
+  };
+
   return (
     <Stack gap={4} p="xs">
       <Group gap="xs">
@@ -81,6 +98,44 @@ export function Capture({ connectionId }: { connectionId: string }) {
       <Text size="xs" c="dimmed">
         Sampled once a second: a statement that starts and finishes between two samples is not seen.
       </Text>
+
+      {data && data.statements.length > 0 && !running && (
+        <Group gap="xs">
+          <Button size="compact-xs" variant="default" onClick={ask}>
+            What should I change?
+          </Button>
+          {advice !== null && (
+            <Text size="xs" c="dimmed">
+              {advice.length === 0
+                ? "nothing an index would help with"
+                : `${advice.length} suggestion(s)`}
+            </Text>
+          )}
+        </Group>
+      )}
+
+      {advice !== null && advice.length > 0 && (
+        <Stack gap={2}>
+          {advice.map(entry => (
+            <Alert key={`${entry.table}-${entry.message}`} color="blue" variant="light" p={6}>
+              <Group gap="xs" justify="space-between" wrap="nowrap">
+                <Text size="xs">{entry.message}</Text>
+                <Group gap={4} wrap="nowrap">
+                  <Badge size="xs" variant="light">
+                    {entry.statements} statement(s), {Math.round(entry.slowestMs / 100) / 10}s
+                  </Badge>
+                  {entry.sql && onOpenInEditor && (
+                    <Button size="compact-xs" variant="subtle"
+                      onClick={() => onOpenInEditor(entry.sql!)}>
+                      Open the statement
+                    </Button>
+                  )}
+                </Group>
+              </Group>
+            </Alert>
+          ))}
+        </Stack>
+      )}
 
       <ScrollArea h={300}>
         <Table striped highlightOnHover fz="xs" stickyHeader>

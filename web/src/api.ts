@@ -953,6 +953,23 @@ export const captureStatus = (conn: string): Promise<CaptureDto> =>
 export const stopCapture = (conn: string): Promise<CaptureDto> =>
   fetch(`${base}/admin/capture/${conn}`, { method: "DELETE" }).then(r => ok<CaptureDto>(r));
 
+export interface CaptureAdviceDto {
+  table: string;
+  message: string;
+  /// The statement to run, where the advice is one.
+  sql: string | null;
+  statements: number;
+  samples: number;
+  slowestMs: number;
+  example: string;
+}
+
+/// What the captured minute suggests: the capture and the index advisor together.
+export const captureAdvice = (conn: string):
+  Promise<{ state: string; reason: string | null; advice: CaptureAdviceDto[] }> =>
+  fetch(`${base}/admin/capture/${conn}/advice`)
+    .then(r => ok<{ state: string; reason: string | null; advice: CaptureAdviceDto[] }>(r));
+
 export interface JobDto {
   id: string; name: string; enabled: boolean; schedule: string;
   lastRun: string | null; lastOutcome: string | null; nextRun: string | null;

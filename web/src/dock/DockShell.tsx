@@ -58,6 +58,7 @@ import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
 import { NewTableDialog } from "../import/NewTableDialog";
 import { SubsetDialog } from "../export/SubsetDialog";
+import { saveAs } from "../storage/saveAs";
 import type { DialectId } from "../sql/splitStatements";
 
 interface TabState {
@@ -734,6 +735,17 @@ export function DockShell() {
         link.click();
         break;
       }
+
+      case "save-object":
+        // The other half of a download: the person picks the folder and the name, and the file is
+        // streamed into it. Where the browser cannot ask, this is the download again.
+        saveAs(objectUrl(s.connectionId, s.node.ref), s.node.label)
+          .then(outcome => {
+            if (outcome === "saved")
+              notifications.show({ message: `${s.node.label} saved` });
+          })
+          .catch(e => notifications.show({ color: "red", message: String(e.message ?? e) }));
+        break;
 
       case "upload-object": {
         const input = document.createElement("input");

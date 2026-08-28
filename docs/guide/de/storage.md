@@ -80,12 +80,29 @@ Tag, an dem es angekommen ist.
 ![Der Baum und die Details eines Objekts](../../assets/screenshots/storage-dark.png)
 
 Wird ein Objekt ausgewählt, füllt das Strukturpanel sich mit dem, was es ist: Größe, Content-Type,
-letzte Änderung, ETag, Speicherklasse, der Anfang des Inhalts als Text, ein Bild, wo es eines ist,
-und für alles, was ein Reader versteht, die Spalten, die es als Tabelle hätte.
+letzte Änderung, ETag, Speicherklasse, der Anfang des Inhalts als Text, und für alles, was ein Reader
+versteht, die Spalten, die es als Tabelle hätte.
+
+**An seinem Platz gezeigt**, statt zum Ansehen heruntergeladen: ein Bild, ein PDF, ein Video, eine
+Aufnahme. Ein Dokument, das als eine lange Zeile ankam, wird eingerückt — außer die Vorschau musste
+vorher abbrechen, denn ein halbes Dokument ist kein JSON, und es zu formatieren würde das
+Gelesene wegwerfen.
 
 Die Vorschau liest den Anfang einer Datei und niemals die ganze — ein versehentlich angeklicktes 4-GB-
 Parquet kostet eine Seite, keinen Download. `WDS_STORAGE_PREVIEW_BYTES` legt fest, wie viel (Vorgabe
-64 kB).
+64 kB). Die Ausnahme sind die Dinge, die an ihrem Platz gezeigt werden: ein Bild oder ein PDF kommt
+ganz, denn die Hälfte davon ist kein Bild.
+
+## Eine Datei mitnehmen
+
+**Download** gibt die Datei an den Browser, der entscheidet, wohin sie geht.
+
+**Save as…** fragt vorher. Wo der Browser das kann (Chromium, Edge), wird die Datei direkt an den
+gewählten Ort gestreamt und nicht durch den Speicher — ein Parquet mit mehreren Gigabyte ist damit
+ein Fortschrittsbalken und kein sterbender Tab; sonst fällt es auf denselben Download zurück. Beides
+steht im Kontextmenü des Objekts und über seiner Vorschau.
+
+Die Bytes sind die des Providers — das Studio streamt sie durch und behält nichts.
 
 ## Eine Datei abfragen
 

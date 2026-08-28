@@ -510,6 +510,8 @@ it works for every engine whose capability set claims support for it.
 | F30.10 | Signing in with an identity provider |
 | F30.11 | A development subset that loads |
 | F30.12 | The newer capabilities as MCP tools |
+| F30.13 | An object shown where it lies |
+| F30.14 | Save as, streamed to where it was asked for |
 
 ## 10. Safety behaviour
 

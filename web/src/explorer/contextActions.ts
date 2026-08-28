@@ -12,8 +12,8 @@ export type ExplorerAction =
   | "script-execute" | "script-refresh-matview" | "script-refresh-matview-live"
   | "grant-schema" | "archive-table" | "dev-subset"
   // Object storage: the object itself rather than the rows in it.
-  | "download-object" | "upload-object" | "delete-object" | "query-as-table" | "copy-uri"
-  | "import-object";
+  | "download-object" | "save-object" | "upload-object" | "delete-object" | "query-as-table"
+  | "copy-uri" | "import-object";
 
 export interface ContextItem {
   action: ExplorerAction;
@@ -80,6 +80,7 @@ const STORAGE_OBJECT: ContextItem[] = [
   { action: "open-data", label: "Open data" },
   { action: "new-query", label: "New query (SELECT *)" },
   { action: "download-object", label: "Download" },
+  { action: "save-object", label: "Save as…" },
   // A file in a bucket that should be a table in a database.
   { action: "import-object", label: "Import into a database…" },
   { action: "export", label: "Export…", divider: true },

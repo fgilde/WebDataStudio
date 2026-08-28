@@ -122,6 +122,23 @@ public class StorageEndpointTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task And_the_same_bytes_come_without_the_attachment_header_to_be_shown()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var response = await client.GetAsync($"/api/storage/{id}/download?ref={Csv}&inline=true", Ct);
+        response.EnsureSuccessStatusCode();
+
+        Assert.Equal("name,age\nada,36\n", await response.Content.ReadAsStringAsync(Ct));
+        // A PDF, a video or a recording behind an attachment header lands in the downloads folder
+        // instead of on screen, which is the whole difference between the two.
+        Assert.Null(response.Content.Headers.ContentDisposition);
+        Assert.Equal("text/csv", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
     public async Task An_upload_lands_in_the_folder_that_was_open_and_can_be_deleted_again()
     {
         using var factory = Factory();

@@ -208,3 +208,5 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F30.10 | Signing in to the studio with an identity provider — Entra, Keycloak, Auth0, Okta — with the studio's roles mapped from the groups it sends | done | all | Login screen, `WDS_OIDC_*` |
 | F30.11 | A development subset: rows from one table, the rows they point at, what is about people replaced, written as one loadable SQL script | done | postgresql, mysql, sqlserver, sqlite, oracle, clickhouse | Explorer, development subset |
 | F30.12 | The newer capabilities as MCP tools: find a value, a document column's shape, growth, what this studio ran, a statement read before it runs, and the data quality rules | done | all | MCP endpoint, assistant |
+| F30.13 | An object shown where it lies: an image, a PDF, a video, a recording, and a document indented rather than left on one line | done | storage | Structure panel |
+| F30.14 | Save as… — the person picks the folder and the name, and the file is streamed into it rather than through memory | done | storage | Object menu, structure panel |

@@ -76,8 +76,12 @@ public static class StorageEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
+        // `inline=true` is the same bytes without the attachment header: a PDF, an audio file or a
+        // video the browser can show where it is. Everything else is a download, because a file the
+        // browser cannot show and does not save is a blank tab.
         app.MapGet("/api/storage/{conn}/download", async (string conn,
-            [FromQuery(Name = "ref")] string objectRef, SessionFactory factory, CancellationToken ct) =>
+            [FromQuery(Name = "ref")] string objectRef, bool? inline, SessionFactory factory,
+            CancellationToken ct) =>
         {
             try
             {
@@ -102,8 +106,15 @@ public static class StorageEndpoints
                 }
 
                 var stream = await store.OpenReadAsync(key, ct);
-                return Results.Stream(stream, head.ContentType ?? "application/octet-stream",
-                    fileDownloadName: target.Name, enableRangeProcessing: false);
+
+                // A range-enabled response is what a video player needs to seek, and it needs a
+                // seekable stream to answer one — which is why only the shown-in-place case asks for
+                // it: a provider's read stream is a network stream, and a download does not seek.
+                return inline == true
+                    ? Results.Stream(stream, head.ContentType ?? "application/octet-stream",
+                        lastModified: head.Modified, entityTag: null, enableRangeProcessing: false)
+                    : Results.Stream(stream, head.ContentType ?? "application/octet-stream",
+                        fileDownloadName: target.Name, enableRangeProcessing: false);
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }

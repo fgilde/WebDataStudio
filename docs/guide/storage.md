@@ -77,11 +77,28 @@ row that fetches the next. Each object shows its size and the day it landed.
 ![The tree, and an object's details](../assets/screenshots/storage-dark.png)
 
 Selecting an object fills the structure panel with what it is: size, content type, last modified,
-ETag, storage class, the front of its content as text, an image where it is one, and for anything a
-reader understands the columns it would have as a table.
+ETag, storage class, the front of its content as text, and for anything a reader understands the
+columns it would have as a table.
+
+**Shown where it lies**, rather than downloaded to be looked at: an image, a PDF, a video, a
+recording. A document that arrived as one long line is indented — unless the preview had to stop
+part-way, because half a document is not JSON and formatting it would drop what was read.
 
 The preview reads the front of a file and never the whole thing — a 4 GB Parquet clicked on by
-accident costs a page, not a download. `WDS_STORAGE_PREVIEW_BYTES` sets how much (default 64 kB).
+accident costs a page, not a download. `WDS_STORAGE_PREVIEW_BYTES` sets how much (default 64 kB). The
+things shown in place are the exception: an image or a PDF is served whole, because half of one is
+not a picture.
+
+## Taking a file with you
+
+**Download** hands the file to the browser, which decides where it goes.
+
+**Save as…** asks first. Where the browser can (Chromium, Edge), the file is streamed into the place
+you picked rather than through memory, so a multi-gigabyte Parquet is a progress bar and not a tab
+that dies; elsewhere it falls back to the same download. Both are in the object's context menu and
+above its preview.
+
+The bytes are the provider's own — the studio streams them through and keeps nothing.
 
 ## Querying a file
 

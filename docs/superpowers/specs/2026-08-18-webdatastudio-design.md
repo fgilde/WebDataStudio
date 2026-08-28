@@ -535,6 +535,7 @@ it works for every engine whose capability set claims support for it.
 | F30.35 | A pivot over the result on screen, and two plans of the same statement held against each other |
 | F30.36 | A file out of a binary cell and back into one, as the file it actually is |
 | F30.37 | A notification when a long run finishes and nobody is watching |
+| F30.38 | Timestamps read by a person, on the clock they chose, and never converted when they carry no zone |
 
 ## 10. Safety behaviour
 

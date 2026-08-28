@@ -233,3 +233,4 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F30.35 | A pivot over the rows on screen — one column down the side, another across the top — and the plan of a statement held against the plan of its previous run | done | all | Result views, plan panel |
 | F30.36 | A binary cell as the file it holds: saved with the extension its first bytes say it has, and replaced from disk through the same preview, written as the engine's own binary literal | done | postgresql, mysql, sqlserver, sqlite, oracle | Data tab, cell viewer |
 | F30.37 | A notification when a run that took longer than the preference finishes while you are looking at something else | done | all | Query tab, preferences |
+| F30.38 | Timestamps shown as a person reads them, on the clock the preference names, with the raw value on hover — and never converted where the column keeps no zone, which the header says | done | all | Result grid, data tab, preferences |

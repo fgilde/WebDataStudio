@@ -58,6 +58,7 @@ to another browser rather than living in one machine's local storage.
 | Rows per page in the data tab | how many rows one page of a table holds |
 | Keep the result with each history entry | see [result snapshots in the history](results.md#history) |
 | Rows a snapshot keeps | how much of a result is kept when it is |
+| Show timestamps in | this computer's zone, UTC, or a named zone. Only what is shown; a value with no zone of its own is never converted |
 | Tell me when a query takes longer than | a notification when a run of at least that many seconds finishes **and** you are looking at another tab. 0 switches it off; permission is asked the first time one would be sent, never on startup |
 
 ### The theme

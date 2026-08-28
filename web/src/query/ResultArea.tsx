@@ -6,6 +6,8 @@ import { ResultGrid } from "../grid/ResultGrid";
 import { RowFormView } from "../grid/RowFormView";
 import { DocumentResultArea } from "../documents/DocumentResultArea";
 import { TransposedView } from "../grid/TransposedView";
+import { describeZone } from "../grid/formatTime";
+import { preferences } from "../shell/preferences";
 import { PivotView } from "../grid/PivotView";
 import { ResultChart } from "../chart/ResultChart";
 import { ResultCompare, type NamedResult } from "../compare/ResultCompare";
@@ -85,6 +87,9 @@ export function ResultArea({ result, onExport, changed, connectionId, sql }: {
                     { label: "Compare", value: "compare" },
                   ]} />
                 {s.running && <Text size="xs" c="dimmed">running… {s.rowsRead} rows</Text>}
+                {describeZone(preferences().timeZone) && (
+                  <Text size="xs" c="dimmed">{describeZone(preferences().timeZone)}</Text>
+                )}
                 <Group gap={4} ml="auto">
                   <Menu withinPortal>
                     <Menu.Target>

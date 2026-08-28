@@ -17,6 +17,9 @@ export interface Preferences {
   /// Tell me when a query that took at least this many seconds is done, if I am looking at
   /// something else. 0 switches it off.
   notifyAfterSeconds: number;
+  /// Which clock timestamps are shown on: "local", "utc", or an IANA name like "Europe/Berlin".
+  /// Only what is shown — a value with no zone of its own is never converted.
+  timeZone: string;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -26,6 +29,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   shortcuts: {},
   inspectBeforeRun: true,
   notifyAfterSeconds: 30,
+  timeZone: "local",
 };
 
 const KEY = "preferences";

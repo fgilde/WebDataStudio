@@ -73,6 +73,24 @@ common first, as checkboxes — the Excel-style filter. Ticking values writes th
 as `=a,=b`, so it is a way of typing rather than a second kind of filter, and it can be edited
 afterwards. A masked column has no list: the distinct values of a column of secrets are the secrets.
 
+## Timestamps and time zones
+
+A timestamp arrives from the driver as `2026-08-29T14:00:00.0000000Z` — correct, and not what
+anybody reads. The grid shows `2026-08-29 14:00:00`, keeps a fraction only when it says something,
+and hovering a cell still shows the raw value, because "which one is it really" is exactly the
+question this is about.
+
+**Which clock.** *Show timestamps in* in the [preferences](shortcuts.md#preferences-and-rebinding)
+is this computer's zone, UTC, or a named zone. It changes only what is shown; nothing is rewritten
+on the way into the database. When it is not your own zone, the footer says so — `times in UTC` —
+so a screenshot cannot be misread later.
+
+**A value with no zone is never converted.** `timestamp without time zone` holding 14:00 means
+14:00; turning it into 16:00 because the reader sits in Berlin would be an invention. Those cells
+carry a dotted underline and say `no time zone` on hover, and the column header says which of the
+two the column is (`timestamptz — stored with a time zone`). That difference is where the "we
+deleted the wrong day" class of accident comes from.
+
 ## Pivot
 
 The grid answers "what is in here" and grouping answers "how many per status". **Pivot** is the

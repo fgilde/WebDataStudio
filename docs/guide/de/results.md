@@ -201,6 +201,24 @@ Das Spaltenmenü der Tabellenansicht listet außerdem die **vorhandenen Werte mi
 Checkboxen, häufigste zuerst. Angehakte Werte landen als `=a,=b` im Filterfeld — eine Art zu tippen,
 kein zweites Filter. Eine maskierte Spalte hat keine Liste: ihre Werte sind genau das Geheimnis.
 
+## Zeitstempel und Zeitzonen
+
+Ein Zeitstempel kommt vom Treiber als `2026-08-29T14:00:00.0000000Z` — korrekt, und nicht das, was
+jemand liest. Das Gitter zeigt `2026-08-29 14:00:00`, behält Nachkommastellen nur, wenn sie etwas
+sagen, und beim Überfahren steht weiterhin der Rohwert da — denn „welcher ist es denn nun wirklich“
+ist genau die Frage, um die es geht.
+
+**Welche Uhr.** *Show timestamps in* in den [Einstellungen](shortcuts.md) ist die Zone dieses
+Rechners, UTC oder eine benannte Zone. Es ändert nur die Anzeige; auf dem Weg in die Datenbank wird
+nichts umgeschrieben. Ist es nicht deine eigene Zone, sagt es die Fußzeile — `times in UTC` —, damit
+ein Screenshot später nicht falsch gelesen wird.
+
+**Ein Wert ohne Zone wird nie umgerechnet.** `timestamp without time zone` mit 14:00 bedeutet 14:00;
+daraus 16:00 zu machen, weil der Leser in Berlin sitzt, wäre eine Erfindung. Solche Zellen sind
+gepunktet unterstrichen und sagen beim Überfahren `no time zone`, und der Spaltenkopf sagt, welche
+der beiden Sorten die Spalte ist (`timestamptz — stored with a time zone`). Aus genau diesem
+Unterschied entsteht die Sorte Unfall, bei der der falsche Tag gelöscht wird.
+
 ## Pivot
 
 Das Gitter beantwortet „was ist hier drin“, das Gruppieren „wie viele je Status“. **Pivot** ist die

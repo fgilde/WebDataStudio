@@ -25,7 +25,18 @@ import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
 import { GenerateDialog } from "./GenerateDialog";
 import { BulkUpdateModal } from "../grid/editing/BulkUpdateModal";
 import { useChangeSet, type RowChange } from "../grid/editing/useChangeSet";
-import { usePreferences } from "../shell/preferences";
+import { preferences, usePreferences } from "../shell/preferences";
+import { carriesZone, describeZone } from "../grid/formatTime";
+
+/// The same "14:00" means two different moments in `timestamptz` and in `timestamp`, so the header
+/// says which of the two this column is.
+const zoneNote = (dataType: string) => {
+  const zoned = carriesZone(dataType);
+
+  return zoned === null ? null
+    : zoned ? `${dataType} — stored with a time zone`
+      : `${dataType} — no time zone stored`;
+};
 
 /// A column that holds bytes. Typing into one is not what anybody wants; it takes a file.
 const isBinary = (type: string) =>
@@ -357,6 +368,8 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           {sort ? ` · sorted by ${sort.column}` : ""}
           {changeSet.isDirty && ` · ${changeSet.changes.length} pending`}
           {page.note ? ` · ${page.note}` : ""}
+          {/* Which clock the timestamps are on, whenever it is not the reader's own. */}
+          {describeZone(preferences().timeZone) ? ` · ${describeZone(preferences().timeZone)}` : ""}
         </Text>
       </Group>
 
@@ -371,7 +384,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--mantine-color-default)" }}>
             <tr>
               {visibleColumns.map(c => (
-                <th key={c.name} style={{
+                <th key={c.name} title={zoneNote(c.dataType) ?? c.dataType} style={{
                   textAlign: "left", padding: "2px 8px", whiteSpace: "nowrap",
                   borderBottom: "1px solid var(--mantine-color-default-border)",
                 }}>

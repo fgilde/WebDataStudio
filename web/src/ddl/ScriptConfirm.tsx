@@ -15,6 +15,9 @@ export interface PendingScript {
   /// Everything the engine knows reads this object. The point of showing it: a rename or a drop
   /// breaks a view somebody else wrote, and that is worth seeing before rather than after.
   dependencies?: DependencyReportDto;
+  /// What running it means. The default is the DDL apply every schema change goes through; the
+  /// account panel hands in its own, because those statements are cached under a key of their own.
+  apply?: (connectionId: string, hash: string) => Promise<unknown>;
 }
 
 /// One statement, shown before it runs.
@@ -35,7 +38,7 @@ export function ScriptConfirm({ pending, onClose, onApplied }: {
     setRunning(true);
 
     try {
-      await applyDdl(pending.connectionId, pending.hash);
+      await (pending.apply ?? applyDdl)(pending.connectionId, pending.hash);
       notifications.show({ color: "green", message: pending.title });
       onApplied?.();
       onClose();

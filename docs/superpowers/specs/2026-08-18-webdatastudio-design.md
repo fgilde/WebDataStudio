@@ -529,6 +529,7 @@ it works for every engine whose capability set claims support for it.
 | F30.29 | What the engine could not do with a query, said in the footer rather than swallowed |
 | F30.30 | The theme a deployment starts in, without taking a person's own choice away |
 | F30.31 | Editors for the objects a table designer never covered: views, routines, triggers, sequences, schemas, descriptions |
+| F30.32 | Accounts and roles: who exists, who is in which role, what each may do, and every change as a statement first |
 
 ## 10. Safety behaviour
 

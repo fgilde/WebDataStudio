@@ -26,7 +26,8 @@
     "smoke:dbgate": "node scripts/smoke-dbgate.mjs",
     "smoke:storage": "node scripts/smoke-storage.mjs",
     "smoke:quality": "node scripts/smoke-quality.mjs",
-    "smoke:sso": "node scripts/smoke-sso.mjs"
+    "smoke:sso": "node scripts/smoke-sso.mjs",
+    "smoke:security": "node scripts/smoke-security.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

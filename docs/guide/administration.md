@@ -136,10 +136,34 @@ blocking whom. A session can be terminated after a confirmation that shows its c
 List, create and drop databases on the engines that have more than one. Dropping asks you to type
 the name.
 
-## Users and privileges
+## Accounts and roles
 
-List the users, and create one or grant a privilege through the same preview-then-apply handshake
-the rest of the app uses: the statement is shown, and only then does it run.
+The **Accounts** tab lists what the server knows: its accounts, its roles, and the difference between
+them. In PostgreSQL there is only one kind of thing and the difference is whether it may sign in;
+the other engines keep two, and the tab says which is which either way.
+
+Per row: whether it is an account or a role, whether it is a superuser, whether it may sign in at
+all, when it expires, and **which roles it is in** — that last one is usually the answer to "why can
+they read that". Clicking a row shows what was granted to it **directly**; anything else it can do
+comes from its roles, and the panel says so rather than leaving a blank.
+
+What can be changed, each through the statement shown first:
+
+| | What it writes |
+|---|---|
+| New account…, New role… | `CREATE ROLE … LOGIN`, `CREATE ROLE … NOLOGIN`, `CREATE USER`, `CREATE LOGIN` — per engine |
+| New password… | `ALTER ROLE … PASSWORD`, `ALTER USER … IDENTIFIED BY`, `ALTER LOGIN … WITH PASSWORD` |
+| Stop it signing in… | `NOLOGIN`, `ACCOUNT LOCK`, `DISABLE` — the cheapest way to stop an account without losing what it may do, and the way back |
+| Put in a role…, Take out of a role… | `GRANT role TO member`, and `ALTER ROLE … ADD MEMBER` on SQL Server |
+| Grant a privilege…, Take a privilege back… | `GRANT`/`REVOKE`, on a table or on something like `ALL TABLES IN SCHEMA public` |
+| Drop… | `DROP ROLE`, `DROP USER`, `DROP LOGIN` |
+
+Two things this deliberately does not do. It never runs anything without showing the statement, and
+the statement is not written to the [audit trail](#audit) when it carries a password — what happened
+is recorded, the password is not. And listing accounts is itself a privilege: a connection without
+it gets an empty list with a line saying why, rather than an error nobody can act on.
+
+MongoDB, Redis, SQLite and DuckDB have no accounts this panel can manage, and say so.
 
 ## Server log
 

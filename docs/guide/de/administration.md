@@ -142,10 +142,35 @@ blockiert. Eine Sitzung lässt sich beenden, nach einer Rückfrage, die ihr aktu
 Datenbanken auflisten, anlegen und löschen — bei den Engines, die mehr als eine haben. Das Löschen
 verlangt, dass du den Namen tippst.
 
-## Benutzer und Rechte
+## Konten und Rollen
 
-Benutzer auflisten sowie anlegen oder ein Recht vergeben, über dieselbe Vorschau-dann-Anwenden-
-Abfolge wie im Rest der Anwendung: erst steht das Statement da, dann läuft es.
+Der Tab **Accounts** listet, was der Server kennt: Konten, Rollen und den Unterschied. In PostgreSQL
+gibt es nur eine Sorte Ding, und der Unterschied ist, ob es sich anmelden darf; die anderen Engines
+führen beides getrennt — der Tab sagt so oder so, was was ist.
+
+Pro Zeile: Konto oder Rolle, Superuser, ob Anmelden überhaupt geht, wann es abläuft, und **in welchen
+Rollen es steckt** — Letzteres ist meist die Antwort auf „warum kann die das lesen“. Ein Klick auf
+eine Zeile zeigt, was ihr **direkt** gewährt wurde; alles Weitere kommt aus ihren Rollen, und das
+Panel sagt das, statt eine leere Liste zu zeigen.
+
+Was sich ändern lässt, jeweils über das zuerst gezeigte Statement:
+
+| | Was geschrieben wird |
+|---|---|
+| New account…, New role… | `CREATE ROLE … LOGIN`, `CREATE ROLE … NOLOGIN`, `CREATE USER`, `CREATE LOGIN` — je Engine |
+| New password… | `ALTER ROLE … PASSWORD`, `ALTER USER … IDENTIFIED BY`, `ALTER LOGIN … WITH PASSWORD` |
+| Stop it signing in… | `NOLOGIN`, `ACCOUNT LOCK`, `DISABLE` — der billigste Weg, ein Konto zu stoppen, ohne seine Rechte zu verlieren, und der Weg zurück |
+| Put in a role…, Take out of a role… | `GRANT role TO member`, auf SQL Server `ALTER ROLE … ADD MEMBER` |
+| Grant a privilege…, Take a privilege back… | `GRANT`/`REVOKE`, auf eine Tabelle oder auf etwas wie `ALL TABLES IN SCHEMA public` |
+| Drop… | `DROP ROLE`, `DROP USER`, `DROP LOGIN` |
+
+Zwei Dinge macht das Panel bewusst nicht. Es führt nie etwas aus, ohne das Statement zu zeigen — und
+das Statement landet nicht im Audit-Trail, wenn ein Passwort darin steht: was passiert ist, wird
+festgehalten, das Passwort nicht. Und Konten aufzulisten ist selbst ein Recht: eine Verbindung ohne
+dieses Recht bekommt eine leere Liste mit einem Satz dazu, statt eines Fehlers, mit dem niemand
+etwas anfangen kann.
+
+MongoDB, Redis, SQLite und DuckDB haben keine Konten, die dieses Panel verwalten kann, und sagen es.
 
 ## Server-Log
 

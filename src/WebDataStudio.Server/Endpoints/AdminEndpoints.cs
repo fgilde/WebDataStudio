@@ -9,7 +9,11 @@ namespace WebDataStudio.Server.Endpoints;
 public static class AdminEndpoints
 {
     public record SystemCommandRequest(string CommandId, string? Target);
-    public record UserRequest(string User, string? Password, string? Privilege, string? Target);
+    public record UserRequest(string User, string? Password, string? Privilege, string? Target,
+        /// What is being done: create, drop, password, login, grant, revoke, grant-role,
+        /// revoke-role. Absent means the old behaviour — a grant if a privilege was named, a new
+        /// account otherwise.
+        string? Action = null, bool? Role = null, bool? CanLogin = null, string? Member = null);
     public record UserApplyRequest(string Hash);
     public record HashRequest(string Password);
     public record DatabaseRequest(string Name);
@@ -184,23 +188,54 @@ public static class AdminEndpoints
                         message = $"{driver.Info.Label} has no user management",
                     });
 
-                return Results.Ok(await UserAdmin.ListAsync(driver, session, ct));
+                // Accounts and roles in one list: in PostgreSQL they are the same thing, and on the
+                // rest the difference is one flag rather than two panels.
+                return Results.Ok(await Security.ListAsync(driver, session, ct));
+            }));
+
+        // Why somebody can read that table: the roles they are in are in the list above, and these
+        // are the rights granted to them directly.
+        app.MapGet("/api/admin/users/{conn}/grants", (string conn, string user, SessionFactory factory,
+            CancellationToken ct) =>
+            WithSession(conn, factory, ct, async (driver, session) =>
+            {
+                if (!driver.Caps.UserManagement)
+                    return Results.BadRequest(new { message = $"{driver.Info.Label} has no user management" });
+
+                return Results.Ok(await Security.GrantsAsync(driver, session, user, ct));
             }));
 
         app.MapPost("/api/admin/users/{conn}/preview", (string conn, UserRequest body,
             SessionFactory factory, IMemoryCache cache, CancellationToken ct) =>
             WithSession(conn, factory, ct, (driver, _) =>
             {
-                // Every user change is previewed as SQL before it runs, same rule as everywhere else.
-                var sql = body.Privilege is { Length: > 0 }
-                    ? UserAdmin.GrantStatement(driver, body.User, body.Privilege, body.Target ?? "DATABASE")
-                    : UserAdmin.CreateStatement(driver, body.User, body.Password ?? "");
+                // Every account change is previewed as SQL before it runs, same rule as everywhere
+                // else. The action is explicit now; without one it means what it always did.
+                var action = body.Action is { Length: > 0 }
+                    ? body.Action
+                    : body.Privilege is { Length: > 0 } ? "grant" : "create";
 
-                var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
-                    System.Text.Encoding.UTF8.GetBytes(sql))).ToLowerInvariant();
-                cache.Set($"user:{hash}", sql, TimeSpan.FromMinutes(10));
+                try
+                {
+                    var sql = Security.Statement(driver, new SecurityChange(action, body.User,
+                        body.Password, body.Role == true, body.CanLogin != false,
+                        body.Privilege, body.Target ?? "DATABASE", body.Member));
 
-                return Task.FromResult(Results.Ok(new { hash, script = sql }));
+                    var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes(sql))).ToLowerInvariant();
+                    cache.Set($"user:{hash}", sql, TimeSpan.FromMinutes(10));
+
+                    // The script is the answer, and it holds a password when one was set. It is not
+                    // written to the audit trail for exactly that reason — what happened is.
+                    return Task.FromResult(Results.Ok(new
+                    {
+                        hash, script = sql, destructive = action is "drop" or "revoke" or "revoke-role",
+                    }));
+                }
+                catch (NotSupportedException e)
+                {
+                    return Task.FromResult(Results.BadRequest(new { message = e.Message }));
+                }
             }));
 
         app.MapPost("/api/admin/users/{conn}/apply", (string conn, UserApplyRequest body,

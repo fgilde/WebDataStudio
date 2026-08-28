@@ -1190,14 +1190,38 @@ export const dropDatabase = (conn: string, name: string): Promise<void> =>
   fetch(`${base}/admin/databases/${conn}/${encodeURIComponent(name)}`, { method: "DELETE" })
     .then(r => ok<void>(r));
 
-export const listUsers = (conn: string): Promise<string[]> =>
-  fetch(`${base}/admin/users/${conn}`).then(r => ok<string[]>(r));
+/// One account or role the server knows. A role is a bag of rights nobody signs in as; in
+/// PostgreSQL that is the only difference between the two.
+export interface DbPrincipalDto {
+  name: string;
+  isRole: boolean;
+  canLogin: boolean;
+  superuser: boolean;
+  validUntil: string | null;
+  locked: boolean;
+  /// The roles this one is in — the answer to "why can they read that".
+  memberOf: string[];
+}
+
+export interface PrivilegeGrantDto { object: string; privilege: string; grantable: boolean }
+
+export const listUsers = (conn: string): Promise<DbPrincipalDto[]> =>
+  fetch(`${base}/admin/users/${conn}`).then(r => ok<DbPrincipalDto[]>(r));
+
+/// What one account or role may do directly. Its roles are in the list itself.
+export const userGrants = (conn: string, user: string): Promise<PrivilegeGrantDto[]> =>
+  fetch(`${base}/admin/users/${conn}/grants?user=${encodeURIComponent(user)}`)
+    .then(r => ok<PrivilegeGrantDto[]>(r));
+
+export type SecurityAction =
+  "create" | "drop" | "password" | "login" | "grant" | "revoke" | "grant-role" | "revoke-role";
 
 export const previewUserChange = (conn: string, body: {
-  user: string; password?: string; privilege?: string; target?: string;
-}): Promise<{ hash: string; script: string }> =>
+  user: string; action?: SecurityAction; password?: string; privilege?: string; target?: string;
+  role?: boolean; canLogin?: boolean; member?: string;
+}): Promise<{ hash: string; script: string; destructive?: boolean }> =>
   fetch(`${base}/admin/users/${conn}/preview`, json("POST", body))
-    .then(r => ok<{ hash: string; script: string }>(r));
+    .then(r => ok<{ hash: string; script: string; destructive?: boolean }>(r));
 
 export const applyUserChange = (conn: string, hash: string): Promise<{ executed: string }> =>
   fetch(`${base}/admin/users/${conn}/apply`, json("POST", { hash }))

@@ -31,6 +31,8 @@ cd web && npx vitest run         # SPA-Units
 cd web && npm run smoke          # Browser-Prüfung gegen einen laufenden Server
 cd web && npm run smoke:admin    # Diagramm-, Administrations- und Vergleichspanels
 cd web && npm run smoke:p9       # Palette, gespeicherte Abfragen, Builder, Charts, Parameter
+cd web && npm run smoke:storage  # ein Bucket: Baum, Objekt, Datei als Tabelle
+cd web && npm run smoke:quality  # Datenqualität, Audit-Trail, Subset, JSON-Spalte
 ```
 
 Die Server-Suite fährt eine Verhaltens-Suite gegen jedes Engine-Fixture — ein neuer Treiber erbt

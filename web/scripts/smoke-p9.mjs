@@ -24,12 +24,17 @@ await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByText("DEMO", { exact: true }).waitFor({ timeout: 15000 });
 await page.getByText("DEMO", { exact: true }).click();
 
+const tool = async (label) => {
+  await page.getByRole("banner").getByRole("button", { name: "Tools" }).click();
+  await page.getByRole("menuitem", { name: label }).first().click();
+};
+
 // --- command palette ---------------------------------------------------------
 await page.keyboard.press("Control+k");
 try {
   await page.getByPlaceholder("Type a command").waitFor({ timeout: 10000 });
   await page.getByPlaceholder("Type a command").fill("diagram");
-  await page.getByText("Open ER diagram").first().waitFor({ timeout: 5000 });
+  await page.getByText("ER diagram").first().waitFor({ timeout: 5000 });
   await page.keyboard.press("Enter");
   await page.locator(".react-flow__node").first().waitFor({ timeout: 20000 });
 } catch (e) { await fail("palette", e); }
@@ -81,7 +86,7 @@ try {
 } catch (e) { await fail("parameters", e); }
 
 // --- query builder -----------------------------------------------------------------
-await page.getByRole("button", { name: "Query builder" }).click();
+await tool(/Query builder/);
 try {
   await page.getByPlaceholder("Add a table").waitFor({ timeout: 15000 });
   await page.getByPlaceholder("Add a table").click();

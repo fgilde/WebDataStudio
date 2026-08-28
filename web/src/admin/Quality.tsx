@@ -142,6 +142,11 @@ export function Quality({ connectionId, onOpenInEditor }: {
                   <Table.Td>
                     {KINDS[rule.kind].label}
                     {rule.argument ? <Text span c="dimmed"> ({rule.argument})</Text> : null}
+                    {/* The sentence somebody wrote is the point of the rule; a table that only
+                        shows it when the rule fails hides what the rule is for. */}
+                    {rule.message
+                      ? <Text size="10px" c="dimmed">{rule.message}</Text>
+                      : null}
                   </Table.Td>
                   <Table.Td>
                     {result === undefined ? <Text c="dimmed">not run</Text>

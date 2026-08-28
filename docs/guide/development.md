@@ -38,7 +38,8 @@ ASPNETCORE_URLS=http://localhost:5005 DB_PATH=/tmp/wds/wds.db \
 cd web && node scripts/screenshots.mjs      # both themes, into docs/assets/screenshots
 ```
 
-`DEMO.sql` is people, orders, items and places — enough for a join, a chart and a map. `PG.sql` adds
+`DEMO.sql` is people, orders, items, places, a document column and a wide table — enough for a
+join, a chart, a map, the JSON shape panel and the grid's wide-result check. `PG.sql` adds
 what only PostgreSQL has: a table with row-level security and two policies, a partitioned table, a
 materialised view, a `plpgsql` function that raises a notice, an extension, a role and an enum.
 
@@ -57,7 +58,15 @@ cd web && npm run smoke:mcp      # the MCP endpoint and its dialog (needs WDS_MC
 cd web && npm run smoke:objects  # policies, partitions, a function run, preferences, snapshots
 cd web && npm run smoke:dbgate   # the filter language, archives, perspective, the map
 cd web && npm run smoke:storage  # a bucket: the tree, an object, a file queried as a table
+cd web && npm run smoke:quality  # data quality, the audit trail, a subset, a JSON column
 ```
+
+The login smoke needs a studio with an account (`WDS_USER`/`WDS_PASSWORD`) and reads
+`/api/auth/me` to decide what the login screen should offer: with `WDS_OIDC_AUTHORITY` and
+`WDS_OIDC_CLIENT_ID` set it checks the provider's button, and without them it checks that there is
+none. The flow itself needs a provider — a Keycloak in the
+[sample app host](https://github.com/fgilde/Nextended/tree/main/Tests/TestProjects/WebDataStudio.AppHost)
+comes up with a realm already imported.
 
 The storage smoke needs a connection whose engine is `storage`, and a folder is enough:
 `WDS_CONN_LAKE=file:///tmp/wds/lake`. The screenshots take the storage shots when such a connection

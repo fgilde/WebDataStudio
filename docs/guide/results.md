@@ -176,6 +176,8 @@ spelling from another's, and there is one **Flatten** statement that turns the v
 columns, ready for a query tab. Arrays and objects are left out of that statement: a column cannot
 hold a subtree.
 
+![What is inside a JSON column](../assets/screenshots/json-shape-dark.png)
+
 Sampling is the honest part of this. The report says how many documents it read and how many of them
 parsed; a column with a hundred shapes in it will say so rather than presenting the first one as the
 truth.

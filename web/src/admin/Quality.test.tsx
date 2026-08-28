@@ -78,6 +78,14 @@ describe("Quality", () => {
     expect(screen.getByRole("button", { name: /Add rule/ }).hasAttribute("disabled")).toBe(true);
   });
 
+  it("shows the sentence somebody wrote, not only when the rule fails", async () => {
+    qualityRules.mockResolvedValue([rule({ message: "every order needs a customer" })]);
+
+    draw();
+
+    await waitFor(() => expect(screen.getByText("every order needs a customer")).toBeTruthy());
+  });
+
   it("shows what each rule counted, and offers the statement behind a failure", async () => {
     qualityRules.mockResolvedValue([rule(), rule({ id: "r2", column: "total", kind: "Unique" })]);
     runQualityRules.mockResolvedValue({

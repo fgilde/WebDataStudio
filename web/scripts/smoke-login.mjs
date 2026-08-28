@@ -48,6 +48,26 @@ try {
   }
 } catch (e) { await fail("screen", e); }
 
+// --- the provider, where the deployment configured one ----------------------------
+try {
+  const me = await (await page.request.get(`${baseUrl}/api/auth/me`)).json();
+  const button = page.getByRole("link", { name: me.sso?.label ?? "Single sign-on" });
+
+  if (me.sso?.enabled) {
+    // A link rather than a fetch: a redirect cannot be followed out of an XMLHttpRequest.
+    const href = await button.getAttribute("href");
+    if (!href?.startsWith("/api/auth/sso"))
+      throw new Error(`the provider button goes to ${href}`);
+
+    // With accounts as well, both ways in are offered.
+    if (!me.sso.only) await page.getByLabel("User").waitFor({ timeout: 5000 });
+    console.log(`ok   the login screen offers ${me.sso.label}`);
+  } else {
+    if (await button.count() > 0) throw new Error("a provider button with no provider configured");
+    console.log("ok   no provider configured, so no provider button");
+  }
+} catch (e) { await fail("sso", e); }
+
 if (!(await page.title()).startsWith(title)) {
   await fail("tab", new Error(`the browser tab says "${await page.title()}"`));
 }

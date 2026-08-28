@@ -95,6 +95,8 @@ dieser Engine** liest (`->>`, `JSON_VALUE`, `json_extract_string`), und es gibt 
 **Flatten**-Statement, das die Wertpfade zu Spalten macht, fertig für einen Query-Tab. Arrays und
 Objekte fehlen darin: eine Spalte kann keinen Teilbaum halten.
 
+![Was in einer JSON-Spalte steht](../../assets/screenshots/json-shape-dark.png)
+
 Die Stichprobe ist der ehrliche Teil daran. Der Bericht sagt, wie viele Dokumente er gelesen hat und
 wie viele davon geparst haben; eine Spalte mit hundert Strukturen darin sagt das, statt die erste als
 Wahrheit auszugeben.

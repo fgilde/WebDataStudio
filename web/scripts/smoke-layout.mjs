@@ -54,16 +54,22 @@ await page.keyboard.press("Control+l");
 await page.keyboard.press("0");
 await page.waitForTimeout(600);
 
-const history = page.getByRole("button", { name: "History", exact: true });
+// The explorer's toolbar used to carry an icon per tool and was cut off at any sensible width; the
+// tools live in one menu now, rendered by the header and by the explorer from the same registry.
+const openHistory = async () => {
+  await page.getByRole("banner").getByRole("button", { name: "Tools" }).click();
+  await page.getByRole("menuitem", { name: /Query history/ }).first().click();
+};
+
 const flashing = () => page.locator(".wds-flash").count();
 
-// History is docked from the start, so the second click is the case the flash exists for: nothing
-// else on screen moves, and without it the button looks broken.
-await history.click();
+// History is docked from the start, so the second time is the case the flash exists for: nothing
+// else on screen moves, and without it the entry looks broken.
+await openHistory();
 check("first activation flashes", await flashing() === 1);
 await page.waitForTimeout(900);
 check("the flash clears itself", await flashing() === 0);
-await history.click();
+await openHistory();
 check("an already-active panel flashes again", await flashing() === 1);
 await page.waitForTimeout(900);
 

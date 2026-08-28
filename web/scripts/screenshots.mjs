@@ -37,6 +37,12 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
   await page.getByText("DEMO", { exact: true }).waitFor({ timeout: 20000 });
   await page.getByText("DEMO", { exact: true }).click();
 
+  // The tools live in one menu now: the explorer's icon row was cut off at any sensible width.
+  const tool = async (label) => {
+    await page.getByRole("banner").getByRole("button", { name: "Tools" }).click();
+    await page.getByRole("menuitem", { name: label }).first().click();
+  };
+
   // Park the pointer in the middle so no tooltip hangs over the shot.
   const shot = async (name) => {
     await page.mouse.move(800, 480);
@@ -62,23 +68,23 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
   await page.getByText("Grid", { exact: true }).click();
 
   // --- diagram ------------------------------------------------------------------
-  await page.getByRole("button", { name: "Diagram" }).click();
+  await tool(/ER diagram/);
   await page.locator(".react-flow__node").first().waitFor({ timeout: 25000 });
   await page.waitForTimeout(700);
   await shot("diagram");
 
   // --- administration ---------------------------------------------------------------
-  await page.getByRole("button", { name: "Administration" }).click();
+  await tool(/^Administration/);
   await page.getByRole("tab", { name: "Maintenance" }).waitFor({ timeout: 20000 });
   await shot("admin");
 
   // --- compare ------------------------------------------------------------------------
-  await page.getByRole("button", { name: "Compare" }).click();
+  await tool(/Compare two connections/);
   await page.getByRole("tab", { name: "Schema" }).waitFor({ timeout: 20000 });
   await shot("compare");
 
   // --- query builder ----------------------------------------------------------------------
-  await page.getByRole("button", { name: "Query builder" }).click();
+  await tool(/Query builder/);
   const addTable = page.getByPlaceholder("Add a table");
   await addTable.waitFor({ timeout: 20000 });
 
@@ -138,8 +144,76 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
   await page.getByText("borrowed").waitFor({ timeout: 15000 });
   await shot("borrowed");
 
+  // --- what is inside a JSON column -----------------------------------------------------------
+  {
+    const events = page.locator(".mantine-UnstyledButton-root")
+      .filter({ hasText: /^events$/ }).first();
+
+    // Waited for rather than counted: the tree renders its nodes a moment after the folder opens,
+    // and a count taken too early reads zero for a node that is on its way.
+    const hasEvents = await events.waitFor({ timeout: 8000 }).then(() => true, () => false);
+
+    if (hasEvents) {
+      await events.dblclick();
+      await page.waitForTimeout(1500);
+
+      const panel = page.locator(".dv-groupview")
+        .filter({ has: page.getByRole("button", { name: "Insert row" }) }).first();
+
+      await panel.locator("thead").getByText("payload", { exact: true }).first().click();
+      const ask = page.getByText("What is in this JSON", { exact: false }).first();
+      const asked = await ask.waitFor({ timeout: 8000 }).then(() => true, () => false);
+
+      if (asked) {
+        await ask.click();
+        // The report reads a sample of the documents, so the shot waits for the paths.
+        await page.getByText("plan", { exact: true }).first().waitFor({ timeout: 20000 });
+        await page.waitForTimeout(600);
+        await shot("json-shape");
+        await page.keyboard.press("Escape");
+      } else {
+        await page.keyboard.press("Escape");
+        console.log("skipped the JSON shot: no menu entry for this column");
+      }
+    } else {
+      console.log("skipped the JSON shot: this demo data has no events table");
+    }
+  }
+
+  // --- rules about the data ---------------------------------------------------------------------
+  {
+    // Two rules through the API the panel calls, so the shot has something to show; they are the
+    // same call the panel makes when somebody presses Add rule.
+    const rule = (body) => page.request.put(`${baseUrl}/api/quality/${demo?.id}`, { data: body });
+
+    await rule({
+      id: "shot-city", connectionId: demo?.id, schema: "", table: "people", column: "city",
+      kind: "NotNull", argument: null, message: "every person needs a city", enabled: true,
+    });
+    await rule({
+      id: "shot-total", connectionId: demo?.id, schema: "", table: "orders", column: "total",
+      kind: "Range", argument: "0..1000", message: null, enabled: true,
+    });
+
+    await tool(/^Administration/);
+    await page.getByRole("tab", { name: "Data quality" }).first().click();
+    await page.getByText("every person needs a city").first().waitFor({ timeout: 20000 });
+    await page.getByRole("button", { name: "Run now" }).click();
+    await page.getByText(/ok|rows/).first().waitFor({ timeout: 20000 });
+    await page.waitForTimeout(600);
+    await shot("quality");
+
+    // And the trail, which by now has this run in it.
+    await page.getByRole("tab", { name: "Audit" }).first().click();
+    await page.waitForTimeout(1200);
+    await shot("audit");
+
+    for (const id of ["shot-city", "shot-total"])
+      await page.request.delete(`${baseUrl}/api/quality/${demo?.id}/${id}`);
+  }
+
   // --- perspective ----------------------------------------------------------------------------
-  await page.getByRole("button", { name: "Perspective" }).click();
+  await tool(/Perspective/);
   const start = page.getByPlaceholder("Start from");
   await start.waitFor({ timeout: 20000 });
   await start.click();
@@ -180,7 +254,7 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
   // A shot of an empty panel would be worse than no shot: say why instead.
   if (!kept.ok()) throw new Error(`could not keep an archive: ${await kept.text()}`);
 
-  await page.getByRole("button", { name: "Archives" }).click();
+  await tool(/Archives/);
   const archive = page.getByText("people-before-the-migration").first();
   await archive.waitFor({ timeout: 20000 });
   await archive.click();
@@ -262,7 +336,7 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
     await page.waitForTimeout(1500);
     await page.getByText(postgres.name, { exact: true }).first().click();
 
-    await page.getByRole("button", { name: "Administration" }).click();
+    await tool(/^Administration/);
     await page.getByRole("tab", { name: "Overview" }).click();
     await page.getByText("Over time").waitFor({ timeout: 25000 });
 

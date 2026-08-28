@@ -73,6 +73,8 @@ kann — eine umbenannte Spalte —, sagt warum, statt die Regeln danach zu stop
 zählende Statement ist einen Klick entfernt in einem Query-Tab. Eine Regel lässt sich abschalten, ohne
 sie zu löschen.
 
+![Regeln über die Daten](../../assets/screenshots/quality-dark.png)
+
 Eine fehlschlagende Regel wird außerdem ein **Health-Finding** — der Alert-Webhook trägt sie also
 mit: eine einmal geschriebene Regel wird von da an beobachtet, ohne dass jemand das Studio öffnet.
 
@@ -94,6 +96,8 @@ Wer hat über dieses Studio was getan: eine Zeile pro Anfrage, die etwas geände
 Haus getragen hat, mit Person, Verbindung und Ergebnis. Filter nach Person, nach Verbindung oder
 danach, was passiert ist — die Suche liest auch das Statement, „wer hat das gelöscht“ ist also ein
 Tabellenname im Feld.
+
+![Wer was getan hat](../../assets/screenshots/audit-dark.png)
 
 Aufzeichnung und Aufbewahrung steuern `WDS_AUDIT` und `WDS_AUDIT_DAYS`; siehe
 [Umgebungsvariablen](environment.md#wer-was-getan-hat).

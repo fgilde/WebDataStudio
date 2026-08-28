@@ -22,7 +22,10 @@ await page.request.put(`${baseUrl}/api/workspace/tabs`, { data: [] });
 await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByText("DEMO", { exact: true }).waitFor({ timeout: 20000 });
 
-await page.getByRole("button", { name: "Query builder" }).click();
+// The tools live in one menu now, rendered by the header and by the explorer from the same
+// registry — the explorer's icon row was cut off at any sensible width.
+await page.getByRole("banner").getByRole("button", { name: "Tools" }).click();
+await page.getByRole("menuitem", { name: /Query builder/ }).first().click();
 const addTable = page.getByPlaceholder("Add a table");
 await addTable.waitFor({ timeout: 20000 });
 
@@ -60,7 +63,9 @@ const builder = page.locator(".dv-groupview").filter({ has: addTable }).first();
 await builder.getByText(/\d+ rows/).first().waitFor({ timeout: 20000 });
 const preview = await builder.innerText();
 check(`the preview shows rows while the query is being built (${/(\d+) rows/.exec(preview)?.[0]})`,
-  /[1-9]\d* rows/.test(preview) && /10\.5/.test(preview));
+  // A row count and a total that looks like money: naming one value would tie this to a seed the
+  // editing smoke is allowed to change.
+  /[1-9]\d* rows/.test(preview) && /\d+\.\d/.test(preview));
 
 // The generated statement carries its model, so the query can come back into the builder.
 await page.getByRole("button", { name: "Open in query tab" }).click();

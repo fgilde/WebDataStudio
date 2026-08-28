@@ -71,6 +71,8 @@ renamed — reports why rather than stopping the rules after it.
 **Run now** runs every enabled rule and shows what each one counted, failing first, with the counting
 statement one click away in a query tab. A rule can be switched off without being deleted.
 
+![Rules about the data](../assets/screenshots/quality-dark.png)
+
 A failing rule also becomes a **health finding**, which means the [alert webhook](#alerts) carries it:
 a rule written once is watched from then on, without anybody opening the studio.
 
@@ -90,6 +92,8 @@ Who did what through this studio: one line per request that changed something or
 building, with who asked, against which connection, and what came of it. Filter by person, by
 connection, or by what happened — the search reads the statement as well as the action, so "who
 dropped that" is a table name in the box.
+
+![Who did what](../assets/screenshots/audit-dark.png)
 
 It is described in full, with its variables, in [Safety](safety.md#who-did-what).
 

@@ -27,8 +27,15 @@ await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByText("DEMO", { exact: true }).waitFor({ timeout: 15000 });
 await page.getByText("DEMO", { exact: true }).click();
 
+// The explorer's toolbar used to carry an icon per tool and was cut off at any sensible width; the
+// tools live in one menu now, rendered by the header and by the explorer from the same registry.
+const tool = async (label) => {
+  await page.getByRole("banner").getByRole("button", { name: "Tools" }).click();
+  await page.getByRole("menuitem", { name: label }).first().click();
+};
+
 // --- ER diagram --------------------------------------------------------------
-await page.getByRole("button", { name: "Diagram" }).click();
+await tool(/ER diagram/);
 try {
   await page.locator(".react-flow__node").first().waitFor({ timeout: 20000 });
   // The node header is "people · main", so match the node box rather than an exact string.
@@ -40,7 +47,7 @@ const nodeCount = await page.locator(".react-flow__node").count();
 if (nodeCount === 0) await fail("diagram-empty", new Error("the diagram drew no tables"));
 
 // --- administration ----------------------------------------------------------
-await page.getByRole("button", { name: "Administration" }).click();
+await tool(/^Administration/);
 try {
   // Administration opens on the overview now, so the maintenance panel has to be asked for.
   await page.getByRole("tab", { name: "Maintenance" }).waitFor({ timeout: 15000 });
@@ -57,7 +64,7 @@ try {
 } catch (e) { await fail("sessions", e); }
 
 // --- compare -------------------------------------------------------------------
-await page.getByRole("button", { name: "Compare" }).click();
+await tool(/Compare two connections/);
 try {
   await page.getByRole("tab", { name: "Schema" }).waitFor({ timeout: 15000 });
   await page.getByRole("button", { name: "Compare", exact: true }).last().waitFor({ timeout: 10000 });

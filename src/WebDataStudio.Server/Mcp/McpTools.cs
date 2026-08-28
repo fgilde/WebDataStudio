@@ -22,7 +22,8 @@ public sealed record McpToolResult(string Text, bool IsError = false);
 /// deal a person gets, which is the only way this is safe to expose at all.
 public sealed class McpToolbox(
     ConnectionRegistry registry, SessionFactory factory, MaskPolicyStore policies,
-    McpOptions options, IMemoryCache cache)
+    McpOptions options, IMemoryCache cache, WorkspaceStore workspace,
+    Analysis.QualityRunner quality)
 {
     /// Rows a single tool call may return. An agent that wants more can page with `offset`.
     private const int MaxRows = 200;
@@ -30,6 +31,8 @@ public sealed class McpToolbox(
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true,
+        // An agent reading `"kind": 0` learns nothing; the name is the whole point of an enum here.
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
     };
 
     public IReadOnlyList<McpTool> Tools =>
@@ -124,6 +127,86 @@ public sealed class McpToolbox(
                 ("database", "integer", "Database number, default 0.", false)),
             Writes: false);
 
+        yield return new McpTool("find_data",
+            "Looks for a value in every text column of every table, and answers with the tables and "
+            + "columns that hold it. The answer to \"where does this customer number actually live\" "
+            + "in one call, on a schema nobody documented.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("value", "string", "What to look for.", true),
+                ("schema", "string", "Only this schema.", false),
+                ("exact", "string", "\"true\" matches the whole value instead of a substring.", false)),
+            Writes: false);
+
+        yield return new McpTool("json_shape",
+            "What is actually inside a JSON or JSONB column: which paths exist, how often, with "
+            + "which types and an example — plus the SELECT that flattens them into columns on this "
+            + "engine. Reading one row of a document column is a guess; this is the shape.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("ref", "string", "Object ref of the table, e.g. \"Table:public/events\".", true),
+                ("column", "string", "The JSON column.", true),
+                ("sample", "integer", "Documents to read, default 200.", false)),
+            Writes: false);
+
+        yield return new McpTool("table_sizes",
+            "How big every table is, and — once the studio has looked twice — how much bigger than "
+            + "it was: the biggest absolute change first, with a per-day rate. Answers \"what is "
+            + "eating the disk\" and \"what is growing\" together.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("days", "integer", "How far back to compare, default 30.", false)),
+            Writes: false);
+
+        yield return new McpTool("query_stats",
+            "The statements this studio has run, grouped by shape: how often, how long, and whether "
+            + "they are getting slower. A fingerprint rather than the text, so the same query with "
+            + "different parameters is one row.",
+            Object(
+                ("connectionId", "string", "Only this connection. Omit for all of them.", false),
+                ("days", "integer", "How far back, default 7.", false),
+                ("top", "integer", "How many statements, default 20.", false)),
+            Writes: false);
+
+        yield return new McpTool("inspect_sql",
+            "Reads a statement without running it and reports what is worth knowing before it does: "
+            + "a DELETE with no WHERE, a cartesian join, a NOT IN that a NULL will break. Cheaper "
+            + "than finding out on production.",
+            Object(
+                ("connectionId", "string", "Whose dialect to read it in. Omit for a common one.", false),
+                ("sql", "string", "The statement or script.", true)),
+            Writes: false);
+
+        yield return new McpTool("quality_rules",
+            "The rules somebody wrote about this connection's data: has a value, no duplicates, "
+            + "between two numbers, points at a row that exists, newest value is recent, or their "
+            + "own condition.",
+            Object(("connectionId", "string", "Connection id.", true)),
+            Writes: false);
+
+        yield return new McpTool("run_quality_rules",
+            "Runs those rules and answers with how many rows break each one. One counting query per "
+            + "rule; a rule that cannot be checked reports why rather than stopping the others.",
+            Object(("connectionId", "string", "Connection id.", true)),
+            Writes: false);
+
+        yield return new McpTool("save_quality_rule",
+            "Writes a rule about the data, so what was found once is watched from then on: a failing "
+            + "rule joins the health findings in the studio's alert sweep. Changes the studio's own "
+            + "state, not the database.",
+            Object(
+                ("connectionId", "string", "Connection id.", true),
+                ("table", "string", "The table the rule is about.", true),
+                ("kind", "string",
+                    "NotNull, Unique, Range, Referential, Freshness or Expression.", true),
+                ("column", "string", "The column. Omit for an expression that names its own.", false),
+                ("schema", "string", "The schema, where the engine has them.", false),
+                ("argument", "string",
+                    "What the kind needs: \"0..100\", \"customers.id\", \"24h\", or the condition "
+                    + "a bad row satisfies.", false),
+                ("message", "string", "What to say when it fails.", false)),
+            Writes: true);
+
         yield return new McpTool("preview_script",
             "Splits a script into statements, says which of them are destructive, and returns a "
             + "hash. Nothing runs. The hash is what apply_script takes, so what runs is what was "
@@ -199,6 +282,14 @@ public sealed class McpToolbox(
                 "health_report" => await HealthAsync(arguments, ct),
                 "server_activity" => await ActivityAsync(arguments, ct),
                 "redis_value" => await RedisValueAsync(arguments, ct),
+                "find_data" => await FindDataAsync(arguments, ct),
+                "json_shape" => await JsonShapeAsync(arguments, ct),
+                "table_sizes" => await TableSizesAsync(arguments, ct),
+                "query_stats" => QueryStatsReport(arguments),
+                "inspect_sql" => await InspectSqlAsync(arguments, ct),
+                "quality_rules" => Ok(quality.For(Required(arguments, "connectionId"))),
+                "run_quality_rules" => await RunQualityAsync(arguments, ct),
+                "save_quality_rule" => SaveQualityRule(arguments),
                 "preview_script" => await PreviewAsync(arguments, ct),
                 "apply_script" => await ApplyAsync(arguments, ct),
                 _ => new McpToolResult($"there is no tool called '{name}'", IsError: true),
@@ -348,7 +439,10 @@ public sealed class McpToolbox(
                     IsError: true);
 
             var target = SchemaNodeRef.Parse(reference);
-            var table = Qualify(target, driver.Dialect);
+            // The driver's own FROM: for a table it is the qualified name, for a file in a bucket it
+            // is the reader that opens it. Building the name here read a Parquet file as a table
+            // called "bucket"."key", which is nothing.
+            var table = driver.FromClause(session, target) ?? Qualify(target, driver.Dialect);
             var sql = driver.Dialect.Paginate($"SELECT * FROM {table}", offset, limit);
 
             return await ReadAsync(driver, session, connection, sql, limit, ct);
@@ -618,6 +712,195 @@ public sealed class McpToolbox(
         DateTimeOffset date => date.ToString("O"),
         _ => value.ToString(),
     };
+
+    /// A value, anywhere. The same walk the studio's own "Find data" does, with the same cap.
+    private async Task<McpToolResult> FindDataAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var value = Required(arguments, "value");
+        var exact = string.Equals(Optional(arguments, "exact"), "true",
+            StringComparison.OrdinalIgnoreCase);
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            var result = await DataSearch.RunAsync(driver, session, value,
+                Optional(arguments, "schema"), exact, DataSearch.DefaultMaxTables, 30, ct);
+
+            return Ok(new
+            {
+                hits = result.Hits,
+                result.TablesSearched,
+                result.TablesSkipped,
+                result.Notes,
+                result.Truncated,
+            });
+        }
+    }
+
+    /// The shape of a document column, and the SELECT that flattens it.
+    private async Task<McpToolResult> JsonShapeAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var reference = Required(arguments, "ref");
+        var column = Required(arguments, "column");
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            var target = SchemaNodeRef.Parse(reference);
+            var detail = await driver.DescribeAsync(session, target, ct);
+
+            // Only a column that exists: the name is interpolated into SQL.
+            if (detail.Columns.All(c => !c.Name.Equals(column, StringComparison.OrdinalIgnoreCase)))
+                return new McpToolResult($"no column '{column}' on {target.Name}", IsError: true);
+
+            if (driver.FromClause(session, target) is not { } from)
+                return new McpToolResult("this object cannot be read", IsError: true);
+
+            var report = await JsonShape.DescribeAsync(driver, session, from, column,
+                Number(arguments, "sample") ?? JsonShape.DefaultSample, ct);
+
+            return Ok(new
+            {
+                report.Sampled,
+                report.Parsed,
+                report.Note,
+                paths = report.Paths.Select(path => new
+                {
+                    path.Path,
+                    path.Types,
+                    path.Present,
+                    path.Example,
+                    expression = JsonShape.Expression(driver.Dialect, column, path.Path),
+                }),
+                flatten = JsonShape.FlattenSql(driver.Dialect, from, column, report.Paths),
+            });
+        }
+    }
+
+    /// How big, and how much bigger than last time. Asking records a sample, so the history builds
+    /// itself — the same as the admin panel.
+    private async Task<McpToolResult> TableSizesAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var window = Math.Clamp(Number(arguments, "days") ?? 30, 1, 365);
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session)
+        {
+            if (!Analysis.TableSizes.Supported(driver.Info.Id))
+                return Ok(new
+                {
+                    available = false,
+                    reason = $"{driver.Info.Label} does not report a size per table",
+                });
+
+            var sizes = await Analysis.TableSizes.ReadAsync(driver, session, ct);
+
+            if (sizes.Count > 0 && workspace.Available)
+                workspace.AddSizeSamples(connection,
+                    sizes.Select(size => (size.Schema, size.Table, size.Bytes, size.Rows)));
+
+            var samples = workspace.Available
+                ? workspace.ListSizeSamples(connection, DateTimeOffset.UtcNow.AddDays(-window))
+                    .Select(sample => new Analysis.SizeGrowth.Sample(sample.Schema, sample.Table,
+                        sample.Bytes, sample.Rows, sample.At))
+                : [];
+
+            return Ok(new
+            {
+                available = true,
+                days = window,
+                tables = sizes.Take(100),
+                growth = Analysis.SizeGrowth.Between(samples),
+            });
+        }
+    }
+
+    /// What this studio has run, grouped by shape and told whether it is getting slower.
+    private McpToolResult QueryStatsReport(JsonElement arguments)
+    {
+        if (!workspace.Available)
+            return new McpToolResult("this studio has no workspace file, so it kept no history",
+                IsError: true);
+
+        var window = Math.Clamp(Number(arguments, "days") ?? 7, 1, 365);
+        var since = DateTimeOffset.UtcNow.AddDays(-window);
+
+        var entries = workspace.ListHistory(Optional(arguments, "connectionId"), null, 5000)
+            .Where(entry => entry.ExecutedAt >= since)
+            .ToList();
+
+        return Ok(new
+        {
+            days = window,
+            runs = entries.Count,
+            statements = QueryStats.Report(entries, Number(arguments, "top") ?? 20),
+        });
+    }
+
+    /// What is worth knowing about a statement before it runs.
+    private async Task<McpToolResult> InspectSqlAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var sql = Required(arguments, "sql");
+        var connection = Optional(arguments, "connectionId");
+
+        // No connection named: the checks that matter here read the same in every dialect, so a
+        // default beats a refusal.
+        if (connection is not { Length: > 0 })
+            return Ok(SqlInspections.Inspect(sql, new Drivers.PostgreSql.PostgreSqlDialect()));
+
+        var (driver, session) = await factory.OpenAsync(connection, ct);
+        await using (session) return Ok(SqlInspections.Inspect(sql, driver.Dialect));
+    }
+
+    private async Task<McpToolResult> RunQualityAsync(JsonElement arguments, CancellationToken ct)
+    {
+        var connection = Required(arguments, "connectionId");
+        var results = await quality.RunAsync(connection, ct);
+
+        return Ok(new
+        {
+            ran = results.Count,
+            failing = results.Count(result => !result.Passed),
+            results = results.Select(result => new
+            {
+                table = result.Rule.Table,
+                column = result.Rule.Column,
+                kind = result.Rule.Kind.ToString(),
+                result.Violations,
+                result.Error,
+                describes = result.Describe(),
+                result.Statement,
+            }),
+        });
+    }
+
+    private McpToolResult SaveQualityRule(JsonElement arguments)
+    {
+        var connection = Required(arguments, "connectionId");
+        var kind = Required(arguments, "kind");
+
+        if (!Enum.TryParse<Analysis.QualityKind>(kind, ignoreCase: true, out var parsed))
+            return new McpToolResult(
+                $"'{kind}' is not a rule; the kinds are "
+                + string.Join(", ", Enum.GetNames<Analysis.QualityKind>()),
+                IsError: true);
+
+        var rule = new Analysis.QualityRule(
+            Guid.NewGuid().ToString("N")[..12],
+            connection,
+            Optional(arguments, "schema") ?? "",
+            Required(arguments, "table"),
+            Optional(arguments, "column") ?? "",
+            parsed,
+            Optional(arguments, "argument"),
+            Optional(arguments, "message"));
+
+        quality.Save(rule);
+        return Ok(rule);
+    }
 
     private static McpToolResult Ok(object payload) =>
         new(JsonSerializer.Serialize(payload, Json));

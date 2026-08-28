@@ -23,10 +23,13 @@ public class McpTests : IAsyncLifetime
         await using var command = connection.CreateCommand();
         command.CommandText = """
             CREATE TABLE customers (
-                id INTEGER PRIMARY KEY, name TEXT NOT NULL, api_key TEXT, city TEXT);
+                id INTEGER PRIMARY KEY, name TEXT NOT NULL, api_key TEXT, city TEXT,
+                profile TEXT);
             INSERT INTO customers VALUES
-                (1, 'ada', 'tok-42', 'london'),
-                (2, 'grace', 'tok-43', 'new york');
+                (1, 'ada', 'tok-42', 'london', '{"plan":"pro","seats":4}'),
+                (2, 'grace', 'tok-43', 'new york', '{"plan":"free"}');
+            CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER, total REAL);
+            INSERT INTO orders VALUES (1, 1, 10.0), (2, NULL, 20.0);
             """;
         await command.ExecuteNonQueryAsync();
     }
@@ -472,5 +475,170 @@ public class McpTests : IAsyncLifetime
         // No assistance endpoint: no tools either, whatever MCP says.
         Assert.False(without.GetProperty("configured").GetBoolean());
         Assert.False(without.GetProperty("tools").GetBoolean());
+    }
+
+    // --- the newer capabilities, as tools ---------------------------------------------------
+
+    [Fact]
+    public async Task The_newer_capabilities_are_offered_too()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+
+        var tools = (await RpcAsync(client, "tools/list"))
+            .GetProperty("result").GetProperty("tools").EnumerateArray()
+            .Select(tool => tool.GetProperty("name").GetString())
+            .ToList();
+
+        Assert.Contains("find_data", tools);
+        Assert.Contains("json_shape", tools);
+        Assert.Contains("table_sizes", tools);
+        Assert.Contains("query_stats", tools);
+        Assert.Contains("inspect_sql", tools);
+        Assert.Contains("quality_rules", tools);
+        Assert.Contains("run_quality_rules", tools);
+        // Writing a rule changes the studio's state, so it waits for WDS_MCP_ALLOW_WRITE.
+        Assert.DoesNotContain("save_quality_rule", tools);
+    }
+
+    [Fact]
+    public async Task A_value_can_be_found_without_knowing_the_schema()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+
+        var (text, failed) = await CallAsync(client, "find_data", new
+        {
+            connectionId = await IdAsync(client), value = "london",
+        });
+
+        Assert.False(failed);
+        Assert.Contains("customers", text);
+        Assert.Contains("city", text);
+    }
+
+    [Fact]
+    public async Task The_shape_of_a_document_column_is_a_tool_call()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+
+        var (text, failed) = await CallAsync(client, "json_shape", new
+        {
+            connectionId = await IdAsync(client), @ref = "Table:customers", column = "profile",
+        });
+
+        Assert.False(failed);
+        Assert.Contains("plan", text);
+        Assert.Contains("seats", text);
+        // And the SELECT that turns those paths into columns.
+        Assert.Contains("flatten", text);
+    }
+
+    [Fact]
+    public async Task A_column_that_is_not_there_says_so_rather_than_building_sql()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+
+        var (text, failed) = await CallAsync(client, "json_shape", new
+        {
+            connectionId = await IdAsync(client), @ref = "Table:customers", column = "nope",
+        });
+
+        Assert.True(failed);
+        Assert.Contains("no column", text);
+    }
+
+    [Fact]
+    public async Task A_statement_can_be_read_before_it_runs()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+
+        var (text, failed) = await CallAsync(client, "inspect_sql", new
+        {
+            sql = "DELETE FROM customers",
+        });
+
+        Assert.False(failed);
+        Assert.Contains("WHERE", text);
+    }
+
+    [Fact]
+    public async Task Rules_about_the_data_can_be_written_read_and_run()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"), ("WDS_MCP_ALLOW_WRITE", "true"));
+        var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var (saved, savedFailed) = await CallAsync(client, "save_quality_rule", new
+        {
+            connectionId = id, table = "orders", column = "customer_id", kind = "NotNull",
+            message = "every order needs a customer",
+        });
+
+        Assert.False(savedFailed);
+        Assert.Contains("NotNull", saved);
+
+        var (listed, _) = await CallAsync(client, "quality_rules", new { connectionId = id });
+        Assert.Contains("every order needs a customer", listed);
+
+        var (ran, ranFailed) = await CallAsync(client, "run_quality_rules", new { connectionId = id });
+
+        Assert.False(ranFailed);
+        // One of the two orders has no customer.
+        Assert.Contains("\"violations\": 1", ran);
+    }
+
+    [Fact]
+    public async Task A_rule_nobody_has_heard_of_lists_the_ones_that_exist()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"), ("WDS_MCP_ALLOW_WRITE", "true"));
+        var client = factory.CreateClient();
+
+        var (text, failed) = await CallAsync(client, "save_quality_rule", new
+        {
+            connectionId = await IdAsync(client), table = "orders", kind = "PleaseInvent",
+        });
+
+        Assert.True(failed);
+        Assert.Contains("Freshness", text);
+    }
+
+    [Fact]
+    public async Task Sizes_are_answered_or_the_engine_says_it_cannot()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+
+        var (text, failed) = await CallAsync(client, "table_sizes", new
+        {
+            connectionId = await IdAsync(client),
+        });
+
+        // SQLite has no size per table, and that is an answer rather than an error.
+        Assert.False(failed);
+        Assert.Contains("does not report a size per table", text);
+    }
+
+    [Fact]
+    public async Task What_this_studio_has_run_is_a_tool_call()
+    {
+        using var factory = Factory(("WDS_MCP_ENABLED", "true"));
+        var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        // One statement in the history, put there the way the browser does.
+        await client.PostAsJsonAsync("/api/history", new
+        {
+            connectionId = id, sql = "SELECT * FROM customers WHERE id = 1", elapsedMs = 3,
+            rowCount = 1,
+        }, TestContext.Current.CancellationToken);
+
+        var (text, failed) = await CallAsync(client, "query_stats", new { connectionId = id });
+
+        Assert.False(failed);
+        Assert.Contains("SELECT * FROM customers WHERE id = ?", text);
     }
 }

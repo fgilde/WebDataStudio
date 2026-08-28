@@ -1,4 +1,7 @@
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
+using WebDataStudio.Server.Drivers.Abstractions;
+using WebDataStudio.Server.Drivers.Storage;
 using WebDataStudio.Server.Import;
 using WebDataStudio.Server.Services;
 
@@ -6,6 +9,27 @@ namespace WebDataStudio.Server.Endpoints;
 
 public static class ImportEndpoints
 {
+    /// A bare name: the schema travels on its own, so nothing here is spliced into an identifier.
+    private static string? TableName(string table)
+    {
+        var trimmed = table.Trim();
+
+        return trimmed.Length == 0
+               || trimmed.Contains('.') || trimmed.Contains('"') || trimmed.Contains('`')
+               || trimmed.Contains('[') || trimmed.Contains(';')
+            ? null
+            : trimmed;
+    }
+
+    /// Where a new table goes when nobody said: the engine's usual default, and nothing for the
+    /// engines that have no schemas at all.
+    private static string DefaultSchema(IDbDriver driver) => driver.Info.Id switch
+    {
+        "postgresql" or "duckdb" => "public",
+        "sqlserver" => "dbo",
+        _ => "",
+    };
+
     public record CopyTableRequest(string SourceConnectionId, string SourceRef,
         string TargetConnectionId, string TargetTable, int? MaxRows);
 
@@ -13,6 +37,110 @@ public static class ImportEndpoints
 
     public static void MapImportEndpoints(this WebApplication app)
     {
+        // --- a file becomes a table ------------------------------------------
+        // The import below fills a table that already exists. This is the other half: a CSV or a
+        // Parquet somebody was sent, or an object in a bucket, that should simply be a table. DuckDB
+        // reads it — it infers a CSV's types better than a hand-rolled sniffer and takes an s3:// URI
+        // as readily as a path — and the target engine's own DDL writer creates the table.
+        app.MapPost("/api/import/{conn}/new-table", async (string conn, string table, string? schema,
+            bool? apply, string? storageConnection, [FromQuery(Name = "ref")] string? objectRef,
+            HttpRequest request, SessionFactory factory, FileTableImport imports,
+            CancellationToken ct) =>
+        {
+            if (TableName(table) is not { } target)
+                return Results.BadRequest(new
+                {
+                    message = "a table name cannot be qualified or quoted here; "
+                              + "pass the schema on its own",
+                });
+
+            string? staged = null;
+
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    FileSource source;
+
+                    if (storageConnection is { Length: > 0 } && objectRef is { Length: > 0 })
+                    {
+                        // An object in a bucket is read where it is: no download, no temp file.
+                        var (_, storageSession) = await factory.OpenAsync(storageConnection, ct);
+                        await using (storageSession)
+                        {
+                            if (storageSession.Unwrap() is not StorageSession storage)
+                                return Results.BadRequest(new
+                                {
+                                    message = $"'{storageConnection}' is not object storage",
+                                });
+
+                            var objectTarget = SchemaEndpoints.ParseObjectRef(objectRef);
+                            var key = StorageDriver.KeyOf(objectTarget);
+                            var setup = new List<string>(DuckDbExtensions.Preamble(
+                                storage.Store.Target.Provider, DuckDbExtensions.BundledDirectory));
+
+                            if (storage.Store.SecretStatement() is { } secret) setup.Add(secret);
+
+                            source = new StorageFileSource(storage.Store.SqlUri(key), setup);
+                        }
+                    }
+                    else
+                    {
+                        if (!request.HasFormContentType)
+                            return Results.BadRequest(new
+                            {
+                                message = "upload a file, or name a storage connection and an object",
+                            });
+
+                        var form = await request.ReadFormAsync(ct);
+                        var file = form.Files.GetFile("file");
+
+                        if (file is null)
+                            return Results.BadRequest(new { message = "no file was uploaded" });
+
+                        if (file.Length > MaxUploadBytes)
+                            return Results.BadRequest(new
+                            {
+                                message = "the file is larger than the 512 MB upload limit",
+                            });
+
+                        // DuckDB reads a file rather than a stream, so an upload is staged here and
+                        // deleted again below whatever happens.
+                        staged = Path.Combine(Path.GetTempPath(),
+                            "wds-import-" + Guid.NewGuid().ToString("N")
+                            + Path.GetExtension(file.FileName));
+
+                        await using (var write = File.Create(staged))
+                            await file.CopyToAsync(write, ct);
+
+                        source = new LocalFileSource(staged);
+                    }
+
+                    var schemaName = schema ?? DefaultSchema(driver);
+
+                    // Two calls, one endpoint: the plan is read before anything is created, which is
+                    // the handshake every other change in this studio uses.
+                    if (apply != true)
+                        return Results.Ok(
+                            await imports.PlanAsync(driver, schemaName, target, source, ct));
+
+                    return Results.Ok(
+                        await imports.RunAsync(driver, session, schemaName, target, source, ct));
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (InvalidOperationException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+            finally
+            {
+                if (staged is not null && File.Exists(staged))
+                    try { File.Delete(staged); } catch (IOException) { }
+            }
+        }).DisableAntiforgery();
+
         app.MapPost("/api/import/preview", async (HttpRequest request, CancellationToken ct) =>
         {
             if (!request.HasFormContentType) return Results.BadRequest(new { message = "expected a file upload" });

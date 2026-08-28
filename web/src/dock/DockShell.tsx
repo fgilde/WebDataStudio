@@ -56,6 +56,7 @@ import {
 } from "../api";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
 import { CopyTableDialog, ImportDialog, type ImportTarget } from "../import/ImportDialog";
+import { NewTableDialog } from "../import/NewTableDialog";
 import type { DialectId } from "../sql/splitStatements";
 
 interface TabState {
@@ -458,6 +459,11 @@ export function DockShell() {
   const [chordOpen, setChordOpen] = useState(false);
   const [exportTarget, setExportTarget] = useState<ExportTarget | null>(null);
   const [importTarget, setImportTarget] = useState<ImportTarget | null>(null);
+  // A file that should simply be a table: an upload, or an object in a bucket.
+  const [newTable, setNewTable] = useState<{
+    connectionId: string;
+    source?: { storageConnection: string; objectRef: string; name: string };
+  } | null>(null);
   const [copySource, setCopySource] = useState<{ connectionId: string; objectRef: string; label: string } | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -701,6 +707,16 @@ export function DockShell() {
         }
 
         newTab(s.connectionId, `SELECT * FROM ${name}`);
+        break;
+
+      case "import-object":
+        // The file is in one connection and the table goes in another, so the dialog asks which.
+        setNewTable({
+          connectionId: "",
+          source: {
+            storageConnection: s.connectionId, objectRef: s.node.ref, name: s.node.label,
+          },
+        });
         break;
 
       case "download-object": {
@@ -1038,6 +1054,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     refreshExplorer: () => setExplorerNonce(n => n + 1),
     goToObject: () => setGotoOpen(true),
     addBucket: () => navigate("/connections?bucket=1"),
+    importFile: () => setNewTable({ connectionId: activeConnection }),
     // Every tool goes through the one registry: a panel is focused, a per-connection tool is
     // opened, and the tab it asked for travels with it.
     openTool: tool => tool.dock === "panel"
@@ -1220,6 +1237,15 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
       <ExportDialog target={exportTarget} onClose={() => setExportTarget(null)} />
       <ImportDialog target={importTarget} onClose={() => setImportTarget(null)} />
+
+      {newTable && (
+        <NewTableDialog connectionId={newTable.connectionId} source={newTable.source}
+          onClose={() => setNewTable(null)}
+          onDone={(table: string) => {
+            notifications.show({ message: `${table} created` });
+            setExplorerNonce(n => n + 1);
+          }} />
+      )}
       <CopyTableDialog source={copySource} connections={connections}
         onClose={() => setCopySource(null)} />
 

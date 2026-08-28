@@ -23,6 +23,24 @@ public abstract class SqlDialect
     /// <c>{0}</c> is the parameter.
     public virtual string NumberCast => "CAST({0} AS numeric)";
 
+    // --- the type names a new table is written with ------------------------------------------
+    // A file's columns arrive as DuckDB's types and have to be written as this engine's. Named
+    // properties rather than a mapping table: each engine then says its own spelling once, and a new
+    // engine that forgets one gets the default rather than a wrong column.
+
+    public virtual string BooleanType => "BOOLEAN";
+    public virtual string SmallIntType => "SMALLINT";
+    public virtual string IntType => "INTEGER";
+    public virtual string BigIntType => "BIGINT";
+    public virtual string DoubleType => "DOUBLE PRECISION";
+    public virtual string DateType => "DATE";
+    public virtual string TimeType => "TIME";
+    public virtual string TimestampType => "TIMESTAMP";
+
+    /// `DECIMAL(18,2)` as this engine spells it. The precision comes from the file, so it travels
+    /// through rather than being flattened to a default.
+    public virtual string DecimalType(string duckdbType) => duckdbType;
+
     /// One path inside a JSON column, as text. `column` is already quoted; `path` is dotted, with
     /// `[]` where an array was folded into one entry.
     ///

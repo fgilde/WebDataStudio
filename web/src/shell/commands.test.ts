@@ -4,7 +4,8 @@ import { TOOLS, visibleTools } from "./tools";
 
 const context = (patch: Partial<CommandContext> = {}): CommandContext => ({
   newQuery: vi.fn(), runCurrent: vi.fn(), cancelCurrent: vi.fn(), formatCurrent: vi.fn(),
-  openConnections: vi.fn(), addConnection: vi.fn(), addBucket: vi.fn(), refreshExplorer: vi.fn(),
+  openConnections: vi.fn(), addConnection: vi.fn(), addBucket: vi.fn(), importFile: vi.fn(),
+  refreshExplorer: vi.fn(),
   goToObject: vi.fn(), openTool: vi.fn(), saveCurrentQuery: vi.fn(), exportResult: vi.fn(),
   openSnippets: vi.fn(), showExplorer: vi.fn(), openInBuilder: vi.fn(), switchTheme: vi.fn(),
   saveLayout: vi.fn(), resetLayout: vi.fn(), copyLink: vi.fn(), showShortcuts: vi.fn(),
@@ -66,7 +67,7 @@ describe("buildCommands", () => {
 
     // The explorer's icon row lost these; if the palette lost them too they would be unreachable.
     for (const id of ["view.saveLayout", "tool.compare", "tool.notebook", "tool.archive",
-      "connection.bucket"])
+      "connection.bucket", "import.file"])
       expect(ids).toContain(id);
   });
 

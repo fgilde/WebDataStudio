@@ -144,6 +144,9 @@ builder.Services.AddSingleton<SchemaScope>();
 builder.Services.AddSingleton<EntraSignIn>();
 builder.Services.AddSingleton<SessionFactory>();
 builder.Services.AddSingleton<StatementCapture>();
+// A file becomes a table: DuckDB reads it, the target engine's DDL writer creates it.
+builder.Services.AddSingleton<WebDataStudio.Server.Import.ImportService>();
+builder.Services.AddSingleton<WebDataStudio.Server.Import.FileTableImport>();
 builder.Services.AddSingleton<QueryRunner>();
 // Export formats somebody wrote themselves: a folder the deployment mounts, plus whatever was
 // saved in this studio. They are text with placeholders, never code to run.

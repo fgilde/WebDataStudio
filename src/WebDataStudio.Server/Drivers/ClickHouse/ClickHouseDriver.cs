@@ -22,6 +22,18 @@ public sealed class ClickHouseDialect : SqlDialect
         return $"JSONExtractString({column}, {string.Join(", ", steps)})";
     }
 
+
+    // ClickHouse names its own widths, and a column that may be empty has to say Nullable.
+    public override string BooleanType => "Nullable(Bool)";
+    public override string SmallIntType => "Nullable(Int16)";
+    public override string IntType => "Nullable(Int32)";
+    public override string BigIntType => "Nullable(Int64)";
+    public override string DoubleType => "Nullable(Float64)";
+    public override string DateType => "Nullable(Date)";
+    public override string TimeType => "Nullable(String)";
+    public override string TimestampType => "Nullable(DateTime)";
+    public override string DecimalType(string duckdbType) => "Nullable(Decimal(38, 6))";
+
 }
 
 public sealed class ClickHouseDriver : AdoDriverBase

@@ -17,6 +17,8 @@ export interface CommandContext {
   openConnections: () => void;
   addConnection: () => void;
   addBucket: () => void;
+  /// A file that should simply be a table.
+  importFile: () => void;
   refreshExplorer: () => void;
   goToObject: () => void;
   /// Opens one of the tools in `tools.ts`. One entry point rather than one callback per tool: the
@@ -67,6 +69,7 @@ export function buildCommands(context: CommandContext): Command[] {
     { id: "connection.add", label: "Add connection", group: "Connections", run: context.addConnection },
     // A bucket is a connection whose form asks for the pieces instead of a URL.
     { id: "connection.bucket", label: "Add a bucket — S3, Azure Blob, Google Cloud, a folder", group: "Connections", run: context.addBucket },
+    { id: "import.file", label: "Import a file as a new table — CSV, TSV, JSON, Parquet", group: "Connections", disabled: !context.activeConnection, run: context.importFile },
     { id: "explorer.refresh", label: "Refresh explorer", group: "Connections", shortcut: "F6", run: context.refreshExplorer },
     { id: "explorer.goto", label: "Go to object", group: "Connections", shortcut: "Ctrl+Shift+O", run: context.goToObject },
 

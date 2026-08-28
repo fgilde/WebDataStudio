@@ -36,6 +36,16 @@ public sealed class OracleDialect : SqlDialect
     public override string JsonPath(string column, string path) =>
         $"JSON_VALUE({column}, '{JsonPathLiteral(path).Replace("[*]", "[0]")}')";
 
+
+    // Oracle: NUMBER for everything numeric, and no BOOLEAN in a table before 23c.
+    public override string BooleanType => "NUMBER(1)";
+    public override string SmallIntType => "NUMBER(5)";
+    public override string IntType => "NUMBER(10)";
+    public override string BigIntType => "NUMBER(19)";
+    public override string DoubleType => "BINARY_DOUBLE";
+    public override string TimeType => "TIMESTAMP";
+    public override string DecimalType(string duckdbType) => "NUMBER";
+
 }
 
 public sealed class OracleDriver : AdoDriverBase

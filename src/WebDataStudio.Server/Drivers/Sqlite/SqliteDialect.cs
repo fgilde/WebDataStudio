@@ -12,4 +12,17 @@ public sealed class SqliteDialect : SqlDialect
     public override string TimestampCast => "{0}";
 
     public override string Paginate(string sql, int offset, int limit) => $"{sql} LIMIT {limit} OFFSET {offset}";
+
+    // SQLite's own five: everything else is an alias for one of them, and writing INTEGER and TEXT
+    // is what makes a column behave the way the file did.
+    public override string BooleanType => "INTEGER";
+    public override string SmallIntType => "INTEGER";
+    public override string IntType => "INTEGER";
+    public override string BigIntType => "INTEGER";
+    public override string DoubleType => "REAL";
+    public override string DateType => "TEXT";
+    public override string TimeType => "TEXT";
+    public override string TimestampType => "TEXT";
+    public override string DecimalType(string duckdbType) => "NUMERIC";
+
 }

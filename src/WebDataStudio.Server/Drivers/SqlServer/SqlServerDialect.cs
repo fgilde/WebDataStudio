@@ -26,4 +26,9 @@ public sealed class SqlServerDialect : SqlDialect
     public override string JsonPath(string column, string path) =>
         $"JSON_VALUE({column}, '{JsonPathLiteral(path).Replace("[*]", "[0]")}')";
 
+
+    public override string BooleanType => "BIT";
+    public override string DoubleType => "FLOAT";
+    public override string TimestampType => "DATETIME2";
+
 }

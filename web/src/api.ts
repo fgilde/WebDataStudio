@@ -787,6 +787,49 @@ export const searchData = (
   return fetch(`${base}/search/${conn}/data?${query}`).then(r => ok<DataSearchDto>(r));
 };
 
+export interface ImportColumnDto { name: string; sourceType: string; targetType: string }
+
+export interface ImportPlanDto {
+  schema: string;
+  table: string;
+  columns: ImportColumnDto[];
+  /// The CREATE TABLE that will run, for reading before it does.
+  createSql: string;
+  /// Where the reader can say so without reading the whole file.
+  rows: number | null;
+  preview: (string | null)[][];
+}
+
+export interface ImportOutcomeDto { table: string; rows: number; createSql: string }
+
+/// A file becomes a table: `apply: false` plans it, `apply: true` creates and loads it.
+export const importFileAsTable = (conn: string, options: {
+  table: string;
+  schema?: string;
+  apply: boolean;
+  file?: File | null;
+  /// An object in a bucket, read where it is rather than downloaded first.
+  source?: { storageConnection: string; objectRef: string };
+}): Promise<ImportPlanDto | ImportOutcomeDto> => {
+  const query = new URLSearchParams({ table: options.table });
+  if (options.schema) query.set("schema", options.schema);
+  if (options.apply) query.set("apply", "true");
+
+  if (options.source) {
+    query.set("storageConnection", options.source.storageConnection);
+    query.set("ref", options.source.objectRef);
+
+    return fetch(`${base}/import/${conn}/new-table?${query}`, { method: "POST" })
+      .then(r => ok<ImportPlanDto | ImportOutcomeDto>(r));
+  }
+
+  const body = new FormData();
+  if (options.file) body.append("file", options.file);
+
+  return fetch(`${base}/import/${conn}/new-table?${query}`, { method: "POST", body })
+    .then(r => ok<ImportPlanDto | ImportOutcomeDto>(r));
+};
+
 export interface JsonPathDto {
   path: string;
   /// Every type seen at this path. More than one is where a flatten breaks.

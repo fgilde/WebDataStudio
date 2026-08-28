@@ -27,6 +27,10 @@ import { BulkUpdateModal } from "../grid/editing/BulkUpdateModal";
 import { useChangeSet, type RowChange } from "../grid/editing/useChangeSet";
 import { usePreferences } from "../shell/preferences";
 
+/// A column that holds bytes. Typing into one is not what anybody wants; it takes a file.
+const isBinary = (type: string) =>
+  /(binary|blob|bytea|image|^raw)/i.test(type);
+
 /// The referenced table as a schema node reference; an unqualified name means the same schema.
 const refOf = (fk: ForeignKeyDto) =>
   `Table:${fk.referencedSchema ? `${fk.referencedSchema}/` : ""}${fk.referencedTable}`;
@@ -503,6 +507,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                           state={changeSet.cellState(rowIndex, c.name)}
                           editable={page.editable && !isLookup(c.name)}
                           boolean={isBoolean(c.dataType)}
+                          binary={isBinary(c.dataType)}
                           lookup={fk ? text => lookupValues(
                             connectionId, refOf(fk), fk.referencedColumns[0], text) : undefined}
                           onCommit={value => changeSet.edit(rowIndex, c.name, value)} />

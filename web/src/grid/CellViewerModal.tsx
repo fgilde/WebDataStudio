@@ -1,4 +1,5 @@
 import { Button, Group, Modal, ScrollArea, Tabs, Text } from "@mantine/core";
+import { fileNameFor, looksBinary, saveCell, size, toBytes } from "./binaryCell";
 
 export interface CellRef { row: number; col: number; column: string; value: unknown }
 
@@ -35,15 +36,9 @@ export function CellViewerModal({ cell, onClose }: { cell: CellRef | null; onClo
   const raw = hex(cell.value);
   const image = imageDataUrl(cell.value);
 
-  const download = () => {
-    const blob = new Blob([text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${cell.column}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  // Bytes are saved as themselves, with the extension their first bytes say they have: a PDF saved
+  // as column.txt is a file nobody can open.
+  const download = () => saveCell(cell.column, cell.value);
 
   return (
     <Modal opened onClose={onClose} title={cell.column} size="lg">
@@ -87,7 +82,14 @@ export function CellViewerModal({ cell, onClose }: { cell: CellRef | null; onClo
       </Tabs>
 
       <Group justify="flex-end" mt="sm">
-        <Button variant="default" size="xs" onClick={download}>Download</Button>
+        <Button variant="default" size="xs" onClick={download}>
+          {looksBinary(cell.value)
+            ? `Save as ${fileNameFor(cell.column, toBytes(cell.value))}`
+            : "Download"}
+        </Button>
+        {looksBinary(cell.value) && (
+          <Text size="xs" c="dimmed">{size(toBytes(cell.value).length)}</Text>
+        )}
       </Group>
     </Modal>
   );

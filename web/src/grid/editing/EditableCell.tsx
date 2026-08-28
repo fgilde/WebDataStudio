@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { notifications } from "@mantine/notifications";
+import { looksBinary, readFileAsCell, saveCell, size, toBytes } from "../binaryCell";
 import { ActionIcon, Autocomplete, Group, Switch, TextInput, Tooltip } from "@mantine/core";
-import { IconCircleOff } from "@tabler/icons-react";
+import { IconCircleOff, IconDownload, IconUpload } from "@tabler/icons-react";
 import { CellValue } from "../CellValue";
 import type { CellState } from "./useChangeSet";
 
@@ -11,11 +13,14 @@ const BORDERS: Record<CellState, string | undefined> = {
   deleted: "2px solid var(--mantine-color-red-6)",
 };
 
-export function EditableCell({ value, state, editable, boolean, lookup, onCommit }: {
+export function EditableCell({ value, state, editable, boolean, binary, lookup, onCommit }: {
   value: unknown;
   state: CellState;
   editable: boolean;
   boolean: boolean;
+  /// A column that holds bytes. Typing into one of those is not what anybody wants: it takes a file
+  /// instead, and shows what is in it rather than a screen of hex.
+  binary?: boolean;
   /// Present on a foreign-key column: returns the candidate values for the given search text.
   lookup?: (search: string) => Promise<{ value: unknown; label: unknown }[]>;
   onCommit: (value: unknown) => void;
@@ -27,8 +32,30 @@ export function EditableCell({ value, state, editable, boolean, lookup, onCommit
 
   useEffect(() => { if (editing) input.current?.focus(); }, [editing]);
 
+  const pick = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+
+      try {
+        onCommit(await readFileAsCell(file));
+      } catch (e) {
+        notifications.show({ color: "red", message: e instanceof Error ? e.message : String(e) });
+      }
+    };
+
+    input.click();
+  };
+
   const start = () => {
     if (!editable || state === "deleted") return;
+
+    // Bytes are picked, not typed.
+    if (binary || looksBinary(value)) { pick(); return; }
+
     setDraft(value === null || value === undefined ? "" : String(value));
     setEditing(true);
     if (lookup) search("");
@@ -90,6 +117,31 @@ export function EditableCell({ value, state, editable, boolean, lookup, onCommit
             <IconCircleOff size={12} />
           </ActionIcon>
         </Tooltip>
+      </Group>
+    );
+  }
+
+  // A blob is shown as what it is and what it weighs, with the two things anybody wants to do to
+  // one: take it out, or put another one in.
+  if (looksBinary(value)) {
+    const bytes = toBytes(value);
+
+    return (
+      <Group gap={4} wrap="nowrap">
+        <Tooltip label="Save this file">
+          <ActionIcon size="xs" variant="subtle" aria-label="Save the file in this cell"
+            onClick={() => saveCell("cell", value)}>
+            <IconDownload size={12} />
+          </ActionIcon>
+        </Tooltip>
+        <span style={{ fontSize: 11, opacity: 0.75 }}>{size(bytes.length)}</span>
+        {editable && (
+          <Tooltip label="Replace with a file">
+            <ActionIcon size="xs" variant="subtle" aria-label="Replace with a file" onClick={pick}>
+              <IconUpload size={12} />
+            </ActionIcon>
+          </Tooltip>
+        )}
       </Group>
     );
   }

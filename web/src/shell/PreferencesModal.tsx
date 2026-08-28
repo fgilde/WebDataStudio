@@ -64,6 +64,11 @@ export function PreferencesModal({ commands, opened, onClose }: {
             <NumberInput size="xs" w={180} label="Rows a snapshot keeps" min={10} max={2000} step={10}
               disabled={!prefs.historySnapshots} value={prefs.snapshotRows}
               onChange={value => store({ snapshotRows: Math.max(10, Number(value) || 200) })} />
+
+            <NumberInput size="xs" w={220} label="Tell me when a query takes longer than" min={0}
+              max={3600} step={10} suffix=" s" value={prefs.notifyAfterSeconds}
+              description="Only while you are looking at something else. 0 switches it off."
+              onChange={value => store({ notifyAfterSeconds: Math.max(0, Number(value) || 0) })} />
           </Stack>
         </Tabs.Panel>
 

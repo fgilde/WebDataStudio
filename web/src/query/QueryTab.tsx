@@ -12,6 +12,7 @@ import { runQuery, type QueryRun } from "./runQuery";
 import { applyChunk, createResultState, type ResultState } from "./resultStore";
 import { addHistory, health, inspectSql, type SqlFindingDto } from "../api";
 import { preferences } from "../shell/preferences";
+import { describeRun, notifyLongRun, shouldNotify } from "../shell/notifyLongRun";
 import { findParameters } from "../editor/parameters";
 import { ParameterDialog } from "../editor/ParameterDialog";
 import { InspectionDialog } from "./InspectionDialog";
@@ -109,6 +110,14 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
 
       const last = state.statements[state.statements.length - 1];
       const prefs = preferences();
+      const elapsed = performance.now() - started;
+
+      // A query somebody walked away from: tell them it is done rather than making them come back
+      // to look. Nothing is sent while they are watching it happen.
+      if (shouldNotify(elapsed, prefs.notifyAfterSeconds, document.hidden))
+        void notifyLongRun(
+          last?.error ? "Query failed" : "Query finished",
+          describeRun(elapsed, last?.rows.length ?? null, last?.error?.text ?? null));
 
       // The result is kept with the entry only when that is asked for: a snapshot is a copy of the
       // data, and the workspace database is not where everybody wants one.

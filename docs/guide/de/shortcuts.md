@@ -43,7 +43,9 @@ auch die ohne Kürzel.
 
 `Strg+,` öffnet die Einstellungen. Sie liegen im Workspace, überleben also einen Neustart und
 begleiten dich in einen anderen Browser, statt in einem Local Storage zu wohnen: Zeilen pro Seite im
-Daten-Tab, ob ein Verlaufseintrag sein Ergebnis behält, und wie viele Zeilen davon.
+Daten-Tab, ob ein Verlaufseintrag sein Ergebnis behält, wie viele Zeilen davon — und ab welcher
+Laufzeit eine Abfrage sich meldet, wenn sie fertig ist und du gerade woanders hinsiehst (0 schaltet
+das ab; nach der Erlaubnis fragt der Browser erst dann, wenn die erste solche Meldung anstünde).
 
 ### Das Theme
 

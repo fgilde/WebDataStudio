@@ -14,6 +14,9 @@ export interface Preferences {
   /// Whether the studio reads a statement before running it and says what it noticed — an UPDATE
   /// with no WHERE, an accidental cross product. It only ever warns.
   inspectBeforeRun: boolean;
+  /// Tell me when a query that took at least this many seconds is done, if I am looking at
+  /// something else. 0 switches it off.
+  notifyAfterSeconds: number;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -22,6 +25,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   snapshotRows: 200,
   shortcuts: {},
   inspectBeforeRun: true,
+  notifyAfterSeconds: 30,
 };
 
 const KEY = "preferences";

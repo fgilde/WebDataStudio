@@ -52,11 +52,9 @@ public static partial class ChangeScriptBuilder
         var columns = change.Values.Keys.ToList();
         var parameters = new Dictionary<string, object?>();
 
-        for (var i = 0; i < columns.Count; i++) parameters[$"p{i}"] = change.Values[columns[i]];
-
         var names = string.Join(", ", columns.Select(dialect.QuoteIdentifier));
         var values = string.Join(", ", columns.Select((column, i) =>
-            Placeholder(dialect, $"p{i}", Type(types, column), change.Values[column])));
+            Bind(dialect, parameters, $"p{i}", Type(types, column), change.Values[column])));
 
         return new ScriptStatement($"INSERT INTO {table} ({names}) VALUES ({values})", parameters, index, false);
     }
@@ -70,20 +68,13 @@ public static partial class ChangeScriptBuilder
 
         var assignments = new List<string>();
         for (var i = 0; i < setColumns.Count; i++)
-        {
-            parameters[$"p{i}"] = change.Values[setColumns[i]];
             assignments.Add($"{dialect.QuoteIdentifier(setColumns[i])} = " +
-                Placeholder(dialect, $"p{i}", Type(types, setColumns[i]), change.Values[setColumns[i]]));
-        }
+                Bind(dialect, parameters, $"p{i}", Type(types, setColumns[i]), change.Values[setColumns[i]]));
 
         var predicates = new List<string>();
         for (var i = 0; i < keyColumns.Count; i++)
-        {
-            var name = $"k{i}";
-            parameters[name] = change.Key[keyColumns[i]];
             predicates.Add($"{dialect.QuoteIdentifier(keyColumns[i])} = " +
-                Placeholder(dialect, name, Type(types, keyColumns[i]), change.Key[keyColumns[i]]));
-        }
+                Bind(dialect, parameters, $"k{i}", Type(types, keyColumns[i]), change.Key[keyColumns[i]]));
 
         var sql = $"UPDATE {table} SET {string.Join(", ", assignments)} WHERE {string.Join(" AND ", predicates)}";
         return new ScriptStatement(sql, parameters, index, false);
@@ -97,12 +88,8 @@ public static partial class ChangeScriptBuilder
 
         var predicates = new List<string>();
         for (var i = 0; i < keyColumns.Count; i++)
-        {
-            var name = $"k{i}";
-            parameters[name] = change.Key[keyColumns[i]];
             predicates.Add($"{dialect.QuoteIdentifier(keyColumns[i])} = " +
-                Placeholder(dialect, name, Type(types, keyColumns[i]), change.Key[keyColumns[i]]));
-        }
+                Bind(dialect, parameters, $"k{i}", Type(types, keyColumns[i]), change.Key[keyColumns[i]]));
 
         return new ScriptStatement($"DELETE FROM {table} WHERE {string.Join(" AND ", predicates)}",
             parameters, index, true);
@@ -110,6 +97,23 @@ public static partial class ChangeScriptBuilder
 
     private static string? Type(IReadOnlyDictionary<string, string> types, string column) =>
         types.TryGetValue(column, out var type) ? type : null;
+
+    /// What goes into the statement for one value, and what goes into the parameter list for it.
+    ///
+    /// Almost always a parameter. The exception is a file somebody put in a binary cell: parameters
+    /// travel as text (see ScriptRequest), and text in a bytea column would be written as the
+    /// *characters* "0x89504e47…" without a complaint. Bytes are written as this engine's own binary
+    /// literal instead — safe to interpolate, because hex is all it can be.
+    private static string Bind(SqlDialect dialect, Dictionary<string, object?> parameters,
+        string name, string? declaredType, object? value)
+    {
+        if (declaredType is { Length: > 0 } && Binary(declaredType.ToLowerInvariant())
+            && Normalize(value) is string text && BinaryValue.Parse(text) is { } bytes)
+            return BinaryValue.Literal(bytes, dialect);
+
+        parameters[name] = value;
+        return Placeholder(dialect, name, declaredType, value);
+    }
 
     /// The parameter, cast to what the column actually is when that is needed.
     ///

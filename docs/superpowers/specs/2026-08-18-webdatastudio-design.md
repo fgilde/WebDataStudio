@@ -533,6 +533,8 @@ it works for every engine whose capability set claims support for it.
 | F30.33 | A transaction a query tab holds open: begin, look at what it did, commit or roll back |
 | F30.34 | Keep going after a failed statement, when that is what was asked for |
 | F30.35 | A pivot over the result on screen, and two plans of the same statement held against each other |
+| F30.36 | A file out of a binary cell and back into one, as the file it actually is |
+| F30.37 | A notification when a long run finishes and nobody is watching |
 
 ## 10. Safety behaviour
 

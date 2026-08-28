@@ -231,3 +231,5 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F30.33 | A transaction a query tab holds open across statements: begin, see what they did while nobody else can, then commit or roll back — swept by the server when nobody comes back | done | postgresql, mysql, sqlserver, sqlite, oracle, duckdb | Query tab, `WDS_TRANSACTION_IDLE_SECONDS` |
 | F30.34 | Keeping going after a statement fails, asked for rather than assumed, with each failure reported where it happened | done | all | Query tab |
 | F30.35 | A pivot over the rows on screen — one column down the side, another across the top — and the plan of a statement held against the plan of its previous run | done | all | Result views, plan panel |
+| F30.36 | A binary cell as the file it holds: saved with the extension its first bytes say it has, and replaced from disk through the same preview, written as the engine's own binary literal | done | postgresql, mysql, sqlserver, sqlite, oracle | Data tab, cell viewer |
+| F30.37 | A notification when a run that took longer than the preference finishes while you are looking at something else | done | all | Query tab, preferences |

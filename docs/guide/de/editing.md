@@ -24,6 +24,22 @@ Sie sind nicht bearbeitbar, und der Tab sagt den Grund: ohne Schlüssel gibt es 
 eine einzelne Zeile anzusprechen. Also einen Schlüssel anlegen — oder über ein selbst geschriebenes
 Statement arbeiten.
 
+## Eine Spalte, in der eine Datei steckt
+
+Eine Binärspalte — `bytea`, `blob`, `varbinary`, `image` — zeigt, wie groß ihr Inhalt ist, und zwei
+Knöpfe: Datei speichern oder durch eine andere ersetzen. Hex in eine Zelle zu tippen will niemand,
+deshalb werden solche Zellen ausgewählt statt bearbeitet.
+
+**Speichern** schreibt die Datei mit der Endung, die ihre ersten Bytes nennen: ein PDF kommt als
+`.pdf` heraus, ein PNG als `.png`, und was das Studio nicht benennen kann als `.bin`. Vorher war es
+immer `.txt` — eine Datei, die niemand öffnen kann.
+
+**Ersetzen** nimmt eine Datei bis 8 MB — Hex verdoppelt die Größe auf dem Weg zum Server, und ein
+Zellen-Editor ist nicht der Ort, um ein Video zu bewegen. Die Änderung geht durch dieselbe Vorschau
+wie jede andere; dort steht der Wert als `0x89504e47… (12463 bytes)` statt als bildschirmfüllendes
+Hex, und das Statement schreibt das Binärliteral der jeweiligen Engine (`0x…`, `'\x…'::bytea`,
+`X'…'`), damit Bytes als Bytes ankommen.
+
 ## Massenänderung
 
 Zellen markieren, und **Bulk update** wendet einen Wert oder einen kleinen Ausdruck auf die

@@ -22,6 +22,22 @@ apply is refused instead of running something you did not read.
 They are not editable, and the tab says so with the reason: without a key there is no safe way to
 address a single row. Add a key, or edit through a statement you write yourself.
 
+## A column that holds a file
+
+A binary column — `bytea`, `blob`, `varbinary`, `image` — shows what it weighs and two buttons: save
+the file, or replace it with another one. Typing hex into a cell is not something anybody wants to
+do, so those cells are picked rather than edited.
+
+**Save** writes the file with the extension its first bytes say it has: a PDF comes out as `.pdf`,
+a PNG as `.png`, and something the studio cannot name as `.bin`. It used to be `.txt` whatever was
+in it, which is a file nobody can open.
+
+**Replace** takes a file of up to 8 MB — hex doubles the size on the way to the server, and a cell
+editor is not the place to move a video. The change goes through the same preview every other edit
+does; in it the value reads as `0x89504e47… (12463 bytes)` rather than as a screen of hex, and the
+statement writes the engine's own binary literal (`0x…`, `'\x…'::bytea`, `X'…'`) so the bytes arrive
+as bytes.
+
 ## Bulk update
 
 Select cells and **Bulk update** applies a value or a small expression to the selection — the

@@ -27,7 +27,10 @@ public sealed record OidcOptions(
     /// False lets a provider serve its metadata over http — a test provider on a laptop, never a
     /// tenant on the internet.
     bool RequireHttpsMetadata,
-    string CallbackPath)
+    string CallbackPath,
+    /// Why this configuration cannot be used, or null when it can. A provider nobody can reach must
+    /// leave the studio working: the login screen simply does not offer it, and the log says why.
+    string? Problem = null)
 {
     public const string Scheme = "oidc";
 
@@ -42,10 +45,15 @@ public sealed record OidcOptions(
         var label = config["WDS_OIDC_LABEL"]?.Trim();
         var callback = config["WDS_OIDC_CALLBACK_PATH"]?.Trim();
 
+        var requireHttps = !string.Equals(config["WDS_OIDC_REQUIRE_HTTPS"], "false",
+            StringComparison.OrdinalIgnoreCase);
+
+        // Both halves or nothing: an authority without a client id cannot start a sign-in, and half
+        // a configuration should not lock everybody out of a studio.
+        var configured = authority.Length > 0 && clientId.Length > 0;
+
         return new OidcOptions(
-            // Both halves or nothing: an authority without a client id cannot start a sign-in, and
-            // half a configuration should not lock everybody out of a studio.
-            Enabled: authority.Length > 0 && clientId.Length > 0,
+            Enabled: configured && Refuse(authority, requireHttps) is null,
             authority,
             clientId,
             config["WDS_OIDC_CLIENT_SECRET"]?.Trim() ?? "",
@@ -55,8 +63,27 @@ public sealed record OidcOptions(
             Set(config["WDS_OIDC_ADMINS"]),
             Set(config["WDS_OIDC_EDITORS"]),
             Set(config["WDS_OIDC_VIEWERS"]),
-            !string.Equals(config["WDS_OIDC_REQUIRE_HTTPS"], "false", StringComparison.OrdinalIgnoreCase),
-            string.IsNullOrEmpty(callback) ? "/signin-oidc" : callback);
+            requireHttps,
+            string.IsNullOrEmpty(callback) ? "/signin-oidc" : callback,
+            configured ? Refuse(authority, requireHttps) : null);
+    }
+
+    /// Why this pair cannot be used, or null.
+    ///
+    /// The handler validates its own options the first time any request passes through
+    /// authentication — not on the sign-in path, on *every* path. So a provider configured wrongly
+    /// used to answer 500 for the whole studio, including the login screen it was meant to improve.
+    /// Whatever cannot work is refused here instead, before the handler is ever registered.
+    private static string? Refuse(string authority, bool requireHttps)
+    {
+        if (!Uri.TryCreate(authority, UriKind.Absolute, out var issuer)
+            || (issuer.Scheme != Uri.UriSchemeHttps && issuer.Scheme != Uri.UriSchemeHttp))
+            return $"WDS_OIDC_AUTHORITY is not an issuer URL: {authority}";
+
+        return issuer.Scheme == Uri.UriSchemeHttp && requireHttps
+            ? "WDS_OIDC_AUTHORITY is http, which a provider on the internet never is. "
+              + "Set WDS_OIDC_REQUIRE_HTTPS=false if this is a provider on your own machine."
+            : null;
     }
 
     private static List<string> Split(string? value) =>

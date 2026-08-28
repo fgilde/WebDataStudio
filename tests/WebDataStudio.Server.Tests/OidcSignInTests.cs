@@ -50,6 +50,44 @@ public class OidcOptionTests
     }
 
     [Fact]
+    public void An_http_authority_without_the_flag_is_refused_rather_than_used()
+    {
+        // The handler validates its options on *every* request, not only on the sign-in path, so a
+        // provider that cannot be built used to answer 500 for the whole studio.
+        var options = Options(("WDS_OIDC_AUTHORITY", "http://localhost:8081/realms/company"),
+            ("WDS_OIDC_CLIENT_ID", "studio"));
+
+        Assert.False(options.Enabled);
+        Assert.Contains("WDS_OIDC_REQUIRE_HTTPS=false", options.Problem);
+    }
+
+    [Fact]
+    public void And_with_the_flag_it_is_used()
+    {
+        var options = Options(("WDS_OIDC_AUTHORITY", "http://localhost:8081/realms/company"),
+            ("WDS_OIDC_CLIENT_ID", "studio"), ("WDS_OIDC_REQUIRE_HTTPS", "false"));
+
+        Assert.True(options.Enabled);
+        Assert.Null(options.Problem);
+    }
+
+    [Theory]
+    [InlineData("login.microsoftonline.com")]
+    [InlineData("ftp://provider.example")]
+    public void An_authority_that_is_not_a_url_is_refused_too(string authority)
+    {
+        var options = Options(("WDS_OIDC_AUTHORITY", authority), ("WDS_OIDC_CLIENT_ID", "studio"));
+
+        Assert.False(options.Enabled);
+        Assert.Contains("issuer URL", options.Problem);
+    }
+
+    [Fact]
+    public void Nothing_configured_has_nothing_to_complain_about() =>
+        // Silence is not a problem: most studios have no provider at all.
+        Assert.Null(Options().Problem);
+
+    [Fact]
     public void Scopes_a_label_and_a_callback_can_be_said()
     {
         var options = Options([
@@ -243,6 +281,27 @@ public class OidcEndpointTests
         // And an open studio stays open.
         Assert.True(me.GetProperty("anonymous").GetBoolean());
 
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.GetAsync("/api/auth/sso", Ct)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_provider_that_cannot_be_used_leaves_the_studio_working()
+    {
+        // http without WDS_OIDC_REQUIRE_HTTPS=false: the studio runs, the login screen does not offer
+        // the provider, and the log says why. Before this it was 500 on every request.
+        using var factory = Factory(
+            ("WDS_OIDC_AUTHORITY", "http://localhost:8081/realms/company"),
+            ("WDS_OIDC_CLIENT_ID", "studio"));
+
+        using var client = factory.CreateClient();
+
+        var me = await client.GetFromJsonAsync<JsonElement>("/api/auth/me", Ct);
+
+        Assert.False(me.GetProperty("sso").GetProperty("enabled").GetBoolean());
+        // And nothing was closed: without a usable provider and without accounts this studio is open.
+        Assert.True(me.GetProperty("anonymous").GetBoolean());
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/connections", Ct)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound,
             (await client.GetAsync("/api/auth/sso", Ct)).StatusCode);
     }

@@ -33,6 +33,7 @@ cd web && npm run smoke:admin    # Diagramm-, Administrations- und Vergleichspan
 cd web && npm run smoke:p9       # Palette, gespeicherte Abfragen, Builder, Charts, Parameter
 cd web && npm run smoke:storage  # ein Bucket: Baum, Objekt, Datei als Tabelle
 cd web && npm run smoke:quality  # Datenqualität, Audit-Trail, Subset, JSON-Spalte
+cd web && npm run smoke:sso      # Anmeldung über einen Provider und die Rollenabbildung
 ```
 
 Die Server-Suite fährt eine Verhaltens-Suite gegen jedes Engine-Fixture — ein neuer Treiber erbt

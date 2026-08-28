@@ -25,7 +25,8 @@
     "smoke:objects": "node scripts/smoke-objects.mjs",
     "smoke:dbgate": "node scripts/smoke-dbgate.mjs",
     "smoke:storage": "node scripts/smoke-storage.mjs",
-    "smoke:quality": "node scripts/smoke-quality.mjs"
+    "smoke:quality": "node scripts/smoke-quality.mjs",
+    "smoke:sso": "node scripts/smoke-sso.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",

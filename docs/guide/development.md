@@ -59,6 +59,7 @@ cd web && npm run smoke:objects  # policies, partitions, a function run, prefere
 cd web && npm run smoke:dbgate   # the filter language, archives, perspective, the map
 cd web && npm run smoke:storage  # a bucket: the tree, an object, a file queried as a table
 cd web && npm run smoke:quality  # data quality, the audit trail, a subset, a JSON column
+cd web && npm run smoke:sso      # signing in through a provider, and the role it maps to
 ```
 
 The login smoke needs a studio with an account (`WDS_USER`/`WDS_PASSWORD`) and reads

@@ -147,7 +147,13 @@ viewer role are what narrow that. A provider *and* `WDS_USERS` can both be confi
 screen then shows the button and the form.
 
 `WDS_OIDC_REQUIRE_HTTPS=false` lets a provider serve its metadata over plain http. That is for a
-Keycloak on a laptop, never for a tenant on the internet. Signing out signs out of the studio; the
+Keycloak on a laptop, never for a tenant on the internet. **Without it, an `http://` authority is
+refused rather than used**: the studio starts, the login screen does not offer the provider, and the
+log says why — a provider configured wrongly must not take the studio down with it.
+
+The redirect URI to register with the provider is `https://<your studio>/signin-oidc`, and a provider
+checks it exactly. A studio published on a port that changes between runs cannot sign anybody in, so
+pin the port where the provider has to know it. Signing out signs out of the studio; the
 provider still knows who you are, so signing in again may not ask twice.
 
 ## Who did what

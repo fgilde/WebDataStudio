@@ -65,8 +65,9 @@ var authentication = builder.Services.AddAuthentication(CookieAuthenticationDefa
 // The handler is always registered and configured from the container, because the values are only
 // final once the host has composed its configuration; /api/auth/sso is what refuses when no
 // provider was configured, so a registered handler nobody can reach costs nothing.
-// Only when one is configured: the authentication middleware instantiates every registered
-// handler on every request, and an OpenID Connect handler without a client id refuses to be built.
+// Only when one is configured *and usable*: the authentication middleware instantiates every
+// registered handler on every request, so a handler that refuses to be built takes the whole studio
+// with it — see OidcOptions.Refuse for what is checked before it gets that far.
 if (OidcOptions.FromConfiguration(builder.Configuration).Enabled)
     authentication.AddOpenIdConnect(OidcOptions.Scheme, o =>
     {
@@ -251,6 +252,11 @@ var built = BuildStamp.Of(typeof(Program).Assembly);
 // a /data that never answers would otherwise turn one unlucky request into a hang and every
 // following one into a queue behind it — which is exactly how an Azure Files mount fails.
 var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("WebDataStudio");
+
+// A provider that was configured but cannot be used: the studio runs, the login screen does not
+// offer it, and this is the only place that says why.
+if (app.Services.GetRequiredService<OidcOptions>().Problem is { } oidcProblem)
+    startupLog.LogWarning("the identity provider is not being offered: {Problem}", oidcProblem);
 var connectionStore = app.Services.GetRequiredService<ConnectionStore>();
 var workspaceStore = app.Services.GetRequiredService<WorkspaceStore>();
 
@@ -306,6 +312,15 @@ app.Use(async (ctx, next) =>
     try
     {
         await next();
+    }
+    // Starting a sign-in can fail before the browser ever reaches the provider: a redirect URI the
+    // provider does not know, a pushed-authorization request it refuses. That is a login screen with
+    // a message on it, not a 500 with an empty body.
+    catch (Exception e) when (ctx.Request.Path.StartsWithSegments("/api/auth/sso")
+                             && !ctx.Response.HasStarted)
+    {
+        startupLog.LogError(e, "the sign-in could not be started");
+        ctx.Response.Redirect("/?sso=failed");
     }
     catch (WorkspaceUnavailableException e)
     {

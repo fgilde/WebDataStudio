@@ -6,6 +6,9 @@ export interface Me {
   role?: string | null;
   /// Name of this studio, from WDS_TITLE. Null when nothing named it.
   title?: string | null;
+  /// The identity provider, where one is configured. `only` means there are no local accounts, so
+  /// the login screen has nothing else to offer.
+  sso?: { enabled: boolean; label: string; only: boolean };
 }
 export interface Connection {
   id: string; name: string; engine: string; readOnly: boolean;

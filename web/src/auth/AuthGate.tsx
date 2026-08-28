@@ -22,5 +22,5 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (!state) return <Center h="100vh"><Loader /></Center>;
   // No credentials configured: no login screen at all.
   if (state.anonymous || state.authenticated) return <>{children}</>;
-  return <LoginPage title={state.title} onSuccess={refresh} />;
+  return <LoginPage title={state.title} sso={state.sso} onSuccess={refresh} />;
 }

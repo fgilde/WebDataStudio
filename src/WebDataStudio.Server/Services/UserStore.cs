@@ -51,10 +51,18 @@ public sealed class UserStore
 
     private readonly List<StudioUser> _users;
 
-    public UserStore(IReadOnlyList<StudioUser> users) => _users = [.. users];
+    public UserStore(IReadOnlyList<StudioUser> users, bool external = false)
+    {
+        _users = [.. users];
+        External = external;
+    }
 
-    /// No accounts configured: the studio runs open and never shows a login screen.
-    public bool Anonymous => _users.Count == 0;
+    /// An identity provider decides who may sign in, rather than a list in the environment.
+    public bool External { get; }
+
+    /// Nowhere to sign in from: the studio runs open and never shows a login screen. A provider
+    /// counts, or configuring one would leave a studio wide open with a login button on it.
+    public bool Anonymous => _users.Count == 0 && !External;
 
     public IReadOnlyList<StudioUser> All => _users;
 
@@ -71,7 +79,7 @@ public sealed class UserStore
                     new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
         }
 
-        return new UserStore(users);
+        return new UserStore(users, OidcOptions.FromConfiguration(config).Enabled);
     }
 
     public static List<StudioUser> Parse(string? value)

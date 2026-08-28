@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Reflection;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using WebDataStudio.Server.Admin;
 using WebDataStudio.Server.Drivers;
@@ -41,7 +42,9 @@ builder.Services.AddSingleton(sp => UserStore.FromConfiguration(sp.GetRequiredSe
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<CurrentUser>();
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+builder.Services.AddSingleton(sp => OidcOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+
+var authentication = builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(o =>
     {
         o.Cookie.Name = "wds.auth";
@@ -53,6 +56,62 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         // An API returns 401/403; it must not redirect a fetch() to a login page.
         o.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
         o.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
+    });
+
+// The company's own identity provider, where there is one. The studio keeps its cookie either way:
+// what arrives from the provider is turned into the same three claims a password sign-in writes, so
+// everything downstream — roles, which connections an account sees, the audit trail — is unchanged.
+//
+// The handler is always registered and configured from the container, because the values are only
+// final once the host has composed its configuration; /api/auth/sso is what refuses when no
+// provider was configured, so a registered handler nobody can reach costs nothing.
+// Only when one is configured: the authentication middleware instantiates every registered
+// handler on every request, and an OpenID Connect handler without a client id refuses to be built.
+if (OidcOptions.FromConfiguration(builder.Configuration).Enabled)
+    authentication.AddOpenIdConnect(OidcOptions.Scheme, o =>
+    {
+        o.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+        // The authorization code flow with PKCE: the only one worth offering a browser in 2026.
+        o.ResponseType = "code";
+        o.UsePkce = true;
+        o.SaveTokens = false;
+        o.GetClaimsFromUserInfoEndpoint = true;
+        o.MapInboundClaims = false;
+
+        o.Events.OnTicketReceived = ctx =>
+        {
+            var options = ctx.HttpContext.RequestServices.GetRequiredService<OidcOptions>();
+            var user = options.UserFor(ctx.Principal ?? new ClaimsPrincipal());
+
+            // Only the studio's own claims are kept: the id token's audience, expiry and the rest
+            // belong to the provider, and a cookie that carries them is a cookie that leaks them.
+            ctx.Principal = new ClaimsPrincipal(new ClaimsIdentity(
+                CurrentUser.ClaimsOf(user), CookieAuthenticationDefaults.AuthenticationScheme));
+
+            return Task.CompletedTask;
+        };
+
+        // A sign-in that goes wrong is a login screen with a message on it, not a stack trace.
+        o.Events.OnRemoteFailure = ctx =>
+        {
+            ctx.Response.Redirect("/?sso=failed");
+            ctx.HandleResponse();
+            return Task.CompletedTask;
+        };
+    });
+
+builder.Services.AddOptions<Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectOptions>(
+        OidcOptions.Scheme)
+    .Configure<OidcOptions>((o, oidc) =>
+    {
+        o.Authority = oidc.Authority;
+        o.ClientId = oidc.ClientId;
+        o.ClientSecret = oidc.ClientSecret;
+        o.RequireHttpsMetadata = oidc.RequireHttpsMetadata;
+        o.CallbackPath = oidc.CallbackPath;
+
+        o.Scope.Clear();
+        foreach (var scope in oidc.Scopes) o.Scope.Add(scope);
     });
 
 builder.Services.AddAuthorization();

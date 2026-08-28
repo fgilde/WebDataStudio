@@ -16,8 +16,9 @@
 //   WDS_OIDC_REQUIRE_HTTPS=false WDS_OIDC_ADMINS=dba-group WDS_OIDC_EDITORS=developers \
 //     dotnet run --project src/WebDataStudio.Server
 //
-// The realm's three people are the three roles: alice is in dba-group, bob in developers, and carol
-// in neither, so she gets the default. Each password is the name.
+// The realm's three people are the three roles: the demo account is in dba-group, bob in developers,
+// and carol in neither, so she gets the default. All three share the demo password, which the realm
+// file reads from the environment — WDS_SSO_ADMIN and WDS_SSO_PASSWORD if yours differ.
 import { chromium } from "playwright";
 
 const baseUrl = process.env.BASE_URL ?? "http://localhost:5005";
@@ -36,6 +37,11 @@ if (!me.sso?.enabled) {
   await browser.close();
   process.exit(0);
 }
+
+// The demo realm's three people, and the password they share. The admin's name is the app host's
+// `demo-user` parameter, so it is configurable here too.
+const admin = process.env.WDS_SSO_ADMIN ?? "admin";
+const secret = process.env.WDS_SSO_PASSWORD ?? "change-me-please";
 
 /// One person, from the login screen to the studio. A fresh context each time: the point is the
 /// sign-in, and a cookie from the last one would skip it.
@@ -57,7 +63,7 @@ const signIn = async (who, expected) => {
     !page.url().startsWith(baseUrl));
 
   await page.fill("#username", who);
-  await page.fill("#password", who);
+  await page.fill("#password", secret);
   await page.click("input[type=submit], button[type=submit]");
   await page.waitForLoadState("networkidle");
 
@@ -74,7 +80,7 @@ const signIn = async (who, expected) => {
 
 // The provider's groups decide the studio's role: dba-group is an admin, developers may write, and
 // anybody in neither gets WDS_OIDC_DEFAULT_ROLE.
-await signIn("alice", "admin");
+await signIn(admin, "admin");
 await signIn("bob", "editor");
 await signIn("carol", process.env.WDS_OIDC_DEFAULT_ROLE ?? "viewer");
 

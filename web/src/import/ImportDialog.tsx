@@ -4,7 +4,12 @@ import {
 } from "@mantine/core";
 import { IconUpload } from "@tabler/icons-react";
 
-export interface ImportTarget { connectionId: string; table?: string }
+export interface ImportTarget {
+  connectionId: string;
+  table?: string;
+  /// The file, where it was dropped on the table rather than picked in here.
+  file?: File | null;
+}
 
 interface Preview {
   format: string;
@@ -20,7 +25,7 @@ export function ImportDialog({ target, onClose, onDone }: {
   onClose: () => void;
   onDone?: () => void;
 }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(target?.file ?? null);
   const [table, setTable] = useState(target?.table ?? "");
   const [hasHeader, setHasHeader] = useState(true);
   const [delimiter, setDelimiter] = useState(",");

@@ -18,6 +18,7 @@
 | `WDS_MAX_ROWS` | Standard-Zeilenlimit je Ergebnis, Vorgabe `1000` |
 | `WDS_STORAGE_PREVIEW_BYTES` | wie viel von einem Objekt die Vorschau liest, Vorgabe `65536` — siehe [Objektspeicher](storage.md) |
 | `WDS_STORAGE_MAX_UPLOAD_BYTES` | größter Upload in einen Bucket, Vorgabe `67108864` |
+| `WDS_STORAGE_ARCHIVE_MAX_OBJECTS`, `WDS_STORAGE_ARCHIVE_MAX_BYTES` | wie viel von einem Prefix ein ZIP mitnehmen darf — siehe [Objektspeicher](storage.md) |
 | `WDS_DUCKDB_EXTENSION_DIR` | wo DuckDBs Speicher-Erweiterungen liegen, im Image `/opt/duckdb/extensions` |
 | `WDS_CONN_<NAME>_SCHEMAS` | nur diese Schemas dieser Verbindung lesen — siehe [Objektspeicher](storage.md) und den Explorer |
 | `WDS_EXPORT_TEMPLATES_DIR` | Ordner mit Export-Templates, die die Bereitstellung mitbringt — siehe [Ergebnisse und Export](results.md) |

@@ -88,6 +88,20 @@ the view readable while it rebuilds and needs a unique index on it; plain is fas
 Both come back as statements from the server, which knows how the engine spells it — Oracle's is
 `DBMS_MVIEW.REFRESH` — and refuses to build one for an object that is not a materialised view.
 
+## Dropping a file on the tree
+
+The tree knows what every node is, so a file dragged onto one can go where it obviously belongs —
+no dialog asks first, and only the nodes that can take it light up:
+
+| Dropped on | What happens |
+|---|---|
+| A bucket or a folder in one | The file is uploaded as it is. Several at once are several uploads. |
+| A table | The import dialog opens with the file and the table filled in — the column mapping still needs a person. |
+| A schema, a table folder or a connection | The file becomes a **new table**: described, previewed and created only after that has been read. |
+
+Everything else takes no files. A view cannot be written to, an index is not a place for rows, and a
+column is not a table, so those nodes stay dark and the browser keeps its "no".
+
 ## A development subset
 
 "I need production-like data" is usually answered with a full dump: too big to work with and too

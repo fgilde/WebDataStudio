@@ -102,6 +102,22 @@ gewählten Ort gestreamt und nicht durch den Speicher — ein Parquet mit mehrer
 ein Fortschrittsbalken und kein sterbender Tab; sonst fällt es auf denselben Download zurück. Beides
 steht im Kontextmenü des Objekts und über seiner Vorschau.
 
+**Download as zip** und **Save zip as…** sind dasselbe für einen ganzen Ordner: das Prefix wird
+seitenweise abgelaufen und jedes Objekt direkt in ein ZIP auf der Antwort geschrieben — hundert
+Dateien kosten hundert Reads und keine Platte.
+
+Ein ZIP hat vorher keine Länge, deshalb werden die Grenzen beim Schreiben gezählt statt vorher
+geprüft:
+
+| Variable | Bedeutung |
+|---|---|
+| `WDS_STORAGE_ARCHIVE_MAX_OBJECTS` | wie viele Objekte ein ZIP halten darf, Vorgabe `2000` |
+| `WDS_STORAGE_ARCHIVE_MAX_BYTES` | wie schwer es werden darf, Vorgabe 2 GB |
+
+Was den Lauf gestoppt hat, steht als `TRUNCATED.txt` im Archiv — eine Antwort, die schon streamt,
+kann nicht zurück und ein Fehler werden. Eine halbe Antwort, die sagt, dass sie halb ist, ist besser
+als eine Datei, der niemand traut.
+
 Die Bytes sind die des Providers — das Studio streamt sie durch und behält nichts.
 
 ## Eine Datei abfragen

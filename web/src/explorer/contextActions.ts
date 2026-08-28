@@ -13,7 +13,7 @@ export type ExplorerAction =
   | "grant-schema" | "archive-table" | "dev-subset"
   // Object storage: the object itself rather than the rows in it.
   | "download-object" | "save-object" | "upload-object" | "delete-object" | "query-as-table"
-  | "copy-uri" | "import-object";
+  | "copy-uri" | "import-object" | "download-prefix" | "save-prefix";
 
 export interface ContextItem {
   action: ExplorerAction;
@@ -93,6 +93,9 @@ const STORAGE_FOLDER: ContextItem[] = [
   // A folder is a table only once a pattern says which of its files belong together.
   { action: "query-as-table", label: "Query as table…" },
   { action: "upload-object", label: "Upload here…" },
+  // A folder, taken with you: one zip rather than a click per file.
+  { action: "download-prefix", label: "Download as zip" },
+  { action: "save-prefix", label: "Save zip as…" },
   { action: "refresh", label: "Refresh" },
   { action: "copy-uri", label: "Copy the path", divider: true },
 ];

@@ -15,6 +15,7 @@ import { ArchiveDialog, type ArchiveTarget } from "../archive/KeepArchiveButton"
 import { NotebookPanel } from "../notebook/NotebookPanel";
 import { isAdmin, useRole } from "../auth/useRole";
 import { ExplorerTree, type ExplorerAction, type ExplorerSelection } from "../explorer/ExplorerTree";
+import type { DropKind } from "../explorer/dropTarget";
 import { ObjectDetailPanel } from "../explorer/ObjectDetailPanel";
 import { QueryTab } from "../query/QueryTab";
 import { DataTab } from "../data/DataTab";
@@ -50,7 +51,8 @@ import {
   selectColumn,
 } from "../sql/objectScripts";
 import {
-  applyDdl, deleteObject, describeObject, listConnections, loadTabs, objectUrl, previewObject,
+  applyDdl, archiveUrl, deleteObject, describeObject, listConnections, loadTabs, objectUrl,
+  previewObject,
   previewRename, refreshStatement, saveTabs, uploadObject,
   type Connection, type ForeignKeyDto,
 } from "../api";
@@ -97,6 +99,9 @@ interface ShellState {
     activeConnection: string;
     select: (selection: ExplorerSelection) => void;
     action: (action: ExplorerAction, selection: ExplorerSelection) => void;
+    /// Files dragged onto a node: the node decides whether that is an upload, an import or a new
+    /// table.
+    dropFiles: (kind: DropKind, selection: ExplorerSelection, files: File[]) => void;
     newQuery: () => void;
     focusPanel: (id: string) => void;
     openTool: (component: string, title: string, connectionId: string) => void;
@@ -345,7 +350,8 @@ function ExplorerDockPanel() {
       </Group>
 
       <div style={{ flex: 1, minHeight: 0 }}>
-        <ExplorerTree key={explorer.nonce} onSelect={explorer.select} onAction={explorer.action} />
+        <ExplorerTree key={explorer.nonce} onSelect={explorer.select} onAction={explorer.action}
+          onDropFiles={explorer.dropFiles} />
       </div>
     </div>
   );
@@ -469,6 +475,8 @@ export function DockShell() {
   const [newTable, setNewTable] = useState<{
     connectionId: string;
     source?: { storageConnection: string; objectRef: string; name: string };
+    /// A file dragged onto a schema, rather than picked in the dialog.
+    dropped?: File | null;
   } | null>(null);
   const [copySource, setCopySource] = useState<{ connectionId: string; objectRef: string; label: string } | null>(null);
   const [subsetTarget, setSubsetTarget] = useState<
@@ -678,6 +686,44 @@ export function DockShell() {
     flashPanel(api.current?.getPanel(id)?.group.element);
   }, [focusPanel]);
 
+  /// A file dropped on a node in the tree. The node decides what that means, so nothing has to be
+  /// asked first: a bucket folder takes the file as it is, a table takes its rows, and a schema turns
+  /// it into a table of its own.
+  const handleDrop = useCallback((kind: DropKind, s: ExplorerSelection, files: File[]) => {
+    const [file] = files;
+    if (!file) return;
+
+    switch (kind) {
+      case "upload":
+        // Straight up: the dialog would only ask what the drop already said.
+        Promise.all(files.map(one => uploadObject(s.connectionId, s.node.ref, one)))
+          .then(() => {
+            notifications.show({
+              message: files.length === 1
+                ? `${file.name} uploaded to ${s.node.label}`
+                : `${files.length} files uploaded to ${s.node.label}`,
+            });
+            setExplorerNonce(n => n + 1);
+          })
+          .catch(e => notifications.show({ color: "red", message: String(e.message ?? e) }));
+        break;
+
+      case "import":
+        // Into a table that exists: the mapping still needs a person, so the dialog opens with the
+        // file and the table already filled in.
+        setImportTarget({
+          connectionId: s.connectionId,
+          table: qualify(s.connectionId, s.node.ref),
+          file,
+        });
+        break;
+
+      case "new-table":
+        setNewTable({ connectionId: s.connectionId, dropped: file });
+        break;
+    }
+  }, [qualify]);
+
   const handleAction = useCallback(async (action: ExplorerAction, s: ExplorerSelection) => {
     const name = qualify(s.connectionId, s.node.ref);
     const engine = engineOf(s.connectionId);
@@ -735,6 +781,27 @@ export function DockShell() {
         link.click();
         break;
       }
+
+      case "download-prefix": {
+        const link = document.createElement("a");
+        link.href = archiveUrl(s.connectionId, s.node.ref);
+        link.download = `${s.node.label || "archive"}.zip`;
+        link.click();
+        notifications.show({
+          message: `zipping ${s.node.label} — the download starts as the files are read`,
+        });
+        break;
+      }
+
+      case "save-prefix":
+        saveAs(archiveUrl(s.connectionId, s.node.ref), `${s.node.label || "archive"}.zip`,
+          { contentType: "application/zip" })
+          .then(outcome => {
+            if (outcome === "saved")
+              notifications.show({ message: `${s.node.label}.zip saved` });
+          })
+          .catch(e => notifications.show({ color: "red", message: String(e.message ?? e) }));
+        break;
 
       case "save-object":
         // The other half of a download: the person picks the folder and the name, and the file is
@@ -1242,6 +1309,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         activeConnection,
         select: setSelection,
         action: handleAction,
+        dropFiles: handleDrop,
         newQuery: () => newTab(activeConnection),
         focusPanel,
         openTool,
@@ -1265,6 +1333,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
       {newTable && (
         <NewTableDialog connectionId={newTable.connectionId} source={newTable.source}
+          dropped={newTable.dropped}
           onClose={() => setNewTable(null)}
           onDone={(table: string) => {
             notifications.show({ message: `${table} created` });

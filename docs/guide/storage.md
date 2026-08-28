@@ -98,6 +98,22 @@ you picked rather than through memory, so a multi-gigabyte Parquet is a progress
 that dies; elsewhere it falls back to the same download. Both are in the object's context menu and
 above its preview.
 
+**Download as zip** and **Save zip as…** are the same two for a whole folder: the prefix is walked
+a page at a time and each object is written straight into a zip on the response, so a hundred files
+cost a hundred reads and no disk.
+
+A zip has no length before it is written, which is why the limits are counted while it is being
+written rather than checked in advance:
+
+| Variable | Meaning |
+|---|---|
+| `WDS_STORAGE_ARCHIVE_MAX_OBJECTS` | how many objects one zip may hold, default `2000` |
+| `WDS_STORAGE_ARCHIVE_MAX_BYTES` | how much it may weigh, default 2 GB |
+
+Whatever stopped the walk is written into the archive as `TRUNCATED.txt`, because a response that is
+already streaming cannot go back and become an error. Half an answer that says it is half beats a
+file nobody can trust.
+
 The bytes are the provider's own — the studio streams them through and keeps nothing.
 
 ## Querying a file

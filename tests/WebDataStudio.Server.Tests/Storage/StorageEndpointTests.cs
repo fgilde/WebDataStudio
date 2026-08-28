@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -32,6 +33,14 @@ public class StorageEndpointTests : IAsyncLifetime
         await using (var image = new MemoryStream([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 1]))
             await store.WriteAsync("exports/logo.png", image, "image/png", Ct);
 
+        // Two more files under the same prefix, and one a folder deeper: a zip of the prefix has to
+        // hold all of them, with the folder inside it.
+        await using (var more = new MemoryStream(Encoding.UTF8.GetBytes("id,total\n1,10\n")))
+            await store.WriteAsync("exports/orders.csv", more, "text/csv", Ct);
+
+        await using (var nested = new MemoryStream(Encoding.UTF8.GetBytes("month,orders\n06,12\n")))
+            await store.WriteAsync("exports/monthly/2026-06.csv", nested, "text/csv", Ct);
+
         // A PDF is ASCII near the front, so the NUL test alone called it text and offered its object
         // headers as a preview.
         await using (var pdf = new MemoryStream(Encoding.ASCII.GetBytes(
@@ -46,11 +55,14 @@ public class StorageEndpointTests : IAsyncLifetime
     }
 
     private WebApplicationFactory<Program> Factory(
-        bool readOnly = false, string? color = null, int? previewBytes = null) =>
+        bool readOnly = false, string? color = null, int? previewBytes = null,
+        int? archiveMaxObjects = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
             b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["DB_PATH"] = Path.Combine(_dir, $"wds-{readOnly}-{color}-{previewBytes}.db"),
+                ["DB_PATH"] = Path.Combine(_dir,
+                    $"wds-{readOnly}-{color}-{previewBytes}-{archiveMaxObjects}.db"),
+                ["WDS_STORAGE_ARCHIVE_MAX_OBJECTS"] = archiveMaxObjects?.ToString(),
                 ["WDS_CONN_LAKE"] = _minio.UrlFor(Bucket),
                 ["WDS_CONN_LAKE_READONLY"] = readOnly ? "true" : null,
                 ["WDS_CONN_LAKE_COLOR"] = color,
@@ -157,6 +169,57 @@ public class StorageEndpointTests : IAsyncLifetime
         // instead of on screen, which is the whole difference between the two.
         Assert.Null(response.Content.Headers.ContentDisposition);
         Assert.Equal("text/csv", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task A_whole_prefix_comes_back_as_one_zip()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var response = await client.GetAsync(
+            $"/api/storage/{id}/archive?ref=Prefix:{Bucket}/exports", Ct);
+        response.EnsureSuccessStatusCode();
+
+        Assert.Equal("application/zip", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("exports.zip", response.Content.Headers.ContentDisposition?.FileNameStar
+                                    ?? response.Content.Headers.ContentDisposition?.FileName);
+
+        using var zip = new ZipArchive(await response.Content.ReadAsStreamAsync(Ct));
+        var names = zip.Entries.Select(entry => entry.FullName).OrderBy(name => name).ToList();
+
+        // The paths are relative to the prefix that was asked for: unzipping gives back the folder,
+        // not the whole bucket's key space.
+        Assert.Contains("people.csv", names);
+        Assert.Contains("orders.csv", names);
+        Assert.Contains("monthly/2026-06.csv", names);
+
+        using var reader = new StreamReader(
+            zip.Entries.First(entry => entry.FullName == "people.csv").Open());
+        Assert.Equal("name,age\nada,36\n", await reader.ReadToEndAsync(Ct));
+    }
+
+    [Fact]
+    public async Task A_zip_that_had_to_stop_says_so_inside_itself()
+    {
+        // One object allowed: whatever stops the walk is written into the zip, because a response
+        // that is already streaming cannot go back and become an error.
+        using var factory = Factory(archiveMaxObjects: 1);
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var response = await client.GetAsync(
+            $"/api/storage/{id}/archive?ref=Prefix:{Bucket}/exports", Ct);
+        response.EnsureSuccessStatusCode();
+
+        using var zip = new ZipArchive(await response.Content.ReadAsStreamAsync(Ct));
+
+        Assert.Equal(2, zip.Entries.Count);
+        var note = zip.Entries.First(entry => entry.FullName == "TRUNCATED.txt");
+
+        using var reader = new StreamReader(note.Open());
+        Assert.Contains("WDS_STORAGE_ARCHIVE_MAX_OBJECTS", await reader.ReadToEndAsync(Ct));
     }
 
     [Fact]

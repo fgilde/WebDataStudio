@@ -1307,6 +1307,11 @@ export const previewObject = (conn: string, ref: string): Promise<StoragePreview
 export const objectUrl = (conn: string, ref: string) =>
   `${base}/storage/${conn}/download?${refQuery(ref)}`;
 
+/// A whole prefix as one zip. Streamed, so the response has no length and the limits are written
+/// into the archive itself where they had to stop the walk.
+export const archiveUrl = (conn: string, ref: string) =>
+  `${base}/storage/${conn}/archive?${refQuery(ref)}`;
+
 export const uploadObject = (conn: string, ref: string, file: File): Promise<{ key: string }> =>
   fetch(`${base}/storage/${conn}/upload?${refQuery(ref, new URLSearchParams({ name: file.name }))}`,
     { method: "POST", headers: { "content-type": file.type || "application/octet-stream" }, body: file })

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Drivers.Storage;
@@ -23,6 +24,8 @@ public static class StorageEndpoints
 
         var maxUpload = long.TryParse(app.Configuration["WDS_STORAGE_MAX_UPLOAD_BYTES"], out var u)
             ? u : 64L * 1024 * 1024;
+
+        var archiveLimits = ArchiveLimits.FromConfiguration(app.Configuration);
 
         app.MapGet("/api/storage/{conn}/preview", async (string conn,
             [FromQuery(Name = "ref")] string objectRef, SessionFactory factory, CancellationToken ct) =>
@@ -115,6 +118,61 @@ public static class StorageEndpoints
                         lastModified: head.Modified, entityTag: null, enableRangeProcessing: false)
                     : Results.Stream(stream, head.ContentType ?? "application/octet-stream",
                         fileDownloadName: target.Name, enableRangeProcessing: false);
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // A whole folder, as one zip. "Save this file" was a download; "give me this folder" was a
+        // click per file.
+        app.MapGet("/api/storage/{conn}/archive", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, HttpContext ctx, SessionFactory factory,
+            ILoggerFactory logs, CancellationToken ct) =>
+        {
+            try
+            {
+                var (_, session) = await factory.OpenAsync(conn, ct);
+                var store = StoreOf(session);
+
+                if (store is null)
+                {
+                    await session.DisposeAsync();
+                    return Results.BadRequest(new { message = NotStorage });
+                }
+
+                var target = SchemaEndpoints.ParseObjectRef(objectRef);
+                var prefix = StorageDriver.KeyOf(target);
+                var name = (target.Name.Length > 0 ? target.Name : "archive") + ".zip";
+
+                Audit.Detail(ctx, $"zip of {prefix}", conn);
+
+                // ZipArchive has no asynchronous write path — CreateEntry().Open() is a synchronous
+                // stream — and Kestrel refuses synchronous writes unless a response asks for them.
+                // Asked for here and nowhere else: the alternative is buffering a whole folder in
+                // memory to have something to write asynchronously, which is worse in every way.
+                if (ctx.Features.Get<IHttpBodyControlFeature>() is { } control)
+                    control.AllowSynchronousIO = true;
+
+                // A zip has no length until it is written, so this is a streamed response: the
+                // session goes back to the pool when the body has been written.
+                return Results.Stream(async stream =>
+                {
+                    try
+                    {
+                        var result = await StorageArchive.WriteAsync(store, prefix, stream,
+                            archiveLimits, ct);
+
+                        logs.CreateLogger("WebDataStudio.Storage").LogInformation(
+                            "zipped {Objects} object(s), {Bytes} byte(s) from {Prefix}{Stopped}",
+                            result.Objects, result.Bytes, prefix,
+                            result.Stopped is null ? "" : $" — {result.Stopped}");
+                    }
+                    finally
+                    {
+                        await session.DisposeAsync();
+                    }
+                }, "application/zip", fileDownloadName: name);
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }

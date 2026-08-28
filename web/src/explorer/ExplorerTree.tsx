@@ -10,6 +10,7 @@ import { schemaCache } from "../editor/schemaCache";
 import {
   actionsFor, connectionActions, type ContextItem, type ExplorerAction, type MenuCapabilities,
 } from "./contextActions";
+import { dragHasFiles, dropKindFor, filesOf, type DropKind } from "./dropTarget";
 
 export type { ExplorerAction } from "./contextActions";
 
@@ -64,10 +65,12 @@ function ContextMenu({ items, at, onClose, onPick }: {
 }
 
 // One lazily loaded level. Children are fetched on first expand and cached until a refresh.
-function TreeLevel({ conn, parent, depth, caps, onSelect, onAction }: {
+function TreeLevel({ conn, parent, depth, caps, onSelect, onAction, onDropFiles }: {
   conn: string; parent?: string; depth: number; caps: MenuCapabilities;
   onSelect: (s: ExplorerSelection) => void;
   onAction: (action: ExplorerAction, s: ExplorerSelection) => void;
+  /// Files dropped on a node, and what that node makes of them.
+  onDropFiles?: (kind: DropKind, s: ExplorerSelection, files: File[]) => void;
 }) {
   const [nodes, setNodes] = useState<SchemaNodeDto[] | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -96,6 +99,9 @@ function TreeLevel({ conn, parent, depth, caps, onSelect, onAction }: {
   // typing the name of.
   const visible = nodes;
 
+  // Which node a file is hovering over, so only that one lights up.
+  const [dropOn, setDropOn] = useState<string | null>(null);
+
   const act = (action: ExplorerAction, node: SchemaNodeDto) => {
     // Refreshing is this level's own business; everything else goes up to the shell.
     if (action === "refresh") { setNodes(null); setNonce(n => n + 1); return; }
@@ -108,7 +114,35 @@ function TreeLevel({ conn, parent, depth, caps, onSelect, onAction }: {
         <div key={node.ref}>
           <UnstyledButton
             w="100%" py={2}
-            style={{ paddingLeft: pad + 4, paddingRight: 4 }}
+            style={{
+              paddingLeft: pad + 4,
+              paddingRight: 4,
+              // The node a file would land in, while it is being dragged over it.
+              outline: dropOn === node.ref ? "1px dashed var(--mantine-color-blue-5)" : undefined,
+              background: dropOn === node.ref
+                ? "var(--mantine-color-blue-light)"
+                : undefined,
+            }}
+            onDragOver={e => {
+              if (!dragHasFiles(e.dataTransfer) || dropKindFor(node.kind) === null) return;
+
+              // Only a node that can take the file: everything else keeps the browser's "no".
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              if (dropOn !== node.ref) setDropOn(node.ref);
+            }}
+            onDragLeave={() => setDropOn(current => (current === node.ref ? null : current))}
+            onDrop={e => {
+              const kind = dropKindFor(node.kind);
+              const files = filesOf(e.dataTransfer).filter(file => file.size > 0 || file.name);
+
+              setDropOn(null);
+              if (kind === null || files.length === 0) return;
+
+              e.preventDefault();
+              onSelect({ connectionId: conn, node });
+              onDropFiles?.(kind, { connectionId: conn, node }, files);
+            }}
             onClick={() => {
               if (node.hasChildren) setOpen(o => ({ ...o, [node.ref]: !o[node.ref] }));
               onSelect({ connectionId: conn, node });
@@ -141,7 +175,7 @@ function TreeLevel({ conn, parent, depth, caps, onSelect, onAction }: {
               borderLeft: "1px solid var(--mantine-color-default-border)",
             }}>
               <TreeLevel conn={conn} parent={node.ref} depth={1} caps={caps}
-                onSelect={onSelect} onAction={onAction} />
+                onSelect={onSelect} onAction={onAction} onDropFiles={onDropFiles} />
             </div>
           )}
         </div>
@@ -158,9 +192,12 @@ function TreeLevel({ conn, parent, depth, caps, onSelect, onAction }: {
   );
 }
 
-export function ExplorerTree({ onSelect, onAction }: {
+export function ExplorerTree({ onSelect, onAction, onDropFiles }: {
   onSelect: (s: ExplorerSelection) => void;
   onAction: (action: ExplorerAction, s: ExplorerSelection) => void;
+  /// A file dragged onto a node: into a bucket folder as an upload, into a table as rows, into a
+  /// schema as a new table. The tree knows what every node is, so this needs no dialog to ask.
+  onDropFiles?: (kind: DropKind, s: ExplorerSelection, files: File[]) => void;
 }) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [capsByEngine, setCapsByEngine] = useState<Record<string, MenuCapabilities>>({});
@@ -273,7 +310,7 @@ export function ExplorerTree({ onSelect, onAction }: {
                   borderLeft: "1px solid var(--mantine-color-default-border)",
                 }}>
                   <TreeLevel conn={c.id} depth={1} caps={capsByEngine[c.engine] ?? {}}
-                    onSelect={onSelect} onAction={onAction} />
+                    onSelect={onSelect} onAction={onAction} onDropFiles={onDropFiles} />
                 </div>
               )}
             </div>

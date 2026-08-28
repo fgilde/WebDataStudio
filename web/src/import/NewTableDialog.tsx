@@ -10,16 +10,18 @@ import { importFileAsTable, listConnections, type Connection, type ImportPlanDto
 /// The other import fills a table that already exists, with the columns mapped by hand. This is for
 /// the CSV somebody was sent: the studio reads it, says what the table will look like, and creates it
 /// only after that has been read.
-export function NewTableDialog({ connectionId, source, onClose, onDone }: {
+export function NewTableDialog({ connectionId, source, dropped, onClose, onDone }: {
   /// Where the table is created. Empty when the dialog was opened from a bucket and the target is
   /// still to be chosen.
   connectionId: string;
   /// An uploaded file, or an object in a bucket that is read where it is.
   source?: { storageConnection: string; objectRef: string; name: string };
+  /// A file dragged onto a schema in the tree, rather than picked in here.
+  dropped?: File | null;
   onClose: () => void;
   onDone?: (table: string) => void;
 }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [file, setFile] = useState<File | null>(dropped ?? null);
   const [table, setTable] = useState(source ? suggest(source.name) : "");
   const [schema, setSchema] = useState("");
   const [plan, setPlan] = useState<ImportPlanDto | null>(null);

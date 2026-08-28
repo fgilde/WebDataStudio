@@ -512,6 +512,8 @@ it works for every engine whose capability set claims support for it.
 | F30.12 | The newer capabilities as MCP tools |
 | F30.13 | An object shown where it lies |
 | F30.14 | Save as, streamed to where it was asked for |
+| F30.15 | A folder taken with you, as one zip |
+| F30.16 | A file dropped where it belongs |
 
 ## 10. Safety behaviour
 

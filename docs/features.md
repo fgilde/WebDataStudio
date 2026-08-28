@@ -210,3 +210,5 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F30.12 | The newer capabilities as MCP tools: find a value, a document column's shape, growth, what this studio ran, a statement read before it runs, and the data quality rules | done | all | MCP endpoint, assistant |
 | F30.13 | An object shown where it lies: an image, a PDF, a video, a recording, and a document indented rather than left on one line | done | storage | Structure panel |
 | F30.14 | Save as… — the person picks the folder and the name, and the file is streamed into it rather than through memory | done | storage | Object menu, structure panel |
+| F30.15 | A whole prefix downloaded as one zip, streamed, with whatever stopped the walk written into the archive itself | done | storage | Explorer, folder menu |
+| F30.16 | A file dragged onto the tree: into a bucket folder as an upload, into a table as rows, into a schema as a new table | done | all | Explorer |

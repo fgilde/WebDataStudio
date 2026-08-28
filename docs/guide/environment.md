@@ -31,6 +31,7 @@
 | `WDS_MAX_ROWS` | default fetch cap per result, default `1000` |
 | `WDS_STORAGE_PREVIEW_BYTES` | how much of an object the preview reads, default `65536` — see [Object storage](storage.md) |
 | `WDS_STORAGE_MAX_UPLOAD_BYTES` | largest upload into a bucket, default `67108864` |
+| `WDS_STORAGE_ARCHIVE_MAX_OBJECTS`, `WDS_STORAGE_ARCHIVE_MAX_BYTES` | how much of a prefix one zip may take with it — see [Object storage](storage.md) |
 | `WDS_DUCKDB_EXTENSION_DIR` | where DuckDB's storage extensions are staged, `/opt/duckdb/extensions` in the image |
 | `WDS_CONN_<NAME>_SCHEMAS` | read only these schemas on that connection — see [Explorer and panels](explorer.md) |
 | `WDS_EXPORT_TEMPLATES_DIR` | folder of export templates the deployment ships — see [Results and export](results.md) |

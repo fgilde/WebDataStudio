@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Pagination, Text, Tooltip,
+  ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Pagination, Select, Text, Tooltip,
 } from "@mantine/core";
 import {
   IconArrowBackUp, IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
@@ -19,6 +19,7 @@ import { MenuFilterInput } from "../grid/MenuFilterInput";
 import { DistinctValues } from "../grid/DistinctValues";
 import { LookupPicker } from "../grid/LookupPicker";
 import { JsonColumnDialog } from "./JsonColumnDialog";
+import { followColumns, newRows } from "./follow";
 import { EditableCell } from "../grid/editing/EditableCell";
 import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
 import { GenerateDialog } from "./GenerateDialog";
@@ -82,6 +83,13 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   const [generateOpen, setGenerateOpen] = useState(false);
   // Which JSON column somebody wanted to look inside.
   const [jsonColumn, setJsonColumn] = useState<string | null>(null);
+  // Following the table: which column says what is new, how often to look, and which rows on this
+  // page were not on the last one. The seen keys are a ref: they are read inside a fetch, not
+  // during a render.
+  const [followColumn, setFollowColumn] = useState<string | null>(null);
+  const [followSeconds, setFollowSeconds] = useState(5);
+  const [fresh, setFresh] = useState<ReadonlySet<number>>(new Set());
+  const seenRows = useRef<Set<string>>(new Set());
   // "customer_id.name": a column from the table a foreign key points at, shown next to the id
   // instead of being reached by following it.
   const [lookups, setLookups] = useState<string[]>([]);
@@ -105,6 +113,31 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
       setError(e instanceof Error ? e.message : String(e));
     }
   };
+  // Following re-fetches the first page, newest first, and nothing else: a tail that also paged
+  // would scroll away from what it is showing.
+  useEffect(() => {
+    if (followColumn === null) return;
+
+    setSort({ column: followColumn, desc: true });
+    setPageIndex(1);
+
+    const timer = window.setInterval(() => setNonce(n => n + 1), followSeconds * 1000);
+    return () => window.clearInterval(timer);
+  }, [followColumn, followSeconds]);
+
+  // Turning it off forgets what it had seen, so switching it on again does not flash a whole page.
+  useEffect(() => {
+    if (followColumn === null) {
+      seenRows.current = new Set();
+      setFresh(new Set());
+    }
+  }, [followColumn]);
+
+  // Which columns could order a tail at all: a timestamp, a date, or an increasing key.
+  const followable = useMemo(
+    () => page ? followColumns(page.columns, page.keyColumns) : [],
+    [page]);
+
   const rowAt = useCallback((index: number) => page?.rows[index], [page]);
   const changeSet = useChangeSet(page?.keyColumns ?? [], columns, rowAt);
 
@@ -117,7 +150,17 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
       filterColumn: filter?.column, filter: filter?.value,
       reveal: reveal || undefined,
     })
-      .then(p => { if (!cancelled) setPage(p); })
+      .then(p => {
+        if (cancelled) return;
+
+        // Following: whatever is on this page and was not on the last one is new, and stays marked
+        // until the next fetch.
+        setFresh(followColumn
+          ? newRows(p.rows, p.columns, p.keyColumns, seenRows.current)
+          : new Set<number>());
+
+        setPage(p);
+      })
       .catch(e => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
   }, [connectionId, objectRef, pageIndex, pageSize, nonce, sort, filter, reveal, lookups]);
@@ -173,6 +216,27 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           <ActionIcon size="sm" variant="subtle" aria-label="Revert" disabled={!changeSet.isDirty}
             onClick={changeSet.revertAll}><IconRestore size={14} /></ActionIcon>
         </Tooltip>
+        {/* Following the table: the newest rows first, re-fetched, and whatever arrived since the
+            last look tinted. Watch mode does this for a query; this is the table's version. */}
+        {followable.length > 0 && (
+          <Tooltip label={followColumn
+            ? `Following ${followColumn}, every ${followSeconds} s`
+            : "Follow this table: newest first, new rows highlighted"}>
+            <Group gap={2} wrap="nowrap">
+              <Select size="xs" w={132} clearable placeholder="follow off"
+                aria-label="Follow column"
+                data={followable.map(name => ({ value: name, label: `follow ${name}` }))}
+                value={followColumn}
+                onChange={(value: string | null) => setFollowColumn(value)} />
+              {followColumn && (
+                <Select size="xs" w={86} aria-label="Follow interval"
+                  data={["2", "5", "10", "30"].map(value => ({ value, label: `${value} s` }))}
+                  value={String(followSeconds)}
+                  onChange={(value: string | null) => setFollowSeconds(Number(value) || 5)} />
+              )}
+            </Group>
+          </Tooltip>
+        )}
         <Tooltip label="Insert row">
           <ActionIcon size="sm" variant="subtle" aria-label="Insert row" disabled={!page.editable}
             onClick={() => changeSet.insertRow({})}><IconPlus size={14} /></ActionIcon>
@@ -413,7 +477,12 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           </thead>
           <tbody>
             {page.rows.map((row, rowIndex) => (
-              <tr key={rowIndex}>
+              <tr key={rowIndex}
+                // A row that has just arrived is tinted until the next fetch: that is the whole
+                // point of following a table.
+                style={fresh.has(rowIndex)
+                  ? { background: "var(--mantine-primary-color-light)" }
+                  : undefined}>
                 {visibleColumns.map((c, colIndex) => {
                   const fk = fkForColumn(c.name);
                   const isSelected = selected.some(s => s.row === rowIndex && s.col === colIndex);

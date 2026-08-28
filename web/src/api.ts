@@ -180,10 +180,17 @@ export interface ExportFormatDto {
 export const listExportFormats = (): Promise<ExportFormatDto[]> =>
   fetch(`${base}/export/formats`).then(r => ok<ExportFormatDto[]>(r));
 
+/// One column of a data page. `masked` is the server saying it replaced the values; the grid offers a
+/// reveal rather than leaving somebody wondering why a value looks like dots.
+export interface DataColumnDto {
+  name: string;
+  dataType: string;
+  nullable: boolean;
+  masked?: boolean;
+}
+
 export interface DataPageDto {
-  // `masked` is the server saying it replaced this column's values; the grid offers a reveal
-  // rather than leaving somebody wondering why a value looks like dots.
-  columns: { name: string; dataType: string; nullable: boolean; masked?: boolean }[];
+  columns: DataColumnDto[];
   rows: unknown[][];
   editable: boolean;
   keyColumns: string[];

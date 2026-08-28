@@ -62,6 +62,11 @@ await page.getByText("orders", { exact: true }).first().dblclick();
 
 await page.getByRole("button", { name: "Insert row" }).waitFor({ timeout: 20000 });
 
+// Following the table: the control only appears where a column can order a tail, and orders is such
+// a table (it has a placed timestamp).
+check("a table with a timestamp can be followed",
+  await page.getByLabel("Follow column").first().isVisible());
+
 // Scoped to the data panel: "customer_id" is also a node in the explorer, and the first match on
 // the page is not the column header.
 const data = page.locator(".dv-groupview")

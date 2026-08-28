@@ -794,6 +794,32 @@ export const searchData = (
   return fetch(`${base}/search/${conn}/data?${query}`).then(r => ok<DataSearchDto>(r));
 };
 
+export interface TableSizeDto {
+  schema: string; table: string; bytes: number; rows: number | null;
+}
+export interface TableGrowthDto {
+  schema: string; table: string;
+  firstBytes: number; lastBytes: number;
+  from: string; to: string;
+  rows: number | null;
+  delta: number;
+  /// Null for a table that started at nothing, where a percentage would be true and useless.
+  percent: number | null;
+  perDay: number;
+}
+export interface SizesDto {
+  available: boolean;
+  reason: string | null;
+  days?: number;
+  tables: TableSizeDto[];
+  growth: TableGrowthDto[];
+}
+
+/// How big every table is — and, once there are two samples, how much bigger than it was. Asking
+/// records a sample, so the history builds itself.
+export const tableSizes = (conn: string, days?: number): Promise<SizesDto> =>
+  fetch(`${base}/admin/sizes/${conn}${days ? `?days=${days}` : ""}`).then(r => ok<SizesDto>(r));
+
 export interface StatementStatsDto {
   fingerprint: string;
   example: string;

@@ -49,6 +49,17 @@ public sealed class WorkspaceStore
                 connection_id TEXT NULL,
                 updated_at TEXT NOT NULL
             );
+            -- How big every table was, whenever somebody looked. Two samples are a growth; one is
+            -- just a size, which the structure panel already says.
+            CREATE TABLE IF NOT EXISTS size_samples (
+                connection_id TEXT NOT NULL,
+                schema_name TEXT NOT NULL,
+                table_name TEXT NOT NULL,
+                bytes INTEGER NOT NULL,
+                rows INTEGER NULL,
+                sampled_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_size_samples ON size_samples(connection_id, sampled_at);
             """);
 
         _connectionString = prepared.ConnectionString;
@@ -160,6 +171,77 @@ public sealed class WorkspaceStore
     /// the client, which is fine — this store belongs to the one user the container serves.
     public string? LoadItem(string key) => GetValue($"item:{key}");
     public void SaveItem(string key, string json) => SetValue($"item:{key}", json);
+    /// Records how big every table is right now. Called when somebody looks at the sizes and by the
+    /// snapshot job, so the history builds itself rather than needing a decision.
+    public void AddSizeSamples(string connectionId,
+        IEnumerable<(string Schema, string Table, long Bytes, long? Rows)> sizes)
+    {
+        if (!Available) return;
+
+        using var connection = Open();
+        using var transaction = connection.BeginTransaction();
+
+        var at = DateTimeOffset.UtcNow.ToString("O");
+
+        foreach (var (schema, table, bytes, rows) in sizes)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO size_samples (connection_id, schema_name, table_name, bytes, rows, sampled_at)
+                VALUES ($c, $s, $t, $b, $r, $a)
+                """;
+            command.Parameters.AddWithValue("$c", connectionId);
+            command.Parameters.AddWithValue("$s", schema);
+            command.Parameters.AddWithValue("$t", table);
+            command.Parameters.AddWithValue("$b", bytes);
+            command.Parameters.AddWithValue("$r", rows ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("$a", at);
+            command.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
+
+    public IReadOnlyList<(string Schema, string Table, long Bytes, long? Rows, DateTimeOffset At)>
+        ListSizeSamples(string connectionId, DateTimeOffset since)
+    {
+        var samples = new List<(string, string, long, long?, DateTimeOffset)>();
+        if (!Available) return samples;
+
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT schema_name, table_name, bytes, rows, sampled_at
+              FROM size_samples
+             WHERE connection_id = $c AND sampled_at >= $since
+             ORDER BY sampled_at
+            """;
+        command.Parameters.AddWithValue("$c", connectionId);
+        command.Parameters.AddWithValue("$since", since.ToString("O"));
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            samples.Add((reader.GetString(0), reader.GetString(1), reader.GetInt64(2),
+                reader.IsDBNull(3) ? null : reader.GetInt64(3),
+                DateTimeOffset.Parse(reader.GetString(4))));
+
+        return samples;
+    }
+
+    /// Keeps the file from growing forever: a year of daily samples is a history, ten years of them
+    /// is a habit nobody chose.
+    public int TrimSizeSamples(TimeSpan keep)
+    {
+        if (!Available) return 0;
+
+        using var connection = Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM size_samples WHERE sampled_at < $before";
+        command.Parameters.AddWithValue("$before", DateTimeOffset.UtcNow.Subtract(keep).ToString("O"));
+
+        return command.ExecuteNonQuery();
+    }
+
     public void SaveLayout(string connectionId, string json) => SetValue($"layout:{connectionId}", json);
     public string? LoadLayout(string connectionId) => GetValue($"layout:{connectionId}");
 

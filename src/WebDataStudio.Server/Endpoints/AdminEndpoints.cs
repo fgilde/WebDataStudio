@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Caching.Memory;
 using WebDataStudio.Server.Admin;
+using WebDataStudio.Server.Analysis;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Services;
 
@@ -361,6 +362,47 @@ public static class AdminEndpoints
             catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         }).DisableAntiforgery();
+
+        // --- how big everything is, and how much bigger than last week --------
+        // The structure panel says one table's size and the treemap says a database's. Neither
+        // answers "which table grew this week", which needs every table at once and a record of what
+        // it was before — so looking also records.
+        app.MapGet("/api/admin/sizes/{conn}", (string conn, int? days, SessionFactory factory,
+            WorkspaceStore workspace, CancellationToken ct) =>
+            WithSession(conn, factory, ct, async (driver, session) =>
+            {
+                if (!TableSizes.Supported(driver.Info.Id))
+                    return Results.Ok(new
+                    {
+                        available = false,
+                        reason = $"{driver.Info.Label} does not report a size per table",
+                        tables = Array.Empty<TableSize>(),
+                        growth = Array.Empty<TableGrowth>(),
+                    });
+
+                var sizes = await TableSizes.ReadAsync(driver, session, ct);
+
+                // Recorded on the way past: the history builds itself rather than needing somebody
+                // to decide to start it.
+                if (sizes.Count > 0)
+                    workspace.AddSizeSamples(conn,
+                        sizes.Select(size => (size.Schema, size.Table, size.Bytes, size.Rows)));
+
+                var window = Math.Clamp(days ?? 30, 1, 365);
+                var samples = workspace
+                    .ListSizeSamples(conn, DateTimeOffset.UtcNow.AddDays(-window))
+                    .Select(sample => new SizeGrowth.Sample(sample.Schema, sample.Table,
+                        sample.Bytes, sample.Rows, sample.At));
+
+                return Results.Ok(new
+                {
+                    available = true,
+                    reason = (string?)null,
+                    days = window,
+                    tables = sizes.Take(100),
+                    growth = SizeGrowth.Between(samples),
+                });
+            }));
 
         // --- what ran in the next minute --------------------------------------
         // Sampling rather than tracing: the server's own list of what it is doing, read once a

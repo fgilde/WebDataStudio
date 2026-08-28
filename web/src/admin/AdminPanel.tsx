@@ -17,6 +17,7 @@ import { SizeTreemap } from "./SizeTreemap";
 import { Replication } from "./Replication";
 import { Jobs } from "./Jobs";
 import { Capture } from "./Capture";
+import { Growth } from "./Growth";
 import { runJob } from "../shell/jobs";
 import { formatBytes } from "../redis/format";
 
@@ -519,11 +520,15 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor, tab }:
         <Jobs connectionId={connectionId} onOpenInEditor={onOpenInEditor} />
       </Tabs.Panel>
       <Tabs.Panel value="databases">
-        {/* The list to act on, and above it where the disk actually went. */}
+        {/* The list to act on, above it where the disk actually went, and below it which table is
+            taking more of it than last week. */}
         <ScrollArea h="100%" p="xs">
           <SizeTreemap connectionId={connectionId} />
           <div style={{ marginTop: 12 }}>
             <Databases connectionId={connectionId} />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Growth connectionId={connectionId} />
           </div>
         </ScrollArea>
       </Tabs.Panel>

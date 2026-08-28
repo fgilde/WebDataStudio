@@ -14,4 +14,8 @@ public sealed class MySqlDialect : SqlDialect
 
     public override string ParameterPrefix => "@";
     public override string Paginate(string sql, int offset, int limit) => $"{sql} LIMIT {limit} OFFSET {offset}";
+
+    /// MySQL unquotes explicitly; without it every extracted string arrives with its quotes.
+    public override string JsonPath(string column, string path) =>
+        $"JSON_UNQUOTE(JSON_EXTRACT({column}, '{JsonPathLiteral(path).Replace("[*]", "[0]")}'))";
 }

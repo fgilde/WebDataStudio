@@ -32,6 +32,57 @@ public static class DataEndpoints
         // Azure Container Apps, and most others — decodes %2F back to a real slash before routing.
         // The route then no longer matches and every object lookup answered 404 in the cloud while
         // working on a machine with nothing in front of it.
+        // What is actually inside a JSON column: which paths exist, how often, with which types.
+        // A JSONB column is one cell of text in the grid otherwise, and reading one row of it is a
+        // guess.
+        app.MapGet("/api/data/{conn}/json", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, string column, int? sample,
+            SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var target = SchemaEndpoints.ParseObjectRef(objectRef);
+                    var detail = await driver.DescribeAsync(session, target, ct);
+
+                    // Only a column that exists: everything else here is interpolated into SQL.
+                    if (detail.Columns.All(c => !c.Name.Equals(column, StringComparison.OrdinalIgnoreCase)))
+                        return Results.BadRequest(new { message = $"no column '{column}'" });
+
+                    if (driver.FromClause(session, target) is not { } from)
+                        return Results.BadRequest(new { message = "this object cannot be read" });
+
+                    var report = await JsonShape.DescribeAsync(driver, session, from, column,
+                        sample ?? JsonShape.DefaultSample, ct);
+
+                    return Results.Ok(new
+                    {
+                        report.Sampled,
+                        report.Parsed,
+                        report.Note,
+                        // Each path with the SQL that reads it on this engine: the panel copies it
+                        // or builds a SELECT from it, and neither has to know one engine's spelling
+                        // from another's.
+                        paths = report.Paths.Select(path => new
+                        {
+                            path.Path,
+                            path.Types,
+                            path.Present,
+                            path.Example,
+                            expression = JsonShape.Expression(driver.Dialect, column, path.Path),
+                        }),
+                        // The SELECT that turns the paths into columns, ready for a query tab.
+                        flatten = JsonShape.FlattenSql(driver.Dialect, from, column, report.Paths),
+                    });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
         app.MapGet("/api/data/{conn}", async (string conn, [FromQuery(Name = "ref")] string objectRef,
             int? offset, int? limit, string? sort, bool? desc, string? filterColumn, string? filter,
             bool? reveal, [FromQuery(Name = "lookup")] string[]? lookup, SessionFactory factory,

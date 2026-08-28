@@ -6,7 +6,7 @@ import {
   IconArrowBackUp, IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
   IconFilter, IconLock, IconPlus, IconRefresh, IconRestore, IconSortAscending, IconSortDescending,
   IconTrash,
-  IconSparkles, IconWand,
+  IconSparkles, IconWand, IconBraces,
 } from "@tabler/icons-react";
 import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
 import {
@@ -18,6 +18,7 @@ import { CellValue } from "../grid/CellValue";
 import { MenuFilterInput } from "../grid/MenuFilterInput";
 import { DistinctValues } from "../grid/DistinctValues";
 import { LookupPicker } from "../grid/LookupPicker";
+import { JsonColumnDialog } from "./JsonColumnDialog";
 import { EditableCell } from "../grid/editing/EditableCell";
 import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
 import { GenerateDialog } from "./GenerateDialog";
@@ -42,10 +43,23 @@ export interface DataTabProps {
   /// The filter the tab opens with. The data search uses it: a hit opens its table already filtered
   /// on the column that matched.
   initialFilter?: { column: string; value: string } | null;
+  /// Opens SQL in a query tab — the flatten of a JSON column goes there rather than running here.
+  onOpenInEditor?: (sql: string) => void;
+}
+
+/// Whether this column is worth opening the JSON panel on: a declared JSON type, or a text column
+/// whose values on this page start like a document. Guessing from the type alone would miss every
+/// `text` column that holds JSON, which is most of them outside PostgreSQL.
+function jsonish(dataType: string, values: unknown[]): boolean {
+  if (/json/i.test(dataType)) return true;
+  if (!/char|text|string|clob/i.test(dataType)) return false;
+
+  return values.some(value => typeof value === "string"
+    && (value.trimStart().startsWith("{") || value.trimStart().startsWith("[")));
 }
 
 export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], onFollowForeignKey,
-  onExport, initialFilter = null }: DataTabProps) {
+  onExport, initialFilter = null, onOpenInEditor }: DataTabProps) {
   // How many rows a page holds is a preference, not a constant: a wide table wants fewer.
   const { pageSize } = usePreferences();
   const [page, setPage] = useState<DataPageDto | null>(null);
@@ -66,6 +80,8 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   const [undoState, setUndoState] = useState<UndoStateDto | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
+  // Which JSON column somebody wanted to look inside.
+  const [jsonColumn, setJsonColumn] = useState<string | null>(null);
   // "customer_id.name": a column from the table a foreign key points at, shown next to the id
   // instead of being reached by following it.
   const [lookups, setLookups] = useState<string[]>([]);
@@ -327,6 +343,17 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                       <Menu.Item disabled={filter === null} onClick={() => setFilter(null)}>
                         Clear filter
                       </Menu.Item>
+                      {/* A JSON column is one cell of text in the grid. This says what is inside
+                          it — which paths, how often, with which types — and offers the SELECT that
+                          turns those paths into columns. */}
+                      {jsonish(c.dataType, page.rows.map(row => row[page.columns.indexOf(c)])) && <>
+                        <Menu.Divider />
+                        <Menu.Item leftSection={<IconBraces size={13} />}
+                          onClick={() => setJsonColumn(c.name)}>
+                          What is in this JSON
+                        </Menu.Item>
+                      </>}
+
                       {/* What is actually in this column, as checkboxes. Ticking values writes them
                           into the box above as `=a,=b` — a way of typing, not a second filter. */}
                       {!isLookup(c.name) && <>
@@ -446,6 +473,11 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
         <Group justify="center" py={4}>
           <Pagination size="xs" total={totalPages} value={pageIndex} onChange={setPageIndex} />
         </Group>
+      )}
+
+      {jsonColumn && (
+        <JsonColumnDialog connectionId={connectionId} objectRef={objectRef} column={jsonColumn}
+          onClose={() => setJsonColumn(null)} onFlatten={onOpenInEditor} />
       )}
 
       <GenerateDialog connectionId={connectionId} objectRef={objectRef} tableName={tableName}

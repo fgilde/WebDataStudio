@@ -23,6 +23,21 @@ public abstract class SqlDialect
     /// <c>{0}</c> is the parameter.
     public virtual string NumberCast => "CAST({0} AS numeric)";
 
+    /// One path inside a JSON column, as text. `column` is already quoted; `path` is dotted, with
+    /// `[]` where an array was folded into one entry.
+    ///
+    /// The default is the SQL/JSON path spelling that PostgreSQL, SQLite and DuckDB all accept;
+    /// MySQL, SQL Server, Oracle and ClickHouse say it their own way and override this.
+    public virtual string JsonPath(string column, string path) =>
+        $"json_extract({column}, '{JsonPathLiteral(path)}')";
+
+    /// `a.b[].c` as the `$.a.b[*].c` that the SQL/JSON functions want, with quotes escaped.
+    protected static string JsonPathLiteral(string path)
+    {
+        var steps = path.Replace("[]", "[*]").Split('.', StringSplitOptions.RemoveEmptyEntries);
+        return "$." + string.Join(".", steps).Replace("'", "''");
+    }
+
     /// The same for a timestamp. Written as an expression rather than a type name because Oracle
     /// needs a format string and everybody else does not.
     public virtual string TimestampCast => "CAST({0} AS timestamp)";

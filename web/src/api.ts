@@ -787,6 +787,30 @@ export const searchData = (
   return fetch(`${base}/search/${conn}/data?${query}`).then(r => ok<DataSearchDto>(r));
 };
 
+export interface JsonPathDto {
+  path: string;
+  /// Every type seen at this path. More than one is where a flatten breaks.
+  types: string[];
+  present: number;
+  example: string | null;
+  /// The SQL that reads this path on this engine.
+  expression: string;
+}
+export interface JsonShapeDto {
+  sampled: number;
+  parsed: number;
+  note: string | null;
+  paths: JsonPathDto[];
+  /// The SELECT that turns the paths into columns.
+  flatten: string;
+}
+
+export const jsonShape = (conn: string, ref: string, column: string,
+  sample?: number): Promise<JsonShapeDto> =>
+  fetch(`${base}/data/${conn}/json?${refQuery(ref, new URLSearchParams({
+    column, ...(sample ? { sample: String(sample) } : {}),
+  }))}`).then(r => ok<JsonShapeDto>(r));
+
 export interface SqlFindingDto {
   id: string;
   /// warning for what is probably a mistake, note for what is merely worth knowing.

@@ -30,6 +30,12 @@ public sealed class OracleDialect : SqlDialect
     /// Oracle folds unquoted identifiers to upper case, so the designer and introspection must
     /// agree on which spelling they compare.
     public static string NormalizeIdentifier(string name) => name.ToUpperInvariant();
+
+    /// Oracle's own JSON_VALUE, which wants the path as a literal and an array index rather than a
+    /// wildcard.
+    public override string JsonPath(string column, string path) =>
+        $"JSON_VALUE({column}, '{JsonPathLiteral(path).Replace("[*]", "[0]")}')";
+
 }
 
 public sealed class OracleDriver : AdoDriverBase

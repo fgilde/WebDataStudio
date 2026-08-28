@@ -9,6 +9,19 @@ public sealed class ClickHouseDialect : SqlDialect
     public override string QuoteIdentifier(string name) => "`" + name.Replace("`", "``") + "`";
     public override string ParameterPrefix => "@";
     public override string Paginate(string sql, int offset, int limit) => $"{sql} LIMIT {limit} OFFSET {offset}";
+
+    /// ClickHouse takes the path as a list of keys rather than as a JSONPath string.
+    public override string JsonPath(string column, string path)
+    {
+        var steps = path.Split('.', StringSplitOptions.RemoveEmptyEntries)
+            .SelectMany(step => step.EndsWith("[]", StringComparison.Ordinal)
+                ? new[] { step[..^2], "1" }
+                : [step])
+            .Select(step => long.TryParse(step, out _) ? step : QuoteLiteral(step));
+
+        return $"JSONExtractString({column}, {string.Join(", ", steps)})";
+    }
+
 }
 
 public sealed class ClickHouseDriver : AdoDriverBase

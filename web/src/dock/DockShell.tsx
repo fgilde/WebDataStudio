@@ -743,10 +743,10 @@ export function DockShell() {
         break;
 
       case "open-data":
-        // A Redis key is one value, not a page of rows: it belongs in the key browser. Asking the
-        // data tab for it produced "ERR wrong number of arguments for 'select' command", because
-        // `SELECT * FROM key` is not a thing Redis can be asked.
-        if (engine === "redis") openRedisKey(s.connectionId, s.node.ref);
+        // A single Redis key belongs in the key browser: that is where its value is shown in the
+        // shape its type has, and where it can be edited. A database or a prefix folder is a table
+        // of keys, and the data tab reads it like any other — the driver builds that page itself.
+        if (engine === "redis" && s.node.kind === "Table") openRedisKey(s.connectionId, s.node.ref);
         else await openData(s.connectionId, s.node.ref, s.node.label);
         break;
 

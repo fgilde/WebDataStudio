@@ -57,6 +57,11 @@ MongoDB · Redis · object storage (S3-compatible, Azure Blob, Google Cloud Stor
 Each driver declares what it can do, and the UI hides what an engine does not support instead of
 offering a button that fails.
 
+The two that have no SQL still browse. The data tab asks the driver for the page: a MongoDB collection
+is read with `find().sort().skip().limit()` and your column filter is translated into the query, while
+a Redis database, key prefix or single key is read as the table it makes — the keys with their types,
+their expiry and their size, or a hash as field and value.
+
 ## What it does
 
 - **Query editor** — Monaco with dialect-aware highlighting, schema-aware completion, formatting,
@@ -87,6 +92,10 @@ offering a button that fails.
 - **Documents** — what is actually inside a JSON or JSONB column: which paths exist, how often, with
   which types and an example, plus the `SELECT` that flattens them into columns in this engine's own
   spelling.
+- **MongoDB and Redis in the same grid** — a collection paged, sorted and filtered by the server with
+  a `find`, nested values kept as JSON in their cell and a field the sample never saw marked as such;
+  a key space as its keys with type, TTL, length and memory, and a key as field and value, member and
+  score, or index and value. Read-only, and it names the command that writes instead.
 - **Data quality** — rules about the rows rather than the catalogue: has a value, no duplicates, in
   a range, points at a row that exists, is recent, or a condition of your own. Each one counts the
   rows that break it, a failing rule joins the health findings and the alert webhook, every run is

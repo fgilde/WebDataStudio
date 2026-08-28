@@ -212,6 +212,84 @@ public class MongoDriverTests(MongoFixture fixture) : IClassFixture<MongoFixture
         Assert.Single(chunks.OfType<ResultChunk.Error>());
     }
 
+    /// The data tab asks every engine for a page of rows. It used to build `SELECT * FROM "people"`
+    /// for MongoDB, which came back as "this is not a MongoDB command" — the driver builds the find
+    /// itself now.
+    [Fact]
+    public async Task A_page_of_documents_arrives_as_rows()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Table, ["shop", "people"]),
+            new PageQuery(0, 2, "name", false, null, null), Ct);
+
+        Assert.NotNull(page);
+        Assert.Contains(page.Columns, column => column.Name == "name");
+        Assert.Equal(2, page.Rows.Count);
+
+        // Sorted by the engine, not by the page: ada before grace.
+        var name = page.Columns.ToList().FindIndex(column => column.Name == "name");
+        Assert.Equal("ada", page.Rows[0][name]);
+
+        // The whole collection is the total, not the page.
+        Assert.Equal(3, page.Total);
+    }
+
+    [Fact]
+    public async Task Paging_skips_the_documents_it_was_told_to()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Table, ["shop", "people"]),
+            new PageQuery(2, 2, "name", false, null, null), Ct);
+
+        Assert.NotNull(page);
+        Assert.Single(page.Rows);
+    }
+
+    [Fact]
+    public async Task A_filter_becomes_part_of_the_find()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Table, ["shop", "people"]),
+            new PageQuery(0, 50, null, false, "name", "=ada"), Ct);
+
+        Assert.NotNull(page);
+        Assert.Single(page.Rows);
+
+        // Filtered means counted: the total is what the filter left, not what the collection holds.
+        Assert.Equal(1, page.Total);
+    }
+
+    [Fact]
+    public async Task A_document_is_not_edited_in_the_grid_and_the_page_says_why()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Table, ["shop", "people"]),
+            new PageQuery(0, 10, null, false, null, null), Ct);
+
+        Assert.NotNull(page);
+        Assert.False(page.Editable);
+        Assert.Contains("updateOne", page.Reason);
+    }
+
+    /// A collection is a table; the database above it is not.
+    [Fact]
+    public async Task A_database_has_no_page_of_its_own()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        Assert.Null(await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Schema, ["shop"]),
+            new PageQuery(0, 10, null, false, null, null), Ct));
+    }
+
     [Fact]
     public async Task Explain_marks_a_collection_scan()
     {
@@ -305,6 +383,115 @@ public class RedisDriverTests(RedisFixture fixture) : IClassFixture<RedisFixture
 
         var error = Assert.Single(chunks.OfType<ResultChunk.Error>());
         Assert.Contains("read-only", error.Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// A key space is a table if you look at it right, and this is the table people actually want:
+    /// what is in here, of what type, expiring when, how big.
+    [Fact]
+    public async Task A_key_space_is_a_table_of_keys()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Schema, ["0"]),
+            new PageQuery(0, 100, null, false, null, null), Ct);
+
+        Assert.NotNull(page);
+        Assert.Equal(["key", "type", "ttl", "length", "memory"],
+            page.Columns.Select(column => column.Name));
+
+        var keys = page.Rows.Select(row => (string?)row[0]).ToList();
+        Assert.Contains("app:greeting", keys);
+        Assert.Contains("app:scores", keys);
+
+        var greeting = page.Rows.First(row => (string?)row[0] == "app:greeting");
+        Assert.Equal("string", greeting[1]);
+        Assert.Null(greeting[2]);   // no TTL was set
+        Assert.Equal(5L, greeting[3]);
+    }
+
+    [Fact]
+    public async Task A_prefix_folder_pages_only_what_is_under_it()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.TableFolder, ["0", "app"]),
+            new PageQuery(0, 100, "key", true, "key", "^app:s"), Ct);
+
+        Assert.NotNull(page);
+        Assert.Equal(["app:scores"], page.Rows.Select(row => (string?)row[0]));
+    }
+
+    [Fact]
+    public async Task A_hash_key_is_field_and_value()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Table, ["0", "app", "user", "1"]),
+            new PageQuery(0, 100, null, false, null, null), Ct);
+
+        Assert.NotNull(page);
+        Assert.Equal(["field", "value"], page.Columns.Select(column => column.Name));
+        Assert.Equal(["name", "ada"], Assert.Single(page.Rows).Select(cell => (string?)cell));
+        Assert.Contains("HSET", page.Reason);
+    }
+
+    [Fact]
+    public async Task A_sorted_set_is_member_and_score()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Table, ["0", "app", "scores"]),
+            new PageQuery(0, 100, null, false, null, null), Ct);
+
+        Assert.NotNull(page);
+        Assert.Equal(["member", "score"], page.Columns.Select(column => column.Name));
+        Assert.Equal(10d, Assert.Single(page.Rows)[1]);
+    }
+
+    [Fact]
+    public async Task A_list_keeps_its_order_and_says_so_with_an_index()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Table, ["0", "app", "queue"]),
+            new PageQuery(0, 100, null, false, null, null), Ct);
+
+        Assert.NotNull(page);
+        Assert.Equal(["index", "value"], page.Columns.Select(column => column.Name));
+        Assert.Equal([0L, 1L], page.Rows.Select(row => row[0]));
+        Assert.Equal("a", page.Rows[0][1]);
+    }
+
+    [Fact]
+    public async Task A_set_is_its_members()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Table, ["0", "app", "tags"]),
+            new PageQuery(0, 100, "member", false, null, null), Ct);
+
+        Assert.NotNull(page);
+        Assert.Equal(["member"], page.Columns.Select(column => column.Name));
+        Assert.Equal(["x", "y"], page.Rows.Select(row => (string?)row[0]));
+    }
+
+    [Fact]
+    public async Task A_string_key_is_its_value_and_its_length()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, Ct);
+
+        var page = await fixture.Driver.PageAsync(session,
+            new SchemaNodeRef(SchemaNodeKind.Table, ["0", "app", "greeting"]),
+            new PageQuery(0, 100, null, false, null, null), Ct);
+
+        Assert.NotNull(page);
+        Assert.Equal(["hello", 5L], Assert.Single(page.Rows));
     }
 
     [Fact]

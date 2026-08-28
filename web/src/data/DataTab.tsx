@@ -352,6 +352,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           {filter ? ` · filtered on ${filter.column}` : ""}
           {sort ? ` · sorted by ${sort.column}` : ""}
           {changeSet.isDirty && ` · ${changeSet.changes.length} pending`}
+          {page.note ? ` · ${page.note}` : ""}
         </Text>
       </Group>
 

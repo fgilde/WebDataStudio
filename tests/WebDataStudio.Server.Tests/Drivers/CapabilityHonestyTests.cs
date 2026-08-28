@@ -46,6 +46,19 @@ public class CapabilityHonestyTests
         Assert.NotEmpty(driver.Dialect.Paginate("SELECT 1", 0, 10));
     }
 
+    /// An engine with no SQL that still claims a browsable object has to build the page itself.
+    /// Without this the data tab reached MongoDB with `SELECT * FROM "sessions"`.
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public void An_engine_without_sql_builds_its_own_pages(string engine)
+    {
+        var driver = new DriverRegistry().Get(engine);
+        if (driver.Caps.Sql || !driver.Caps.TabularBrowse) return;
+
+        // A driver that leaves PageAsync to the interface default has no method of its own here.
+        Assert.NotNull(driver.GetType().GetMethod("PageAsync"));
+    }
+
     [Theory]
     [MemberData(nameof(Engines))]
     public void Every_engine_the_connection_form_offers_has_a_capability_set(string engine)

@@ -224,6 +224,7 @@ export function ExplorerTree({ onSelect, onAction, onDropFiles }: {
           ddl: driver.caps.ddl,
           multiDatabase: driver.caps.multiDatabase,
           fullTextIndexes: driver.caps.fullTextIndexes,
+          browseContainers: driver.caps.browseContainers,
         } satisfies MenuCapabilities,
       ]))))
       .catch(() => setCapsByEngine({}));

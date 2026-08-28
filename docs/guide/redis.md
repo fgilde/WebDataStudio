@@ -82,12 +82,34 @@ cannot see it.
 
 ## Opening a key
 
-A double-click on a key in the explorer opens it in the **Keys** tab with its value loaded — not in
-the data tab. A Redis key is one value with a shape of its own, not a page of rows, and asking the
-data tab for it used to produce `ERR wrong number of arguments for 'select' command`, because
-`SELECT * FROM key` is not something Redis can be asked. The API says the same thing now: browsing
-rows on a Redis connection answers "Redis has no rows to browse; open the key in the key browser
-instead".
+A double-click on a key in the explorer opens it in the **Keys** tab with its value loaded. That is
+where a value is edited in the shape its type has, so it stays the answer to a double-click.
+
+## The key space as a table
+
+**Open data** on a database or a prefix folder reads the key space as a grid: the key, its type, its
+TTL in seconds, its length and what it costs in memory. It is the inventory question — what is in
+here, what type is it, when does it expire, how big is it — and because it is a normal data tab it
+sorts, filters and exports like any other.
+
+**Open data** on a single key reads it as the table its type makes: field and value for a hash, index
+and value for a list, the members of a set, member and score for a sorted set, id and fields for a
+stream, the value and its length for a string. Asking the data tab for a key used to produce
+`ERR wrong number of arguments for 'select' command`, because the tab built `SELECT * FROM key`; the
+driver builds the page itself now.
+
+What this grid cannot do, it says:
+
+- It is **read-only**, and the reason names the command that writes — `HSET`, `ZADD`, `SET`. Editing
+  a value is the key browser's job.
+- A key space is scanned, not indexed. A page looks at the first 20 000 keys, and the footer says so
+  when it stopped there. Filtering on the key name is applied before anything is asked about each
+  key, which is why `^session:` is the cheap way to narrow it.
+- Sorting by TTL, length or memory orders the page that was read rather than the whole key space,
+  because Redis has no order of its own to ask for. The footer says that too.
+- `MEMORY USAGE` is disabled on some managed Redis deployments. Where the server refuses it the
+  column stays empty rather than the page failing.
+- The column menu's list of values is not offered: counting them is a `GROUP BY`, and there is none.
 
 ## Command help in the console
 

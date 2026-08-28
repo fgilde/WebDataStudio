@@ -129,6 +129,42 @@ Spaltenköpfe haben ein Menü zum Sortieren und Filtern, und beides läuft auf d
 hält standardmäßig 200 von womöglich Millionen Zeilen, im Browser wäre also die falsche Menge
 sortiert. Wie viele es sind, ist eine [Einstellung](shortcuts.md).
 
+### Eine Engine ohne SQL
+
+Für MongoDB und Redis baut der Daten-Tab kein `SELECT` — er fragt den Treiber nach der Seite, und der
+baut sie so, wie seine Engine es kann:
+
+- Eine **MongoDB-Collection** wird mit `find().sort().skip().limit()` gelesen. Der Spaltenfilter wird
+  in die Abfrage übersetzt: `^ada` wird ein verankerter regulärer Ausdruck, `>10` ein `$gt` mit einer
+  Zahl, `=a,=b` ein `$in`, `NULL` eine Null-Prüfung. Blättern und Sortieren passieren im Server, die
+  Reihenfolge gilt also für die Collection und nicht für die Seite. Die Spalten sind die Form, die das
+  Struktur-Panel gesampelt hat; ein Feld, das diese Seite zeigt und das im Sample nie vorkam, wird
+  hinten angehängt und als `unsampled` markiert — Dokumente haben kein Schema, und genau deshalb
+  zeigt man sie. Ein verschachteltes Dokument oder ein Array bleibt JSON in seiner Zelle, „was steht
+  in diesem JSON“ aus dem Spaltenmenü gilt also auch dafür.
+- Eine **Redis-Datenbank oder ein Präfix-Ordner** wird als die Schlüssel gelesen, die darin liegen:
+  der Schlüssel, sein Typ, seine TTL in Sekunden, seine Länge und was er an Speicher kostet. Das ist
+  die Inventarliste, die man von einem Cache tatsächlich will, und sie sortiert, filtert und
+  exportiert wie jedes andere Gitter. Ein Schlüsselraum wird gescannt und nicht indiziert: eine Seite
+  sieht sich die ersten 20 000 Schlüssel an, und die Fußzeile sagt es, wenn dort Schluss war.
+  `MEMORY USAGE` gibt es nicht auf jedem gemanagten Redis; wo es abgelehnt wird, bleibt die Spalte
+  leer, statt die Seite scheitern zu lassen.
+- Ein **einzelner Redis-Schlüssel** wird als die Tabelle gelesen, die sein Typ ergibt: Feld und Wert
+  bei einem Hash, Index und Wert bei einer Liste, die Mitglieder einer Menge, Mitglied und Score bei
+  einem Sorted Set, Id und Felder bei einem Stream, der Wert und seine Länge bei einem String. Ein
+  Doppelklick öffnet einen Schlüssel weiterhin im Schlüssel-Browser, dort lässt sich der Wert
+  bearbeiten; das Gitter ist der andere Blick darauf — und der Weg, ihn zu sortieren oder zu filtern.
+
+Zwei Dinge folgen daraus, dass es kein SQL gibt. Das Gitter ist **nur lesbar** und nennt stattdessen
+den Befehl, der schreibt — `updateOne` für ein Dokument, `HSET` für ein Hash-Feld —, statt einen
+Speichern-Knopf zu zeigen, der nicht funktionieren kann. Und das Spaltenmenü bietet keine Liste der
+vorkommenden Werte an: die zu zählen ist ein `GROUP BY`, also wird das mit Begründung abgelehnt und
+der Filter stattdessen getippt.
+
+Was die Engine mit der Abfrage nicht machen konnte, steht in der Fußzeile neben der Zeilenzahl, statt
+still verschluckt zu werden: ein Filter ohne Übersetzung, eine Sortierung, für die ein Schlüsselraum
+keine eigene Ordnung hat, ein Scan, der an seiner Grenze aufhörte.
+
 ## Die Filtersprache
 
 ![Das Spaltenmenü: Filterfeld und die Werte der Spalte](../../assets/screenshots/filter-dark.png)

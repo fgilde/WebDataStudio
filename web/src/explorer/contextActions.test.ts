@@ -67,6 +67,14 @@ describe("actionsFor", () => {
     expect(ids("Schema")).toContain("new-table");
   });
 
+  it("offers a key space its own inventory as rows", () => {
+    // A Redis database and a prefix folder are tables of keys; a SQL schema is not.
+    expect(ids("Schema", { browseContainers: true })).toContain("open-data");
+    expect(ids("TableFolder", { browseContainers: true })).toContain("open-data");
+    expect(ids("Schema")).not.toContain("open-data");
+    expect(ids("TableFolder")).not.toContain("open-data");
+  });
+
   it("keeps folders that only list things down to a refresh", () => {
     expect(ids("ViewFolder")).toEqual(["refresh"]);
     expect(ids("SequenceFolder")).toEqual(["refresh"]);

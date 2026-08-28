@@ -51,5 +51,15 @@ public interface IDbDriver
             ? $"{Dialect.QuoteIdentifier(target.Path[0])}.{Dialect.QuoteIdentifier(target.Name)}"
             : Dialect.QuoteIdentifier(target.Name);
 
+    /// A page of rows for an engine that has no SQL to build one with.
+    ///
+    /// Null — the default — means "build the SELECT the way you always did", which is every SQL
+    /// engine and a file in a bucket. MongoDB and Redis answer instead: a collection is documents
+    /// projected onto the shape the driver sampled, a Redis database is its keys with their types and
+    /// their expiry, and a Redis key is its own contents. Without this the data tab sent
+    /// `SELECT * FROM "sessions"` to MongoDB, which is not a sentence it knows.
+    Task<TabularPage?> PageAsync(IDbSession session, SchemaNodeRef target, PageQuery query,
+        CancellationToken ct) => Task.FromResult<TabularPage?>(null);
+
     Task<AnalyzeReport> AnalyzeAsync(IDbSession session, AnalyzeScope scope, SchemaNodeRef? target, CancellationToken ct);
 }

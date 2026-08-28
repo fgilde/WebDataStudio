@@ -41,8 +41,29 @@ await page.goto(baseUrl, { waitUntil: "networkidle" });
 await page.getByText(redis.name, { exact: true }).first().click();
 await page.waitForTimeout(400);
 
-// The browser button only exists for a Redis connection.
-await page.getByRole("button", { name: "Redis browser" }).click();
+// --- the key space as a table -------------------------------------------------------------------
+// "Open data" on a Redis database used to produce `SELECT * FROM key` and an error from the server.
+// The driver builds the page itself now: the keys with their type, expiry and size.
+await page.getByText("db0", { exact: true }).first().waitFor({ timeout: 20000 });
+await page.getByText("db0", { exact: true }).first().click({ button: "right" });
+await page.getByText("Open data", { exact: true }).click();
+
+const keyGrid = page.locator(".dv-groupview")
+  .filter({ has: page.getByRole("columnheader", { name: "memory" }) }).first();
+
+await keyGrid.getByRole("columnheader", { name: "memory" }).waitFor({ timeout: 20000 });
+const keyTable = await keyGrid.innerText();
+
+check("the key space opens as a table of keys",
+  ["key", "type", "ttl", "length", "memory"].every(column => keyTable.includes(column)));
+check("with a type per key", keyTable.includes("string"));
+check("and it says which command writes instead of offering a save",
+  keyTable.includes("Redis command"));
+
+// --- the key browser ----------------------------------------------------------------------------
+// It lives in the Tools menu, and the entry only exists for a Redis connection.
+await page.getByRole("button", { name: "Tools" }).first().click();
+await page.getByRole("menuitem", { name: "Redis key browser" }).click();
 await page.getByRole("tab", { name: "Keys" }).waitFor({ timeout: 20000 });
 
 const panel = page.locator(".dv-groupview").filter({ has: page.getByRole("tab", { name: "Analysis" }) }).first();

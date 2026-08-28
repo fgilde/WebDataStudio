@@ -60,7 +60,8 @@ public sealed class RedisDriver : IDbDriver
 
     public DriverCapabilities Caps { get; } = new()
     {
-        Sql = false, TabularBrowse = false, MultiDatabase = true, Backup = true,
+        // A key space browses now: PageAsync answers with keys, and a key with its own contents.
+        Sql = false, TabularBrowse = true, BrowseContainers = true, MultiDatabase = true, Backup = true,
         SessionList = true, KillSession = true, ServerStats = true, SystemCommands = true,
     };
 
@@ -172,6 +173,24 @@ public sealed class RedisDriver : IDbDriver
         _ = ct;
         return new ObjectDetail(target, columns, [], [], [], length, null,
             $"{type.ToString().ToLowerInvariant()} key", null);
+    }
+
+    /// A page of rows out of a key space. A database or a prefix folder answers with its keys — type,
+    /// expiry, length, memory — and a single key with whatever its type makes into rows.
+    public async Task<TabularPage?> PageAsync(IDbSession session, SchemaNodeRef target,
+        PageQuery query, CancellationToken ct)
+    {
+        if (target.Path.Count == 0) return null;
+
+        var redis = Cast(session);
+        var database = int.TryParse(target.Path[0], out var number) ? number : 0;
+        var db = redis.Multiplexer.GetDatabase(database);
+
+        if (target.Kind == SchemaNodeKind.Table)
+            return await RedisPage.ValueAsync(db, string.Join(":", target.Path.Skip(1)), query, ct);
+
+        var prefix = target.Path.Count > 1 ? string.Join(":", target.Path.Skip(1)) + ":" : "";
+        return await RedisPage.KeysAsync(db, redis.Server, database, prefix, query, ct);
     }
 
     public async IAsyncEnumerable<ResultChunk> ExecuteAsync(IDbSession session, ScriptRequest request,

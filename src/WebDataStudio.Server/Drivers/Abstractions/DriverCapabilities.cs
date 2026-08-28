@@ -9,6 +9,11 @@ public sealed record DriverCapabilities
     /// Whether an object can be browsed as a page of rows. False for a key/value store, where an
     /// object is one value with a shape of its own and `SELECT * FROM key` means nothing.
     public bool TabularBrowse { get; init; } = true;
+
+    /// Whether a container - a database, a folder of keys - is itself a page of rows. True for a key
+    /// space, where the inventory of keys with their types and their expiry is the interesting table
+    /// and no single object holds it.
+    public bool BrowseContainers { get; init; }
     public bool MultiSchema { get; init; }
     public bool MultiDatabase { get; init; }
     public bool EstimatedPlan { get; init; }

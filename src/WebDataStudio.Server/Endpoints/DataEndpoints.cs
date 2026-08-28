@@ -186,6 +186,37 @@ public static class DataEndpoints
                         });
 
                     var target = SchemaEndpoints.ParseObjectRef(objectRef);
+                    var take = Math.Clamp(limit ?? defaultLimit, 1, 100_000);
+                    var skip = Math.Max(offset ?? 0, 0);
+
+                    // An engine that has no SQL builds its own page: a MongoDB collection is a
+                    // find().sort().skip().limit(), a Redis database is its keys, a Redis key is its
+                    // own contents. Asked before anything else, because none of what follows -
+                    // a FROM clause, a WHERE, an ORDER BY - exists for them.
+                    if (await driver.PageAsync(session, target,
+                            new PageQuery(skip, take, sort, desc == true, filterColumn, filter), ct)
+                        is { } built)
+                    {
+                        var hidden = reveal == true
+                            ? []
+                            : Masking.IndexesOf(built.Columns, policies.For(conn));
+
+                        return Results.Ok(new
+                        {
+                            columns = Masking.Describe(built.Columns, hidden),
+                            rows = Masking.Apply(built.Rows, hidden),
+                            editable = built.Editable && !session.Spec.ReadOnly,
+                            keyColumns = Array.Empty<string>(),
+                            reason = session.Spec.ReadOnly ? "this connection is read-only" : built.Reason,
+                            totalEstimate = built.Total,
+                            lookups = Array.Empty<string>(),
+                            offset = skip,
+                            limit = take,
+                            // What the driver could not do with this query, said rather than swallowed.
+                            note = built.Note,
+                        });
+                    }
+
                     var detail = await driver.DescribeAsync(session, target, ct);
                     var identity = RowIdentity.Resolve(detail);
 
@@ -198,9 +229,6 @@ public static class DataEndpoints
                             message = "this object cannot be read as a table; open the preview or " +
                                       "download it instead",
                         });
-
-                    var take = Math.Clamp(limit ?? defaultLimit, 1, 100_000);
-                    var skip = Math.Max(offset ?? 0, 0);
 
                     // A column from the table on the other side of a foreign key, shown here rather
                     // than reached by following it: "orders.customer_id.name" next to the id.
@@ -308,8 +336,14 @@ public static class DataEndpoints
                 var (driver, session) = await factory.OpenAsync(conn, ct);
                 await using (session)
                 {
-                    if (!driver.Caps.TabularBrowse)
-                        return Results.BadRequest(new { message = $"{driver.Info.Label} has no columns to count" });
+                    // Counting values is a GROUP BY, which is SQL. An engine without it browses
+                    // (PageAsync) but cannot answer this one.
+                    if (!driver.Caps.Sql)
+                        return Results.BadRequest(new
+                        {
+                            message = $"{driver.Info.Label} cannot count the values of a column; "
+                                      + "type the filter instead",
+                        });
 
                     var target = SchemaEndpoints.ParseObjectRef(objectRef);
                     var detail = await driver.DescribeAsync(session, target, ct);

@@ -44,6 +44,8 @@ public class RedisEndpointTests : IAsyncLifetime
                     new { name = "CACHE", engine = "redis", connectionString = _container.GetConnectionString() },
                     new { name = "FILE", engine = "sqlite", connectionString = "Data Source=:memory:" },
                 }),
+                // An agent reads the same key space the data tab does.
+                ["WDS_MCP_ENABLED"] = "true",
             })));
 
     private static async Task<string> IdAsync(HttpClient client, string name)
@@ -54,6 +56,53 @@ public class RedisEndpointTests : IAsyncLifetime
         return document.RootElement.EnumerateArray()
             .First(c => c.GetProperty("name").GetString() == name)
             .GetProperty("id").GetString()!;
+    }
+
+    /// The text one MCP tool call produced.
+    private static async Task<string> CallAsync(HttpClient client, string tool, object arguments)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var response = await client.PostAsJsonAsync("/mcp", new
+        {
+            jsonrpc = "2.0", id = 1, method = "tools/call", @params = new { name = tool, arguments },
+        }, ct);
+
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        return body.GetProperty("result").GetProperty("content")[0]
+            .GetProperty("text").GetString() ?? "";
+    }
+
+    /// browse_rows used to refuse a Redis connection outright ("it is a key/value store"), so an
+    /// agent had one fewer way to look at a cache than a person did.
+    [Fact]
+    public async Task An_agent_browses_the_key_space_too()
+    {
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var id = await IdAsync(client, "CACHE");
+
+        var text = await CallAsync(client, "browse_rows", new { connectionId = id, @ref = "Schema:0" });
+
+        Assert.Contains("user:1", text);
+        Assert.Contains("profile:1", text);
+    }
+
+    [Fact]
+    public async Task An_agent_can_filter_the_keys_it_asks_for()
+    {
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var id = await IdAsync(client, "CACHE");
+
+        var text = await CallAsync(client, "browse_rows", new
+        {
+            connectionId = id, @ref = "Schema:0", filterColumn = "key", filter = "^profile",
+        });
+
+        Assert.Contains("profile:1", text);
+        Assert.DoesNotContain("user:1", text);
     }
 
     [Fact]
@@ -117,23 +166,82 @@ public class RedisEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    /// A key is one value, not a page of rows. Asking the data tab for it used to reach the driver
-    /// as `SELECT * FROM key` and come back as "ERR wrong number of arguments for 'select' command",
-    /// which told the user nothing about what to do instead.
+    /// The data tab used to answer "ERR wrong number of arguments for 'select' command" here,
+    /// because it built `SELECT * FROM key`. The driver builds the page itself now: a key is the
+    /// table its type makes.
     [Fact]
-    public async Task Browsing_rows_on_redis_says_where_to_look_instead()
+    public async Task Browsing_rows_on_a_redis_key_reads_the_value()
     {
         var ct = TestContext.Current.CancellationToken;
         using var factory = Factory();
         var client = factory.CreateClient();
         var id = await IdAsync(client, "CACHE");
 
-        var response = await client.GetAsync($"/api/data/{id}?ref=Table:0/user/1", ct);
-        var message = await response.Content.ReadAsStringAsync(ct);
+        var body = await client.GetFromJsonAsync<JsonElement>($"/api/data/{id}?ref=Table:0/user/1", ct);
+
+        Assert.Contains("value", body.GetProperty("columns").EnumerateArray()
+            .Select(column => column.GetProperty("name").GetString()));
+
+        var row = Assert.Single(body.GetProperty("rows").EnumerateArray().ToList());
+        Assert.Equal("ada", row[0].GetString());
+
+        // Not editable, and it says why rather than offering a save button that cannot work.
+        Assert.False(body.GetProperty("editable").GetBoolean());
+        Assert.Contains("SET", body.GetProperty("reason").GetString()!);
+    }
+
+    [Fact]
+    public async Task Browsing_rows_on_a_redis_database_lists_the_keys()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var id = await IdAsync(client, "CACHE");
+
+        var body = await client.GetFromJsonAsync<JsonElement>($"/api/data/{id}?ref=Schema:0", ct);
+
+        var names = body.GetProperty("columns").EnumerateArray()
+            .Select(column => column.GetProperty("name").GetString()).ToList();
+
+        Assert.Equal(["key", "type", "ttl", "length", "memory"], names);
+        Assert.Equal(3, body.GetProperty("totalEstimate").GetInt64());
+
+        var keys = body.GetProperty("rows").EnumerateArray()
+            .Select(row => row[0].GetString()).ToList();
+
+        Assert.Equal(["profile:1", "user:1", "user:2"], keys);
+    }
+
+    [Fact]
+    public async Task A_prefix_folder_lists_only_the_keys_under_it()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var id = await IdAsync(client, "CACHE");
+
+        var body = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/data/{id}?ref=TableFolder:0/user&filterColumn=key&filter=$2", ct);
+
+        var row = Assert.Single(body.GetProperty("rows").EnumerateArray().ToList());
+        Assert.Equal("user:2", row[0].GetString());
+        Assert.Equal("string", row[1].GetString());
+    }
+
+    /// Counting the values of a column is a GROUP BY. Redis browses now, so the refusal has to name
+    /// the real reason rather than "has no columns to count".
+    [Fact]
+    public async Task Distinct_values_are_refused_with_a_reason()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var id = await IdAsync(client, "CACHE");
+
+        var response = await client.GetAsync($"/api/data/{id}/distinct?ref=Schema:0&column=key", ct);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Contains("key browser", message);
-        Assert.DoesNotContain("select", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("cannot count", await response.Content.ReadAsStringAsync(ct));
     }
 
     [Fact]

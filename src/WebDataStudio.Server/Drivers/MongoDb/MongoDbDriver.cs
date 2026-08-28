@@ -139,6 +139,47 @@ public sealed class MongoDbDriver : IDbDriver
             "shape sampled from the first 100 documents", null);
     }
 
+    /// A page of documents, as rows. The data tab asks every engine the same question; for MongoDB
+    /// the answer is a `find`, and this is where that happens instead of in the endpoint.
+    public async Task<TabularPage?> PageAsync(IDbSession session, SchemaNodeRef target,
+        PageQuery query, CancellationToken ct)
+    {
+        if (target.Kind != SchemaNodeKind.Table || target.Path.Count == 0) return null;
+
+        var mongo = Cast(session);
+        var collection = mongo.Client.GetDatabase(target.Path[0])
+            .GetCollection<BsonDocument>(target.Name);
+
+        var (filter, note) = query.FilterColumn is { Length: > 0 } && query.Filter is { Length: > 0 }
+            ? MongoPage.Filter(query.FilterColumn, query.Filter)
+            : (new BsonDocument(), null);
+
+        var find = collection.Find(filter);
+
+        if (query.Sort is { Length: > 0 } sort)
+            find = find.Sort(new BsonDocument(sort, query.Desc ? -1 : 1));
+
+        var documents = await find.Skip(query.Offset).Limit(query.Limit).ToListAsync(ct);
+
+        // The shape the driver samples, so the columns are the ones the structure panel shows — plus
+        // whatever this page turned up that the sample never saw.
+        var detail = await DescribeAsync(session, target, ct);
+        var (columns, rows) = MongoPage.Project(documents, detail.Columns);
+
+        // Counting a filtered collection costs a scan on a big one, so it is only asked for when a
+        // filter narrowed it; otherwise the collection's own count is already known.
+        var total = filter.ElementCount == 0
+            ? detail.RowCount
+            : await collection.CountDocumentsAsync(filter, cancellationToken: ct);
+
+        return new TabularPage(columns, rows, total,
+            // A document is edited as a document. The grid writes cells through a change script,
+            // which is SQL — so it says why rather than offering a button that cannot work.
+            Editable: false,
+            Reason: "a document is edited as a document: use a query tab with updateOne",
+            Note: note);
+    }
+
     public async IAsyncEnumerable<ResultChunk> ExecuteAsync(IDbSession session, ScriptRequest request,
         [EnumeratorCancellation] CancellationToken ct)
     {

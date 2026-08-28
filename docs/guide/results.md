@@ -200,6 +200,40 @@ sorting and filtering, and both run on the server — a page holds 200 of possib
 so sorting in the browser would order the wrong set. How many rows a page holds is a
 [preference](shortcuts.md#preferences-and-rebinding).
 
+### An engine that has no SQL
+
+The data tab does not build a `SELECT` for MongoDB or Redis — it asks the driver for the page, and the
+driver builds it the way its engine can:
+
+- A **MongoDB collection** is read with `find().sort().skip().limit()`. The column filter is
+  translated into the query: `^ada` becomes an anchored regular expression, `>10` a `$gt` with a
+  number, `=a,=b` an `$in`, `NULL` a null check. Paging and sorting happen in the server, so the
+  order is over the collection rather than over the page. The columns are the shape the structure
+  panel sampled, and a field this page turned up that the sample never saw is added at the end and
+  marked `unsampled` — documents have no schema, and that is the point of showing them. A nested
+  document or an array stays JSON in its cell, so the column menu's "what is in this JSON" applies to
+  it just as it does to a JSONB column.
+- A **Redis database or prefix folder** is read as the keys it holds: the key, its type, its TTL in
+  seconds, its length and what it costs in memory. That is the inventory people actually want out of a
+  cache, and it sorts, filters and exports like any other grid. A key space is scanned rather than
+  indexed, so a page looks at the first 20 000 keys and the footer says so when it stopped there.
+  `MEMORY USAGE` is not available on every managed Redis; where it is refused the column stays empty
+  rather than the page failing.
+- A **single Redis key** is read as the table its type makes: field and value for a hash, index and
+  value for a list, the members of a set, member and score for a sorted set, id and fields for a
+  stream, the value and its length for a string. A double-click still opens a key in the
+  [key browser](redis.md), which is where its value can be edited; the grid is the other way to look
+  at it, and the way to sort or filter it.
+
+Two things follow from having no SQL. The grid is **read-only**, and it says which command writes
+instead — `updateOne` for a document, `HSET` for a hash field — rather than showing a save button that
+cannot work. And the column menu offers no list of the values a column holds: counting them is a
+`GROUP BY`, so that request is refused with a reason and the filter is typed instead.
+
+Whatever the engine could not do with the query is written into the footer next to the row count
+rather than silently dropped: a filter with no translation, a sort a key space has no order of its
+own for, a scan that stopped at its cap.
+
 ## History
 
 `Ctrl+H` opens the history: every statement that ran, with when, how long it took, how many rows it

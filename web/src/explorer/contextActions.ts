@@ -29,6 +29,9 @@ export interface MenuCapabilities {
   ddl?: boolean;
   multiDatabase?: boolean;
   fullTextIndexes?: boolean;
+  /// Whether a database or folder is itself a page of rows — a key space is, and its inventory of
+  /// keys is the table worth opening.
+  browseContainers?: boolean;
 }
 
 const TABLE: ContextItem[] = [
@@ -166,6 +169,7 @@ export function actionsFor(kind: string, caps: MenuCapabilities = {}): ContextIt
 
     case "Schema":
       return keepWritable([
+        ...(caps.browseContainers ? [{ action: "open-data" as const, label: "Open data" }] : []),
         ...CONTAINER,
         { action: "export", label: "Export schema…" },
         { action: "new-query", label: "New query here" },
@@ -183,7 +187,9 @@ export function actionsFor(kind: string, caps: MenuCapabilities = {}): ContextIt
       return STORAGE_FOLDER;
 
     case "TableFolder":
-      return keepWritable(CONTAINER);
+      return keepWritable(caps.browseContainers
+        ? [{ action: "open-data", label: "Open data" }, ...CONTAINER]
+        : CONTAINER);
 
     case "Database":
       return keepWritable([

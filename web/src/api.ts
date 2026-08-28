@@ -204,6 +204,9 @@ export interface DataPageDto {
   /// Column names that came from the table a foreign key points at. Read-only: an edit here would
   /// be an update to a row this grid is not addressing.
   lookups?: string[];
+  /// What the engine could not do with this query — a filter MongoDB has no date periods for, a
+  /// sort a key space has no order for, a key scan that stopped at its cap. Shown, not swallowed.
+  note?: string | null;
 }
 export interface ChangePreviewDto {
   hash: string; script: string; statementCount: number; destructive: boolean;

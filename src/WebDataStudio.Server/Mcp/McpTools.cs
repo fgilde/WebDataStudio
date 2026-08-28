@@ -74,13 +74,19 @@ public sealed class McpToolbox(
             Writes: false);
 
         yield return new McpTool("browse_rows",
-            "A page of rows from one table or view, with the same masking and the same row cap the "
-            + "studio's data tab applies.",
+            "A page of rows from one table, view, collection or key space, with the same masking and "
+            + "the same row cap the studio's data tab applies. A MongoDB collection is read with a "
+            + "find, a Redis database answers with its keys and a Redis key with its own contents.",
             Object(
                 ("connectionId", "string", "Connection id.", true),
-                ("ref", "string", "Object ref of a table or view.", true),
+                ("ref", "string", "Object ref of a table, view, collection or key.", true),
                 ("limit", "integer", $"Rows to return, at most {MaxRows}.", false),
-                ("offset", "integer", "Rows to skip.", false)),
+                ("offset", "integer", "Rows to skip.", false),
+                ("sort", "string", "Column to sort by.", false),
+                ("desc", "string", "\"true\" to sort descending.", false),
+                ("filterColumn", "string", "Column the filter applies to.", false),
+                ("filter", "string", "Filter expression: ^starts, $ends, >10, NULL, or a word for "
+                    + "contains.", false)),
             Writes: false);
 
         yield return new McpTool("run_query",
@@ -119,8 +125,8 @@ public sealed class McpToolbox(
             Writes: false);
 
         yield return new McpTool("redis_value",
-            "One Redis key: its type, TTL and value, in the shape that type has. A key/value store "
-            + "has no rows, so browse_rows and run_query do not apply to it.",
+            "One Redis key: its type, TTL and value, in the shape that type has. browse_rows reads "
+            + "the same key as a table; this is the value itself, nesting and all.",
             Object(
                 ("connectionId", "string", "A Redis connection id.", true),
                 ("key", "string", "The key to read.", true),
@@ -466,10 +472,32 @@ public sealed class McpToolbox(
         {
             if (!driver.Caps.TabularBrowse)
                 return new McpToolResult(
-                    $"{driver.Info.Label} has no rows to browse; it is a key/value store",
-                    IsError: true);
+                    $"{driver.Info.Label} has no rows to browse", IsError: true);
 
             var target = SchemaNodeRef.Parse(reference);
+            var sort = Optional(arguments, "sort");
+            var filterColumn = Optional(arguments, "filterColumn");
+            var filter = Optional(arguments, "filter");
+            var desc = string.Equals(Optional(arguments, "desc"), "true", StringComparison.OrdinalIgnoreCase);
+
+            // The same page the data tab gets: an engine without SQL builds it itself, so a Mongo
+            // collection and a Redis key space are browsable here too rather than answering with a
+            // statement they do not understand.
+            if (await driver.PageAsync(session, target,
+                    new PageQuery(offset, limit, sort, desc, filterColumn, filter), ct) is { } page)
+            {
+                var hidden = Masking.IndexesOf(page.Columns, policies.For(connection));
+
+                return Ok(new
+                {
+                    columns = page.Columns.Select(column => new { column.Name, column.DataType }),
+                    rowCount = page.Rows.Count,
+                    rows = Masking.Apply(page.Rows, hidden).Select(row => row.Select(Text).ToArray()),
+                    total = page.Total,
+                    note = page.Note,
+                });
+            }
+
             // The driver's own FROM: for a table it is the qualified name, for a file in a bucket it
             // is the reader that opens it. Building the name here read a Parquet file as a table
             // called "bucket"."key", which is nothing.

@@ -7,6 +7,9 @@ eine Ausnahme wirft, statt still nichts zu tun.
 | Capability | PostgreSQL | MySQL | SQL Server | SQLite | Oracle | DuckDB | ClickHouse | MongoDB | Redis | Storage |
 |---|---|---|---|---|---|---|---|---|---|---|
 | SQL | ja | ja | ja | ja | ja | ja | ja | — | — | ja |
+| Als Zeilen durchsehen | ja | ja | ja | ja | ja | ja | ja | ja | ja | ja |
+| Container als Zeilen durchsehen | — | — | — | — | — | — | — | — | ja | — |
+| Werte einer Spalte zählen | ja | ja | ja | ja | ja | ja | ja | — | — | ja |
 | Schemas | ja | — | ja | — | ja | ja | ja | — | — | — |
 | Several databases | ja | ja | ja | — | — | — | ja | ja | ja | — |
 | Transactions | ja | ja | ja | ja | ja | ja | — | — | — | — |
@@ -33,6 +36,18 @@ eine Ausnahme wirft, statt still nichts zu tun.
 
 MongoDB und Redis sind keine SQL-Engines: ihre Abfrage-Tabs nehmen die Befehle der jeweiligen
 Engine, und Dokument-Ergebnisse erscheinen als JSON-Baum mit Tabellenansicht für flache Dokumente.
+
+Durchsehen können sie trotzdem. Der Daten-Tab fragt den Treiber nach einer Seite, statt ein
+`SELECT` zu bauen: eine MongoDB-Collection wird mit `find().sort().skip().limit()` gelesen — die
+Filtersprache des Studios wird in die Abfrage übersetzt —, und eine Redis-Datenbank, ein
+Präfix-Ordner oder ein einzelner Schlüssel wird als die Tabelle gelesen, die er ergibt. Zwei Dinge
+folgen daraus, dass es kein SQL gibt: das Gitter darüber ist nur lesbar und nennt stattdessen den
+Befehl, der schreibt; und das Zählen der Werte einer Spalte (die Häkchenliste im Spaltenmenü) wird
+abgelehnt, denn das ist ein `GROUP BY`. Dann eben den Filter tippen.
+
+„Container als Zeilen durchsehen“ ist der zweite Unterschied: bei jeder SQL-Engine ist ein Schema
+ein Ordner und sonst nichts, während eine Redis-Datenbank oder ein Schlüssel-Präfix selbst die
+interessante Tabelle ist — ihre Schlüssel, deren Typ, deren Ablauf und deren Größe.
 
 DuckDB und SQLite sind Dateien — also keine Sitzungen, keine Benutzer, keine zweite Datenbank zum
 Umschalten. SQLite sichert sich selbst mit `VACUUM INTO`; ein Restore hieße, die Datei unter einer

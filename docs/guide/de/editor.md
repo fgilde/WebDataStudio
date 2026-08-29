@@ -89,6 +89,13 @@ eingebaut. **Manage snippets** in der Befehlspalette öffnet einen Editor für e
 serverseitig liegen und mit dem Arbeitsbereich mitwandern. Ein eigenes Snippet mit dem Präfix eines
 eingebauten ersetzt dieses.
 
+### Snippets, die zur Bereitstellung gehören
+
+`WDS_SNIPPETS_FILE` — oder `WithSnippets(...)` aus einem Aspire-AppHost — legt Snippets in die
+Vervollständigung aller: der Mandantenfilter, den euer Schema braucht, einmal geschrieben. Hier sind
+sie nur lesbar, und ein eigenes Snippet mit demselben Präfix gewinnt für die eigene Person — so wie
+ein eigenes über einem eingebauten steht.
+
 ## Gespeicherte Abfragen und Verlauf
 
 Jeder Lauf landet in einem durchsuchbaren Verlauf, der einen Neustart übersteht. Das Panel **Saved**

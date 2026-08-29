@@ -23,7 +23,10 @@ public sealed record DashboardTile(
 public sealed record Dashboard(
     string Id, string Name, IReadOnlyList<DashboardTile> Tiles,
     /// How often the boxes run themselves. 0 means only when somebody asks.
-    int RefreshSeconds, DateTimeOffset UpdatedAt);
+    int RefreshSeconds, DateTimeOffset UpdatedAt,
+    /// True for one the deployment ships: the studio shows it and cannot change or delete it, the
+    /// same deal a mounted quality rule gets.
+    bool FromFile = false);
 
 public sealed record ObjectNote(
     long Id, string ConnectionId, string ObjectRef, string Author, string Body, DateTimeOffset At);

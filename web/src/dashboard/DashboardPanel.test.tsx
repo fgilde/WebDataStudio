@@ -123,6 +123,20 @@ describe("a page of statements", () => {
     expect(await screen.findByLabelText("Statement of tile 1")).toBeTruthy();
   });
 
+  /// A page the deployment ships is shown here and changed where it is written.
+  it("says a dashboard belongs to the deployment rather than letting somebody edit it", async () => {
+    listDashboards.mockResolvedValue({
+      available: true,
+      dashboards: [{ ...dashboard, fromFile: true }],
+    });
+
+    wrap();
+
+    expect(await screen.findByText("from the deployment")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit tiles" })).toHaveProperty("disabled", true);
+    expect(screen.getByLabelText("Delete this dashboard")).toHaveProperty("disabled", true);
+  });
+
   it("puts the tiles of an existing dashboard one click away", async () => {
     wrap();
 

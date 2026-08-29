@@ -255,6 +255,11 @@ Dashboards liegen in der Workspace-Datei des Studios: sie überleben einen Neust
 Arbeitsbereich, nicht zu einem Browser. Ein Studio ohne Workspace sagt das, statt die Seite zu
 verlieren.
 
+**Ein Dashboard, das zur Bereitstellung gehört**, kommt aus `WDS_DASHBOARD_FILE` — einer JSON-Datei
+derselben Form, oder aus `WithDashboards(...)` in einem Aspire-AppHost. Es trägt die Kennzeichnung
+*from the deployment*, Bearbeiten und Löschen sind aus, und wer es anders will, speichert eine Kopie
+unter anderem Namen.
+
 ## Karte
 
 ![Die Kartenansicht](../../assets/screenshots/map-dark.png)

@@ -540,6 +540,7 @@ it works for every engine whose capability set claims support for it.
 | F30.40 | A dashboard: statements side by side, running themselves |
 | F30.41 | What a row looked like before, where the database itself kept it |
 | F30.42 | One setting, several paths: what a repository ships and what an app host wrote both count |
+| F30.43 | The rest of what a deployment brings: connections, the masking baseline, dashboards, snippets, the preferences a studio starts with |
 
 ## 10. Safety behaviour
 

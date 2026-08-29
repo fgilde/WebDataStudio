@@ -402,6 +402,7 @@ app.MapRedisEndpoints();
 app.MapDiagramEndpoints();
 app.MapSavedQueryEndpoints();
 app.MapDashboardEndpoints();
+app.MapDeploymentEndpoints();
 app.MapReportEndpoints();
 app.MapFederationEndpoints();
 app.MapAssistantEndpoints();

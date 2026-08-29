@@ -10,6 +10,7 @@ namespace WebDataStudio.Server.Services;
 public static class EnvironmentConnections
 {
     private const string ArrayVariable = "WDS_CONNECTIONS";
+    private const string FileVariable = "WDS_CONNECTIONS_FILE";
     private const string SinglePrefix = "WDS_CONN_";
 
     /// Reserved endings: `WDS_CONN_SHOP_ENGINE` configures `WDS_CONN_SHOP`, it is not a
@@ -22,6 +23,19 @@ public static class EnvironmentConnections
     public static IReadOnlyList<ConnectionSpec> Parse(IDictionary<string, string?> env)
     {
         var specs = new List<ConnectionSpec>();
+
+        // The same array, kept in a file rather than in a variable: ten legacy servers that are not
+        // Aspire resources are a JSON file somebody reviews, not a wall of environment.
+        if (env.TryGetValue(FileVariable, out var files))
+            foreach (var entry in ShippedFiles.Read<Entry>(files, what: "connection file"))
+            {
+                if (string.IsNullOrWhiteSpace(entry.Name) || string.IsNullOrWhiteSpace(entry.Engine))
+                    continue;
+
+                specs.Add(new ConnectionSpec(StableId(entry.Name), entry.Name, entry.Engine!,
+                    entry.ConnectionString, entry.ReadOnly, entry.Color, entry.Group,
+                    ConnectionSource.Environment));
+            }
 
         if (env.TryGetValue(ArrayVariable, out var json) && !string.IsNullOrWhiteSpace(json))
         {

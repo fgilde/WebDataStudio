@@ -84,6 +84,12 @@ Type a prefix and press `Ctrl+Space`: `sel`, `ins`, `upd`, `del`, `join`, `cte`,
 built in. **Manage snippets** in the command palette opens an editor for your own, which are stored
 server-side and travel with your workspace. A snippet of yours with a built-in's prefix replaces it.
 
+### Snippets the deployment ships
+
+`WDS_SNIPPETS_FILE` — or `WithSnippets(...)` from an Aspire app host — puts snippets in everybody's
+completion list: the tenant filter your schema needs, written once. They are read-only here, and a
+snippet of your own with the same prefix wins for you, the way one of your own wins over a built-in.
+
 ## Saved queries and history
 
 Every run is written to a searchable history that survives a restart. The **Saved** panel keeps

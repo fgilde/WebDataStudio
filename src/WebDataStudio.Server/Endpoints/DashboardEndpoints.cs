@@ -20,25 +20,57 @@ public static class DashboardEndpoints
     {
         var api = app.MapGroup("/api/dashboards");
 
-        api.MapGet("/", (WorkspaceStore store) => Results.Ok(new
+        api.MapGet("/", (WorkspaceStore store, IConfiguration config) => Results.Ok(new
         {
             available = store.Available,
-            dashboards = store.ListDashboards(),
+            // What the deployment ships first: those are the ones somebody is meant to look at.
+            dashboards = Shipped(config).Concat(store.ListDashboards()),
         }));
 
         api.MapPost("/", (DashboardRequest body, WorkspaceStore store) => Save(store, "", body));
 
-        api.MapPut("/{id}", (string id, DashboardRequest body, WorkspaceStore store) =>
-            store.ListDashboards().All(one => one.Id != id)
-                ? Results.NotFound()
-                : Save(store, id, body));
-
-        api.MapDelete("/{id}", (string id, WorkspaceStore store) =>
+        api.MapPut("/{id}", (string id, DashboardRequest body, WorkspaceStore store,
+            IConfiguration config) =>
         {
+            if (Shipped(config).Any(one => one.Id == id)) return Owned();
+
+            return store.ListDashboards().All(one => one.Id != id)
+                ? Results.NotFound()
+                : Save(store, id, body);
+        });
+
+        api.MapDelete("/{id}", (string id, WorkspaceStore store, IConfiguration config) =>
+        {
+            if (Shipped(config).Any(one => one.Id == id)) return Owned();
+
             store.DeleteDashboard(id);
             return Results.NoContent();
         });
     }
+
+    /// The dashboards a deployment ships, from WDS_DASHBOARD_FILE. Their ids are their names, so
+    /// the same file read twice is the same dashboard rather than a second copy.
+    private static IReadOnlyList<Dashboard> Shipped(IConfiguration config) =>
+        ShippedFiles.Read<DashboardRequest>(config["WDS_DASHBOARD_FILE"], what: "dashboard file")
+            .Where(one => !string.IsNullOrWhiteSpace(one.Name))
+            .Select(one => new Dashboard(
+                $"shipped:{one.Name.Trim()}", one.Name.Trim(),
+                (one.Tiles ?? []).Where(tile => !string.IsNullOrWhiteSpace(tile.Sql))
+                    .Select(tile => new DashboardTile(
+                        string.IsNullOrWhiteSpace(tile.Title) ? "untitled" : tile.Title.Trim(),
+                        tile.ConnectionId ?? "", tile.Sql.Trim(),
+                        Views.Contains(tile.View) ? tile.View! : "table",
+                        Math.Clamp(tile.Width ?? 1, 1, 4)))
+                    .ToList(),
+                one.RefreshSeconds is { } seconds && seconds > 0 ? Math.Clamp(seconds, 10, 3600) : 0,
+                DateTimeOffset.MinValue, FromFile: true))
+            .ToList();
+
+    private static IResult Owned() => Results.BadRequest(new
+    {
+        message = "this dashboard comes with the deployment; save a copy under another name to "
+                  + "change it",
+    });
 
     private static IResult Save(WorkspaceStore store, string id, DashboardRequest body)
     {

@@ -25,6 +25,11 @@
 | `WDS_CONN_<NAME>_SCHEMAS` | nur diese Schemas dieser Verbindung lesen — siehe [Objektspeicher](storage.md) und den Explorer |
 | `WDS_EXPORT_TEMPLATES_DIR` | Ordner mit Export-Templates, die die Bereitstellung mitbringt — siehe [Ergebnisse und Export](results.md) |
 | `WDS_QUALITY_FILE` | Datenqualitätsregeln, die zur Bereitstellung gehören, als JSON — siehe [Administration](administration.md) |
+| `WDS_CONNECTIONS_FILE` | Verbindungen als JSON-Datei (oder mehrere), dasselbe Array wie in `WDS_CONNECTIONS` — für die zehn Altsysteme, für die eine Wand aus Variablen die falsche Form ist |
+| `WDS_MASK_FILE` | die Maskierungs-Grundlinie als JSON: `{ "maskByDefault": true, "extra": [...], "never": [...] }`. Zählt zusätzlich zu den Variablen |
+| `WDS_DASHBOARD_FILE` | Dashboards, die zur Bereitstellung gehören. Sichtbar unter **Tools → Dashboard**, mit Kennzeichnung und ohne Bearbeiten |
+| `WDS_SNIPPETS_FILE` | Editor-Snippets für alle, die dieses Studio öffnen. Ein eigenes Snippet mit gleichem Präfix gewinnt für die jeweilige Person |
+| `WDS_PREFERENCES_FILE` | womit ein Studio startet, bevor jemand eine Einstellung geändert hat — Zeitzone, Zeilen pro Seite und der Rest |
 | `WDS_SAFETY_NET`, `WDS_SAFETY_MAX_ROWS` | die Zeilen sichern, bevor ein Statement alle nimmt: `DELETE`/`UPDATE` ohne `WHERE`, `TRUNCATE` |
 | `WDS_PUBLIC_URL` | unter welcher Adresse dieses Studio von außen erreichbar ist, damit ein Alert zurück auf den Fundort verlinken kann |
 | `WDS_MAX_SESSIONS` | offene Sitzungen je Verbindung, Vorgabe `8` |
@@ -47,7 +52,9 @@ Erkannte Schemata: `postgres`, `postgresql`, `mysql`, `mariadb`, `sqlserver`, `m
 `oracle`, `duckdb`, `clickhouse`, `mongodb`, `redis`.
 
 **Mehrere Pfade in einer Einstellung.** `WDS_SAVED_QUERIES_DIR`, `WDS_EXPORT_TEMPLATES_DIR`,
-`WDS_QUALITY_FILE` und `WDS_SEED_SQL` nehmen je einen Pfad oder eine Liste davon, getrennt durch
+`WDS_QUALITY_FILE`, `WDS_SEED_SQL`, `WDS_CONNECTIONS_FILE`, `WDS_MASK_FILE`,
+`WDS_DASHBOARD_FILE`, `WDS_SNIPPETS_FILE` und `WDS_PREFERENCES_FILE` nehmen je einen Pfad oder
+eine Liste davon, getrennt durch
 `;`. So zählt beides — was ein Repository mitliefert und was ein App-Host geschrieben hat —, statt
 dass das zweite das erste stillschweigend ersetzt:
 

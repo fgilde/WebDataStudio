@@ -1,5 +1,5 @@
 import {
-  ActionIcon, Alert, Button, Group, Loader, Modal, NumberInput, Select, Stack, Table, Text,
+  ActionIcon, Alert, Badge, Button, Group, Loader, Modal, NumberInput, Select, Stack, Table, Text,
   TextInput, Tooltip,
 } from "@mantine/core";
 import { IconPlus, IconRefresh, IconTrash, IconPencil, IconExternalLink } from "@tabler/icons-react";
@@ -90,6 +90,7 @@ export function DashboardPanel({ onOpenInEditor }: {
         {dashboard && (
           <>
             <Button size="compact-xs" variant="default" leftSection={<IconPencil size={13} />}
+              disabled={dashboard.fromFile === true}
               onClick={() => setEditing(dashboard)}>
               Edit tiles
             </Button>
@@ -98,9 +99,17 @@ export function DashboardPanel({ onOpenInEditor }: {
               <IconRefresh size={14} />
             </ActionIcon>
             <ActionIcon size="sm" variant="subtle" color="red" aria-label="Delete this dashboard"
+              disabled={dashboard.fromFile === true}
               onClick={() => remove(dashboard.id)}>
               <IconTrash size={14} />
             </ActionIcon>
+
+            {/* Where it came from, so nobody wonders why the buttons are dead. */}
+            {dashboard.fromFile && (
+              <Tooltip label="This page comes with the deployment. Change it where it is written.">
+                <Badge size="sm" variant="light" color="grape">from the deployment</Badge>
+              </Tooltip>
+            )}
 
             {dashboard.refreshSeconds > 0 && (
               <Text size="xs" c="dimmed">every {dashboard.refreshSeconds}s</Text>
@@ -116,7 +125,7 @@ export function DashboardPanel({ onOpenInEditor }: {
         </Text>
       )}
 
-      {dashboard && dashboard.tiles.length === 0 && (
+      {dashboard && dashboard.tiles.length === 0 && dashboard.fromFile !== true && (
         <Stack gap={6} align="flex-start">
           <Text size="xs" c="dimmed">
             {dashboard.name} has no tiles yet. A tile is a statement and what to draw with it — one

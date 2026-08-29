@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { loadWorkspaceItem, saveWorkspaceItem } from "../api";
+import { deploymentPreferences, loadWorkspaceItem, saveWorkspaceItem } from "../api";
 
 export interface Preferences {
   /// Rows per page in the data tab.
@@ -44,13 +44,30 @@ const announce = () => listeners.forEach(listener => listener());
 /// Read once at start-up. A workspace without preferences, or one that cannot be read, leaves the
 /// defaults in place — this is nobody's reason to see an error.
 export async function loadPreferences(): Promise<void> {
+  // What the deployment says a studio should start with, under what this workspace has: a stack can
+  // set the time zone or the page size for everybody, and the first person to change one keeps
+  // their change.
+  let shipped: Partial<Preferences> = {};
+
+  try {
+    const answer = await deploymentPreferences();
+    if (answer.configured && answer.preferences) shipped = answer.preferences;
+  } catch { /* a studio without one is the normal case */ }
+
   try {
     const stored = await loadWorkspaceItem<Partial<Preferences>>(KEY);
-    if (stored) {
-      current = { ...DEFAULT_PREFERENCES, ...stored, shortcuts: stored.shortcuts ?? {} };
-      announce();
-    }
-  } catch { /* the defaults are a fine answer */ }
+
+    current = {
+      ...DEFAULT_PREFERENCES, ...shipped, ...(stored ?? {}),
+      shortcuts: stored?.shortcuts ?? {},
+    };
+
+    announce();
+  } catch {
+    // The workspace could not be read; the deployment's own answer is still better than nothing.
+    current = { ...DEFAULT_PREFERENCES, ...shipped, shortcuts: {} };
+    announce();
+  }
 }
 
 export async function savePreferences(next: Partial<Preferences>): Promise<void> {

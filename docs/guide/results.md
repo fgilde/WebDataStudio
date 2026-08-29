@@ -122,6 +122,10 @@ per tile — a statement slower than the interval does not pile up behind itself
 Dashboards live in the studio's workspace file, so they survive a restart and follow the workspace
 rather than one browser. A studio without one says so instead of losing the page.
 
+**A dashboard a deployment ships** comes from `WDS_DASHBOARD_FILE` — a JSON file of the same shape,
+or `WithDashboards(...)` in an Aspire app host. It carries a *from the deployment* badge, its edit
+and delete buttons are off, and somebody who wants it different saves a copy under another name.
+
 ## Geography
 
 ![The map view](../assets/screenshots/map-dark.png)

@@ -3,18 +3,27 @@ import {
   ActionIcon, Alert, Button, Group, Modal, ScrollArea, Stack, Table, Text, TextInput, Textarea,
 } from "@mantine/core";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
-import { loadWorkspaceItem, saveWorkspaceItem } from "../api";
+import { deploymentSnippets, loadWorkspaceItem, saveWorkspaceItem } from "../api";
 import { BUILT_IN, type Snippet } from "./snippets";
 
 const KEY = "snippets";
 
 export function useUserSnippets(): [Snippet[], (list: Snippet[]) => Promise<void>] {
   const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [shipped, setShipped] = useState<Snippet[]>([]);
 
   useEffect(() => {
     loadWorkspaceItem<Snippet[]>(KEY)
       .then(list => setSnippets(Array.isArray(list) ? list : []))
       .catch(() => setSnippets([]));
+
+    // What the stack ships. A person's own snippet with the same prefix wins over it, the way a
+    // person's own wins over a built-in one.
+    deploymentSnippets()
+      .then(list => setShipped(list.map(one => ({
+        prefix: one.prefix, label: one.label, body: one.body, description: one.description,
+      }))))
+      .catch(() => setShipped([]));
   }, []);
 
   const save = async (list: Snippet[]) => {
@@ -22,7 +31,12 @@ export function useUserSnippets(): [Snippet[], (list: Snippet[]) => Promise<void
     await saveWorkspaceItem(KEY, list);
   };
 
-  return [snippets, save];
+  // Editing is about one's own; completion wants both. The manager below only ever writes the
+  // first list, which is why `save` takes what it was given rather than the merged one.
+  const mine = new Set(snippets.map(snippet => snippet.prefix.toLowerCase()));
+  const merged = [...snippets, ...shipped.filter(one => !mine.has(one.prefix.toLowerCase()))];
+
+  return [merged, save];
 }
 
 export function SnippetManager({ opened, onClose }: { opened: boolean; onClose: () => void }) {

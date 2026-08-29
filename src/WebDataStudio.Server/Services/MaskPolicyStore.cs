@@ -19,10 +19,31 @@ public sealed class MaskPolicyStore(WorkspaceStore workspace, IConfiguration con
     ///
     /// This is the baseline. What somebody set from the column menu wins over it for that column,
     /// because they were looking at the data at the time.
-    public MaskPolicy Baseline => new(
-        !string.Equals(config["WDS_MASK_DEFAULT"], "false", StringComparison.OrdinalIgnoreCase),
-        Names(config["WDS_MASK_EXTRA"]),
-        Names(config["WDS_MASK_NEVER"]));
+    /// What a deployment can ship as a file instead of as three variables: the same three things,
+    /// in a shape a long list is bearable in.
+    private sealed record MaskFile(bool? MaskByDefault, string[]? Extra, string[]? Never);
+
+    public MaskPolicy Baseline
+    {
+        get
+        {
+            var file = ShippedFiles.ReadOne<MaskFile>(config["WDS_MASK_FILE"], what: "masking file");
+
+            var byDefault = !string.Equals(config["WDS_MASK_DEFAULT"], "false",
+                                StringComparison.OrdinalIgnoreCase)
+                            && file?.MaskByDefault != false;
+
+            // Both sources count: a file and a variable are two ways of saying the same thing, and a
+            // deployment that uses both means both.
+            var extra = Names(config["WDS_MASK_EXTRA"]);
+            var never = Names(config["WDS_MASK_NEVER"]);
+
+            foreach (var column in file?.Extra ?? []) extra.Add(column);
+            foreach (var column in file?.Never ?? []) never.Add(column);
+
+            return new MaskPolicy(byDefault, extra, never);
+        }
+    }
 
     public MaskPolicy For(string connectionId)
     {

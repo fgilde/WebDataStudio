@@ -1306,6 +1306,8 @@ export interface DashboardDto {
   /// How often the tiles run themselves. 0 means only when asked.
   refreshSeconds: number;
   updatedAt: string;
+  /// True for one the deployment ships: shown here, changed where it is written.
+  fromFile?: boolean;
 }
 
 export const listDashboards = (): Promise<{ available: boolean; dashboards: DashboardDto[] }> =>
@@ -1407,6 +1409,30 @@ export const compareData = (body: {
   keyColumns: string[]; maxRows?: number;
 }): Promise<DataComparisonDto> =>
   fetch(`${base}/compare/data`, json("POST", body)).then(r => ok<DataComparisonDto>(r));
+
+// --- what the deployment ships -------------------------------------------------
+/// Snippets a stack ships: everybody who opens this studio has them, and nobody can change them
+/// here. A snippet of one's own with the same prefix wins for that person.
+export const deploymentSnippets = (): Promise<
+  { prefix: string; label: string; body: string; description: string }[]> =>
+  fetch(`${base}/deployment/snippets`)
+    .then(r => ok<{ prefix: string; label: string; body: string; description: string }[]>(r));
+
+/// The preferences a studio starts with, before anybody changed one.
+export const deploymentPreferences = (): Promise<{
+  configured: boolean;
+  preferences: Partial<{
+    pageSize: number; historySnapshots: boolean; snapshotRows: number; inspectBeforeRun: boolean;
+    notifyAfterSeconds: number; timeZone: string;
+  }> | null;
+}> =>
+  fetch(`${base}/deployment/preferences`).then(r => ok<{
+    configured: boolean;
+    preferences: Partial<{
+      pageSize: number; historySnapshots: boolean; snapshotRows: number; inspectBeforeRun: boolean;
+      notifyAfterSeconds: number; timeZone: string;
+    }> | null;
+  }>(r));
 
 // --- workspace items (snippets, layout presets) --------------------------------
 export const loadWorkspaceItem = <T>(key: string): Promise<T | null> =>

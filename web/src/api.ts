@@ -1257,6 +1257,37 @@ export const driftScript = (conn: string): Promise<DriftScriptDto> =>
 export const takeSnapshot = (): Promise<{ moved: number }> =>
   fetch(`${base}/schema/snapshot`, json("POST", {})).then(r => ok<{ moved: number }>(r));
 
+/// One box on a dashboard: a statement, and what to draw with what comes back.
+export interface DashboardTileDto {
+  title: string;
+  connectionId: string;
+  sql: string;
+  /// "number" shows the first cell, "table" the rows, "chart" a bar per row.
+  view: string;
+  width: number;
+}
+
+export interface DashboardDto {
+  id: string;
+  name: string;
+  tiles: DashboardTileDto[];
+  /// How often the tiles run themselves. 0 means only when asked.
+  refreshSeconds: number;
+  updatedAt: string;
+}
+
+export const listDashboards = (): Promise<{ available: boolean; dashboards: DashboardDto[] }> =>
+  fetch(`${base}/dashboards`).then(r => ok<{ available: boolean; dashboards: DashboardDto[] }>(r));
+
+export const saveDashboard = (id: string, body: {
+  name: string; tiles: DashboardTileDto[]; refreshSeconds: number;
+}): Promise<DashboardDto> =>
+  fetch(id ? `${base}/dashboards/${id}` : `${base}/dashboards`, json(id ? "PUT" : "POST", body))
+    .then(r => ok<DashboardDto>(r));
+
+export const deleteDashboard = (id: string): Promise<void> =>
+  fetch(`${base}/dashboards/${id}`, { method: "DELETE" }).then(r => ok<void>(r));
+
 export const serverLog = (conn: string, lines = 200): Promise<ServerLogDto> =>
   fetch(`${base}/admin/logs/${conn}?lines=${lines}`).then(r => ok<ServerLogDto>(r));
 

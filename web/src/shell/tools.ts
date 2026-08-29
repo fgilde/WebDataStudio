@@ -63,6 +63,10 @@ export const TOOLS: ToolDefinition[] = [
     label: "Archives — results kept as files", requiresConnection: true,
   },
   {
+    id: "tool.dashboard", component: "dashboard", dock: "tool", title: "Dashboard",
+    label: "Dashboard", requiresConnection: false,
+  },
+  {
     id: "tool.redis", component: "redis", dock: "tool", title: "Redis",
     label: "Redis key browser", requiresConnection: true, engine: "redis",
   },
@@ -109,4 +113,5 @@ export function visibleTools(options: { admin: boolean; engine?: string }): Tool
 /// The components the dock has to provide. Typing the dock's map against this is what makes a tool
 /// without a panel a compile error rather than a click that does nothing.
 export type ToolComponent = "datasearch" | "diagram" | "builder" | "notebook" | "perspective"
-  | "compare" | "federate" | "archive" | "redis" | "admin" | "health" | "history" | "saved";
+  | "compare" | "federate" | "archive" | "redis" | "admin" | "health" | "history" | "saved"
+  | "dashboard";

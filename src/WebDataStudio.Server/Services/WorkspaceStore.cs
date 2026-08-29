@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using System.Text.Json;
 
 namespace WebDataStudio.Server.Services;
 
@@ -10,6 +11,20 @@ public sealed record HistoryEntry(long Id, string ConnectionId, string Sql,
 
 /// A note somebody left on an object: what a column really means, why a table is the way it is,
 /// what the last migration broke.
+/// One box on a dashboard: a statement, and what to draw with what comes back.
+public sealed record DashboardTile(
+    string Title, string ConnectionId, string Sql,
+    /// `number` shows the first cell of the first row, `table` the rows, `chart` a bar per row.
+    string View,
+    /// How many columns of the grid it takes, 1 to 4.
+    int Width);
+
+/// A page of boxes, each one a statement somebody wants on a screen rather than in a tab.
+public sealed record Dashboard(
+    string Id, string Name, IReadOnlyList<DashboardTile> Tiles,
+    /// How often the boxes run themselves. 0 means only when somebody asks.
+    int RefreshSeconds, DateTimeOffset UpdatedAt);
+
 public sealed record ObjectNote(
     long Id, string ConnectionId, string ObjectRef, string Author, string Body, DateTimeOffset At);
 
@@ -110,6 +125,13 @@ public sealed class WorkspaceStore
                 at TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS ix_notes_object ON notes(connection_id, object_ref);
+            CREATE TABLE IF NOT EXISTS dashboards (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                tiles TEXT NOT NULL,
+                refresh_seconds INTEGER NOT NULL,
+                updated_at TEXT NOT NULL
+            );
             """);
 
         _connectionString = prepared.ConnectionString;
@@ -513,6 +535,63 @@ public sealed class WorkspaceStore
     public string? LoadLayout(string connectionId) => GetValue($"layout:{connectionId}");
 
     // --- saved queries -------------------------------------------------------
+    /// Every dashboard. The list is short on purpose: these are pages somebody made, not a log.
+    public IReadOnlyList<Dashboard> ListDashboards()
+    {
+        if (!Available) return [];
+
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText =
+            "SELECT id, name, tiles, refresh_seconds, updated_at FROM dashboards ORDER BY name COLLATE NOCASE";
+
+        using var reader = cmd.ExecuteReader();
+        var list = new List<Dashboard>();
+
+        while (reader.Read())
+            list.Add(new Dashboard(
+                reader.GetString(0), reader.GetString(1),
+                JsonSerializer.Deserialize<List<DashboardTile>>(reader.GetString(2)) ?? [],
+                reader.GetInt32(3), DateTimeOffset.Parse(reader.GetString(4))));
+
+        return list;
+    }
+
+    public Dashboard SaveDashboard(Dashboard dashboard)
+    {
+        var stored = dashboard with
+        {
+            Id = string.IsNullOrEmpty(dashboard.Id) ? Guid.NewGuid().ToString("n") : dashboard.Id,
+            UpdatedAt = DateTimeOffset.UtcNow,
+        };
+
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText =
+            "INSERT INTO dashboards (id, name, tiles, refresh_seconds, updated_at) "
+            + "VALUES ($id, $name, $tiles, $refresh, $at) "
+            + "ON CONFLICT(id) DO UPDATE SET name = excluded.name, tiles = excluded.tiles, "
+            + "refresh_seconds = excluded.refresh_seconds, updated_at = excluded.updated_at";
+
+        cmd.Parameters.AddWithValue("$id", stored.Id);
+        cmd.Parameters.AddWithValue("$name", stored.Name);
+        cmd.Parameters.AddWithValue("$tiles", JsonSerializer.Serialize(stored.Tiles));
+        cmd.Parameters.AddWithValue("$refresh", stored.RefreshSeconds);
+        cmd.Parameters.AddWithValue("$at", stored.UpdatedAt.ToString("O"));
+        cmd.ExecuteNonQuery();
+
+        return stored;
+    }
+
+    public void DeleteDashboard(string id)
+    {
+        using var db = Open();
+        using var cmd = db.CreateCommand();
+        cmd.CommandText = "DELETE FROM dashboards WHERE id = $id";
+        cmd.Parameters.AddWithValue("$id", id);
+        cmd.ExecuteNonQuery();
+    }
+
     public IReadOnlyList<SavedQuery> ListSavedQueries()
     {
         using var db = Open();

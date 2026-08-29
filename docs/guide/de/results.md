@@ -233,6 +233,28 @@ Nulls nicht. Null bekommt einen eigenen Namen, `(none)`, denn danach zu gruppier
 Frage. Bei sechzig verschiedenen Spaltenwerten ist Schluss, und das steht da: ein Pivot mit
 neunhundert Spalten ist ein Scrollbalken, keine Antwort.
 
+## Ein Dashboard
+
+**Tools → Dashboard** ist eine Seite mit Statements nebeneinander: die Zahl, nach der jeden Morgen
+jemand fragt, die Tabelle, die nach einem Deployment geprüft wird, ein Balken pro Zeile für „wie
+viele je Status“.
+
+Eine Kachel besteht aus Titel, Verbindung, Statement und dem, was daraus gezeichnet wird — eine
+Zahl, eine Tabelle oder ein Balken pro Zeile. Sie nimmt eine bis vier der vier Spalten ein, und die
+Seite kann sich selbst in einem Intervall neu ausführen (frühestens alle zehn Sekunden; darunter ist
+es ein Lasttest und kein Dashboard). Der Pfeil auf einer Kachel öffnet ihr Statement in einem
+Abfrage-Tab — dort passiert alles, was über Hinsehen hinausgeht.
+
+Nichts hier kann, was ein Abfrage-Tab nicht kann: eine Kachel läuft über denselben Endpunkt, mit
+derselben Zeilengrenze, derselben Maskierung und derselben Zeile im
+[Audit-Trail](administration.md). Eine Kachel, deren Statement scheitert, sagt das auf der Kachel,
+statt ein leeres Kästchen zu zeigen — und es läuft immer nur eine Ausführung je Kachel, ein
+Statement, das länger braucht als das Intervall, staut sich also nicht hinter sich selbst.
+
+Dashboards liegen in der Workspace-Datei des Studios: sie überleben einen Neustart und gehören zum
+Arbeitsbereich, nicht zu einem Browser. Ein Studio ohne Workspace sagt das, statt die Seite zu
+verlieren.
+
 ## Karte
 
 ![Die Kartenansicht](../../assets/screenshots/map-dark.png)

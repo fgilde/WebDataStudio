@@ -104,6 +104,24 @@ that had a number" is an answer, one that folded nulls in is not. Null gets a na
 `(none)`, because grouping by it is a real question. The column field stops at sixty distinct
 values and says so: a pivot with nine hundred columns is a scroll bar, not an answer.
 
+## A dashboard
+
+**Tools → Dashboard** is a page of statements side by side: the number somebody asks for every
+morning, the table checked after a deployment, a bar per row for "how many per status".
+
+A tile is a title, a connection, a statement and what to draw with it — one number, a table, or a
+bar per row. It takes one to four of the four columns, and the page can run itself every so often
+(ten seconds at the fastest; below that it is a load test rather than a dashboard). The arrow on a
+tile opens its statement in a query tab, which is where anything beyond looking happens.
+
+Nothing here can do what a query tab cannot: a tile runs through the same endpoint, with the same
+row cap, the same masking and the same line in the [audit trail](administration.md#audit). A tile
+whose statement fails says so on the tile rather than leaving an empty box, and one run at a time
+per tile — a statement slower than the interval does not pile up behind itself.
+
+Dashboards live in the studio's workspace file, so they survive a restart and follow the workspace
+rather than one browser. A studio without one says so instead of losing the page.
+
 ## Geography
 
 ![The map view](../assets/screenshots/map-dark.png)

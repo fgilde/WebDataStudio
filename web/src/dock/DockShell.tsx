@@ -11,6 +11,7 @@ import { useAppTheme } from "../ThemeProvider";
 import { FederationPanel } from "../federate/FederationPanel";
 import { PerspectivePanel } from "../perspective/PerspectivePanel";
 import { ArchivePanel } from "../archive/ArchivePanel";
+import { DashboardPanel } from "../dashboard/DashboardPanel";
 import { ArchiveDialog, type ArchiveTarget } from "../archive/KeepArchiveButton";
 import { NotebookPanel } from "../notebook/NotebookPanel";
 import { isAdmin, useRole } from "../auth/useRole";
@@ -275,6 +276,13 @@ function ArchiveDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) 
   );
 }
 
+function DashboardDockPanel() {
+  const shell = useShell();
+
+  // A tile hands its statement to a query tab, which is where anything beyond looking happens.
+  return <DashboardPanel onOpenInEditor={(connectionId, sql) => shell.runStatement(connectionId, sql)} />;
+}
+
 function NotebookDockPanel(props: IDockviewPanelProps<{ connectionId?: string }>) {
   const shell = useShell();
   return <NotebookPanel connections={shell.connections} connectionId={props.params.connectionId} />;
@@ -381,6 +389,7 @@ const toolComponents: Record<ToolComponent, DockPanel> = {
   health: HealthDockPanel as DockPanel,
   history: HistoryDockPanel as DockPanel,
   saved: SavedQueriesDockPanel as DockPanel,
+  dashboard: DashboardDockPanel as DockPanel,
 };
 
 const components = {

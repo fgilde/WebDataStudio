@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { followColumns, newRows, rowKey, suggestFollowColumn } from "./follow";
+import { followColumns, newRows, rowKey, suggestFollowColumn, withoutAddress } from "./follow";
 import type { DataColumnDto } from "../api";
 
 const column = (name: string, dataType: string): DataColumnDto =>
@@ -87,5 +87,25 @@ describe("newRows", () => {
         columns, ["id"], seen, 250);
 
     expect(seen.size).toBeLessThanOrEqual(250);
+  });
+});
+
+describe("withoutAddress", () => {
+  const columns = [{ name: "wds_row_address" }, { name: "id" }, { name: "body" }];
+
+  it("drops the address column and the value under it", () => {
+    const shown = withoutAddress([["(0,1)", 1, "first"], ["(0,2)", 2, "second"]], columns);
+
+    expect(shown.columns.map(c => c.name)).toEqual(["id", "body"]);
+    expect(shown.rows).toEqual([[1, "first"], [2, "second"]]);
+  });
+
+  it("leaves a result that has no address alone", () => {
+    const plain = [{ name: "id" }, { name: "body" }];
+    const rows = [[1, "first"]];
+    const shown = withoutAddress(rows, plain);
+
+    expect(shown.columns).toBe(plain);
+    expect(shown.rows).toBe(rows);
   });
 });

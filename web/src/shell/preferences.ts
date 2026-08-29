@@ -34,6 +34,23 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
 const KEY = "preferences";
 
+/// Layers one set of preferences over another, ignoring what it does not actually say.
+///
+/// A deployment that sets only the time zone sends `{"timeZone":"utc","pageSize":null,…}` — every
+/// other field is null, because the file it comes from is allowed to be partial. Spreading that
+/// over the defaults replaced `pageSize: 200` with `null`, and a data tab then asked for `limit=`,
+/// which is a 400 for every table in the studio. Absent has to mean absent.
+export function layer(base: Preferences, over: Partial<Preferences> | null | undefined): Preferences {
+  const merged = { ...base };
+
+  for (const [key, value] of Object.entries(over ?? {})) {
+    if (value === null || value === undefined) continue;
+    (merged as Record<string, unknown>)[key] = value;
+  }
+
+  return merged;
+}
+
 // One copy for the whole app, so a change reaches the data tab and the shortcut handler at once
 // without threading a context through everything in between.
 let current: Preferences = DEFAULT_PREFERENCES;
@@ -58,20 +75,20 @@ export async function loadPreferences(): Promise<void> {
     const stored = await loadWorkspaceItem<Partial<Preferences>>(KEY);
 
     current = {
-      ...DEFAULT_PREFERENCES, ...shipped, ...(stored ?? {}),
+      ...layer(layer(DEFAULT_PREFERENCES, shipped), stored),
       shortcuts: stored?.shortcuts ?? {},
     };
 
     announce();
   } catch {
     // The workspace could not be read; the deployment's own answer is still better than nothing.
-    current = { ...DEFAULT_PREFERENCES, ...shipped, shortcuts: {} };
+    current = { ...layer(DEFAULT_PREFERENCES, shipped), shortcuts: {} };
     announce();
   }
 }
 
 export async function savePreferences(next: Partial<Preferences>): Promise<void> {
-  current = { ...current, ...next };
+  current = layer(current, next);
   announce();
   await saveWorkspaceItem(KEY, current);
 }

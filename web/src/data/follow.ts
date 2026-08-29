@@ -13,6 +13,20 @@ import type { DataColumnDto } from "../api";
 /// It addresses the row and means nothing to a reader, so the grid keeps it and does not show it.
 export const ROW_ADDRESS = "wds_row_address";
 
+/// The rows and columns as a person sees them: everything except the physical address the server
+/// selected to be able to write a keyless table. Copying or exporting it would put a column nobody
+/// asked for — and nobody can use — into the file.
+export function withoutAddress<C extends { name: string }>(rows: unknown[][], columns: C[]):
+  { rows: unknown[][]; columns: C[] } {
+  const at = columns.findIndex(column => column.name === ROW_ADDRESS);
+  if (at < 0) return { rows, columns };
+
+  return {
+    columns: columns.filter((_, index) => index !== at),
+    rows: rows.map(row => row.filter((_, index) => index !== at)),
+  };
+}
+
 export function followColumns(columns: DataColumnDto[], keyColumns: string[] = []): string[] {
   const temporal = columns.filter(column => /date|time|stamp/i.test(column.dataType));
 

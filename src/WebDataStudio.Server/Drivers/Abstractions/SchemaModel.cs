@@ -68,4 +68,8 @@ public sealed record ObjectDetail(
     long? RowCount,
     long? SizeBytes,
     string? Comment,
-    string? Ddl);
+    string? Ddl,
+    /// True for a relation that holds no rows of its own — a partitioned table's root. It reads
+    /// like a table and cannot be addressed like one: a physical row address belongs to whichever
+    /// partition holds the row, and two partitions can hand out the same one. See RowIdentity.
+    bool Partitioned = false);

@@ -90,7 +90,9 @@ public static class RowHistory
         var (supported, note) = await SupportsAsync(driver, session, target, ct);
         if (!supported) return new RowHistoryResult(false, [], [], note);
 
-        if (key.Count == 0)
+        // A row addressed by where it physically is has no history to follow: the address is what
+        // changes when the row is written, so the versions of it are not versions of one row.
+        if (key.Count == 0 || key.ContainsKey(Editing.RowIdentity.AddressColumn))
             return new RowHistoryResult(true, [], [],
                 "this row has no key columns, so there is no way to follow one row through time");
 

@@ -16,6 +16,10 @@ public sealed record SeedOptions(bool Configured, string Path)
     }
 }
 
+/// What one sweep did: how many connections were seeded, and how many still have a script that
+/// has not run.
+public sealed record SeedSweep(int Seeded, int Pending);
+
 /// Runs a seed script once per connection, so a fresh stack comes up with data in it instead of
 /// empty tables nobody can click on.
 ///
@@ -32,11 +36,16 @@ public sealed class SeedScripts(
 
     /// Seeds every connection that has a script and has not had this version of it. Returns how
     /// many connections were seeded.
-    public async Task<int> RunAsync(CancellationToken ct)
+    public async Task<int> RunAsync(CancellationToken ct) => (await SweepAsync(ct)).Seeded;
+
+    /// The same, and how many connections still have a script that did not run — a server that was
+    /// not up yet, which is the normal state of a SQL Server thirty seconds into a stack starting.
+    public async Task<SeedSweep> SweepAsync(CancellationToken ct)
     {
-        if (!options.Configured) return 0;
+        if (!options.Configured) return new SeedSweep(0, 0);
 
         var seeded = 0;
+        var pending = 0;
 
         foreach (var spec in registry.All())
         {
@@ -66,9 +75,15 @@ public sealed class SeedScripts(
                 Remember(spec.Id, hash);
                 seeded++;
             }
+            else
+            {
+                // Worth coming back for: the script exists, it has not run, and the reason is
+                // usually that the database is still starting.
+                pending++;
+            }
         }
 
-        return seeded;
+        return new SeedSweep(seeded, pending);
     }
 
     /// `WDS_SEED_SQL` is either one file — used for every connection — or a directory holding
@@ -173,10 +188,26 @@ public sealed class SeedScriptStartup(SeedScripts seeds, ILogger<SeedScriptStart
     {
         if (!seeds.Configured) return;
 
+        // A database in the same stack is not ready when the studio is. SQL Server takes the best
+        // part of a minute, and a seed that ran once eight seconds in and never again is how a
+        // stack comes up with an empty schema nobody can click on.
+        //
+        // Trying again is safe: a script that ran is remembered by its hash and is not run twice.
+        var waits = new[] { 8, 15, 15, 30, 30, 60 };
+
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(8), stoppingToken);
-            await seeds.RunAsync(stoppingToken);
+            foreach (var wait in waits)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(wait), stoppingToken);
+
+                var sweep = await seeds.SweepAsync(stoppingToken);
+                if (sweep.Pending == 0) return;
+
+                log.LogInformation(
+                    "{Pending} connection(s) still have a seed script that has not run; trying again",
+                    sweep.Pending);
+            }
         }
         catch (OperationCanceledException)
         {

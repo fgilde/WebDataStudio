@@ -19,7 +19,7 @@ import { MenuFilterInput } from "../grid/MenuFilterInput";
 import { DistinctValues } from "../grid/DistinctValues";
 import { LookupPicker } from "../grid/LookupPicker";
 import { JsonColumnDialog } from "./JsonColumnDialog";
-import { followColumns, newRows, ROW_ADDRESS } from "./follow";
+import { followColumns, newRows, withoutAddress, ROW_ADDRESS } from "./follow";
 import { parsePastedRows } from "../export/pasteRows";
 import { EditableCell } from "../grid/editing/EditableCell";
 import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
@@ -222,6 +222,10 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
     ? page.columns.filter(c => !hidden.has(c.name) && c.name !== ROW_ADDRESS)
     : [];
 
+  // What leaves the tab — the clipboard, and anything reading the whole result — without the
+  // address column. The grid keeps it, because the row editor addresses rows by it.
+  const shown = withoutAddress(page.rows, page.columns);
+
   // Rows on their way in: what somebody copied out of a spreadsheet becomes pending inserts,
   // which the preview then shows as the statements they are. Nothing is written by pasting.
   const pasteRows = async () => {
@@ -352,13 +356,15 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
             </Button>
           </Menu.Target>
           <Menu.Dropdown>
-            <Menu.Item onClick={() => copy(copyAsCsv(page.rows, page.columns))}>
+            {/* Without the row address: it is how the server writes this table, not a column
+                anybody asked for. */}
+            <Menu.Item onClick={() => copy(copyAsCsv(shown.rows, shown.columns))}>
               This page as CSV
             </Menu.Item>
-            <Menu.Item onClick={() => copy(copyAsJson(page.rows, page.columns))}>
+            <Menu.Item onClick={() => copy(copyAsJson(shown.rows, shown.columns))}>
               This page as JSON
             </Menu.Item>
-            <Menu.Item onClick={() => copy(copyAsMarkdown(page.rows, page.columns))}>
+            <Menu.Item onClick={() => copy(copyAsMarkdown(shown.rows, shown.columns))}>
               This page as Markdown
             </Menu.Item>
             <Menu.Divider />

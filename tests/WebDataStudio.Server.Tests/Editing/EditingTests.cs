@@ -10,8 +10,9 @@ namespace WebDataStudio.Server.Tests.Editing;
 public class RowIdentityTests
 {
     private static ObjectDetail Table(IReadOnlyList<ColumnInfo> columns, IReadOnlyList<IndexInfo>? indexes = null,
-        SchemaNodeKind kind = SchemaNodeKind.Table) =>
-        new(new SchemaNodeRef(kind, ["public", "people"]), columns, indexes ?? [], [], [], null, null, null, null);
+        SchemaNodeKind kind = SchemaNodeKind.Table, bool partitioned = false) =>
+        new(new SchemaNodeRef(kind, ["public", "people"]), columns, indexes ?? [], [], [], null, null,
+            null, null, partitioned);
 
     private static ColumnInfo Column(string name, bool pk = false, bool nullable = false) =>
         new(name, "text", nullable, null, pk, false, null, 1);
@@ -83,6 +84,42 @@ public class RowIdentityTests
 
         Assert.False(result.Editable);
         Assert.Null(result.RowAddress);
+    }
+
+    [Fact]
+    public void A_materialised_view_is_not_addressed_by_where_its_rows_are()
+    {
+        // It reads like a table and is refreshed rather than updated: PostgreSQL refuses an UPDATE
+        // on one outright, so offering the grid as editable would be a promise the engine breaks.
+        var result = RowIdentity.Resolve(
+            Table([Column("path")], null, SchemaNodeKind.MaterializedView), new PostgreSqlDialect());
+
+        Assert.False(result.Editable);
+        Assert.Null(result.RowAddress);
+    }
+
+    [Fact]
+    public void A_partitioned_table_is_not_addressed_by_where_its_rows_are()
+    {
+        // The root holds no rows of its own. Every ctid it hands out belongs to a partition, and
+        // two partitions can hand out the same one — so writing by it would eventually write the
+        // wrong row, in a different partition, without an error.
+        var result = RowIdentity.Resolve(
+            Table([Column("sensor")], null, partitioned: true), new PostgreSqlDialect());
+
+        Assert.False(result.Editable);
+        Assert.Null(result.RowAddress);
+    }
+
+    [Fact]
+    public void A_partitioned_table_with_a_key_is_still_editable()
+    {
+        // Nothing about a key depends on where the row physically is, so the ordinary path stands.
+        var result = RowIdentity.Resolve(
+            Table([Column("id", pk: true)], null, partitioned: true), new PostgreSqlDialect());
+
+        Assert.True(result.Editable);
+        Assert.Equal(["id"], result.KeyColumns);
     }
 
     [Fact]

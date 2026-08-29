@@ -53,11 +53,16 @@ public sealed class SeedFromConnection(
     }
 
     /// Returns how many tables were actually copied.
-    public async Task<int> RunAsync(CancellationToken ct)
+    public async Task<int> RunAsync(CancellationToken ct) => (await SweepAsync(ct)).Seeded;
+
+    /// The same, and how many tables could not be copied yet — a source that is still starting,
+    /// which is the normal state of a database thirty seconds into a stack coming up.
+    public async Task<SeedSweep> SweepAsync(CancellationToken ct)
     {
-        if (!options.Configured) return 0;
+        if (!options.Configured) return new SeedSweep(0, 0);
 
         var copied = 0;
+        var pending = 0;
 
         foreach (var copy in Read())
         {
@@ -67,7 +72,9 @@ public sealed class SeedFromConnection(
 
             if (target is null)
             {
+                // The target may simply not be registered yet; worth another look.
                 log.LogWarning("there is no connection called {Connection} to seed", copy.To);
+                pending += copy.Tables?.Count ?? 0;
                 continue;
             }
 
@@ -112,14 +119,16 @@ public sealed class SeedFromConnection(
                 catch (OperationCanceledException) { throw; }
                 catch (Exception e)
                 {
-                    // One table that will not copy is not a reason for the others not to.
+                    // One table that will not copy is not a reason for the others not to — and the
+                    // reason is often "not up yet", so it is worth coming back for.
                     log.LogWarning(e, "{Table} could not be copied from {From} into {To}",
                         table, copy.From, copy.To);
+                    pending++;
                 }
             }
         }
 
-        return copied;
+        return new SeedSweep(copied, pending);
     }
 
     /// Whether the target already has this table. Asked by describing it: every driver can, and a
@@ -161,10 +170,23 @@ public sealed class SeedFromStartup(SeedFromConnection seeds, ILogger<SeedFromSt
     {
         if (!seeds.Configured) return;
 
+        // Same reason the seed scripts try again: the source is a container too, and a copy that
+        // ran once twelve seconds in and never again leaves the target empty for the whole session.
+        // Trying again is safe, because a table that exists is left alone.
+        var waits = new[] { 12, 15, 15, 30, 30, 60 };
+
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(12), stoppingToken);
-            await seeds.RunAsync(stoppingToken);
+            foreach (var wait in waits)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(wait), stoppingToken);
+
+                var sweep = await seeds.SweepAsync(stoppingToken);
+                if (sweep.Pending == 0) return;
+
+                log.LogInformation("{Pending} table(s) could not be copied yet; trying again",
+                    sweep.Pending);
+            }
         }
         catch (OperationCanceledException)
         {

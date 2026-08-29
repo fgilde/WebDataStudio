@@ -257,3 +257,67 @@ public class StartupFilesTests : IAsyncLifetime
         Assert.Equal(0, await factory.Services.GetRequiredService<SeedScripts>().RunAsync(ct));
     }
 }
+
+/// A database in the same stack is not ready when the studio is, and a seed that runs once and
+/// never again is how a stack comes up with an empty schema.
+public class SeedRetryTests : IDisposable
+{
+    private readonly string _dir = Directory.CreateTempSubdirectory("wds-seed-retry").FullName;
+
+    public void Dispose() => TestDirectory.Remove(_dir);
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    [Fact]
+    public async Task A_script_that_could_not_run_is_still_outstanding()
+    {
+        var seedDir = Path.Combine(_dir, "seed");
+        Directory.CreateDirectory(seedDir);
+        await File.WriteAllTextAsync(Path.Combine(seedDir, "GONE.sql"), "CREATE TABLE t (id int);", Ct);
+
+        // Nothing is listening there — the same shape as a SQL Server that is still starting.
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DB_PATH"] = Path.Combine(_dir, "wds.db"),
+                ["WDS_CONN_GONE"] = "postgres://app:pw@127.0.0.1:1/shop",
+                ["WDS_SEED_SQL"] = seedDir,
+            })));
+
+        using var client = factory.CreateClient();
+        var sweep = await factory.Services.GetRequiredService<SeedScripts>().SweepAsync(Ct);
+
+        Assert.Equal(0, sweep.Seeded);
+        Assert.Equal(1, sweep.Pending);
+    }
+
+    [Fact]
+    public async Task A_connection_that_worked_leaves_nothing_outstanding()
+    {
+        var db = Path.Combine(_dir, "here.db");
+        var seedDir = Path.Combine(_dir, "seed2");
+        Directory.CreateDirectory(seedDir);
+        await File.WriteAllTextAsync(Path.Combine(seedDir, "HERE.sql"), "CREATE TABLE t (id int);", Ct);
+
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
+            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DB_PATH"] = Path.Combine(_dir, "wds2.db"),
+                ["WDS_CONN_HERE"] = $"sqlite:///{db.Replace('\\', '/')}",
+                ["WDS_SEED_SQL"] = seedDir,
+            })));
+
+        using var client = factory.CreateClient();
+        var seeds = factory.Services.GetRequiredService<SeedScripts>();
+
+        var first = await seeds.SweepAsync(Ct);
+        Assert.Equal(1, first.Seeded);
+        Assert.Equal(0, first.Pending);
+
+        // And the second sweep does nothing at all: a script that ran is remembered by its hash,
+        // which is what makes trying again safe.
+        var second = await seeds.SweepAsync(Ct);
+        Assert.Equal(0, second.Seeded);
+        Assert.Equal(0, second.Pending);
+    }
+}

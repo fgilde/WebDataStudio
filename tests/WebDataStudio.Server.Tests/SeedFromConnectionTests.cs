@@ -142,6 +142,39 @@ public class SeedFromConnectionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_table_that_could_not_be_copied_is_still_outstanding()
+    {
+        // A source that is not up yet is the normal state of a stack coming up, and it has to be
+        // worth coming back for rather than lost for the session.
+        using var factory = Factory("""
+            [{ "from": "SRC", "to": "DST", "tables": ["nonsense"] }]
+            """);
+        using var client = factory.CreateClient();
+
+        var sweep = await factory.Services.GetRequiredService<SeedFromConnection>().SweepAsync(Ct);
+
+        Assert.Equal(0, sweep.Seeded);
+        Assert.Equal(1, sweep.Pending);
+    }
+
+    [Fact]
+    public async Task Nothing_is_outstanding_once_every_table_is_there()
+    {
+        using var factory = Factory(Both);
+        using var client = factory.CreateClient();
+        var seeds = factory.Services.GetRequiredService<SeedFromConnection>();
+
+        var first = await seeds.SweepAsync(Ct);
+        Assert.Equal(1, first.Seeded);
+        Assert.Equal(0, first.Pending);
+
+        // The second sweep finds both tables in place and leaves them alone.
+        var second = await seeds.SweepAsync(Ct);
+        Assert.Equal(0, second.Seeded);
+        Assert.Equal(0, second.Pending);
+    }
+
+    [Fact]
     public async Task Without_a_file_nothing_is_copied_anywhere()
     {
         using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(b =>

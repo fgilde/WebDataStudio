@@ -44,7 +44,14 @@ public sealed class ConnectionRegistry
             .ToList();
     }
 
-    public ConnectionSpec? Find(string id) => All().FirstOrDefault(c => c.Id == id);
+    /// A connection by its id, or — when nothing has that id — by its name.
+    ///
+    /// Everything a person or a deployment writes down says the name: a dashboard tile, a schedule
+    /// file, a seed. Ids are the studio's own and are checked first, so a name can never shadow
+    /// one. Three callers used to do this by hand, and the fourth forgot.
+    public ConnectionSpec? Find(string idOrName) =>
+        All().FirstOrDefault(c => c.Id == idOrName)
+        ?? All().FirstOrDefault(c => c.Name.Equals(idOrName, StringComparison.OrdinalIgnoreCase));
 
     public static ConnectionDto ToDto(ConnectionSpec spec) => new(
         spec.Id, spec.Name, spec.Engine, spec.ReadOnly, spec.Color, spec.Group,

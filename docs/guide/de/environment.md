@@ -36,6 +36,9 @@
 | `WDS_IDLE_TIMEOUT_SECONDS` | wie lange eine ungenutzte Sitzung offen bleibt, Vorgabe `300` |
 | `WDS_OPEN_BROWSER` | `true` öffnet beim Start einen Browser (Vorgabe der Desktop-Builds) |
 | `WDS_ARCHIVE_DIR`, `WDS_ARCHIVE_MAX_ROWS` | wohin behaltene Ergebnisse geschrieben werden und wie viele Zeilen eines behält — siehe [Ergebnisse](results.md) |
+| `WDS_SEED_FROM_FILE` | Tabellen, die beim Start aus einer Verbindung in eine andere kopiert werden — für eine Entwicklungsdatenbank, die nicht leer sein soll. Eine vorhandene Tabelle bleibt unangetastet |
+| `WDS_BACKUP_SCHEDULE_FILE` | Dumps, die das Studio selbst zieht: alle N Minuten oder täglich zu einer UTC-Zeit, wobei die neuesten aufgehoben werden |
+| `WDS_BACKUP_DIR` | wohin diese Dumps gehen. Vorgabe `/data/backups` — dort ein Volume einhängen |
 | `WDS_APP_WINDOW` | `false` öffnet einen normalen Browser-Tab statt eines eigenen Fensters — siehe [Erste Schritte](getting-started.md) |
 | `DB_PATH` | Anwendungsdatenbank (SQLite), Vorgabe `/data/webdatastudio.db` |
 | `ASPNETCORE_URLS` | Listen-Adresse, Vorgabe `http://0.0.0.0:8080` |
@@ -127,6 +130,55 @@ dem Haus getragen hat — ein ausgeführtes Statement, ein Export, ein angewende
 abgelehnter Zugriff — mit Person, Verbindung und Ergebnis. Zu lesen ist das im Tab **Audit** der
 Administration, der wie alles unter `/api/admin` die Admin-Rolle braucht. Anfragebodies werden nie
 mitgeschrieben: in einem Verbindungsbody steht ein Passwort.
+
+## Backups nach Zeitplan
+
+`WDS_BACKUP_SCHEDULE_FILE` benennt eine JSON-Datei mit Jobs, `WDS_BACKUP_DIR` sagt, wohin die Dumps
+gehen (Vorgabe `/data/backups` — dort ein Volume einhängen, sonst leben sie genau so lange wie der
+Container):
+
+```json
+[
+  { "name": "nightly", "connection": "SHOP", "dailyAtUtc": "02:00", "keep": 7 },
+  { "name": "schema",  "connection": "SHOP", "everyMinutes": 360, "schemaOnly": true, "keep": 4 }
+]
+```
+
+Zwei Arten zu sagen, wann — `everyMinutes` oder `dailyAtUtc` — und kein Cron-Parser: niemand hat das
+Studio gebeten, ein Scheduler zu sein, nur den Dump zu ziehen, den man sonst jeden Morgen von Hand
+zieht. Die Datei wird bei jedem Durchlauf gelesen; sie zu ändern braucht keinen Neustart.
+
+Gedumpt wird mit dem Werkzeug der Engine selbst, demselben wie beim Download. Ein Werkzeug, das im
+Image fehlt, wird gemeldet, statt eine Null-Byte-Datei zu hinterlassen, die aussieht wie eine leere
+Datenbank; ein fehlgeschlagener Lauf löscht, was er halb geschrieben hat. `keep` räumt nur die
+Dateien dieses Jobs weg, nie fremde — zwei Zeitpläne dürfen sich ein Verzeichnis teilen.
+
+**Ohne die Datei ist alles aus.** Ein Studio, das ungefragt `pg_dump` startet, sollte niemand
+ausrollen. `GET /api/admin/backup-schedule` sagt, welche Jobs es gibt und wie der letzte Lauf war —
+ein Zeitplan, den niemand sehen kann, ist einer, dessen Fehler niemand bemerkt.
+
+## Eine Datenbank, die nicht leer startet
+
+`WDS_SEED_SQL` ist die Antwort, wenn man die Daten aufschreiben kann. `WDS_SEED_FROM_FILE` ist die
+Antwort, wenn nicht — weil die Tabellen woanders schon existieren: auf einem Staging-Server, in einem
+Container, den der Stack mit einer Beispieldatenbank hochgefahren hat:
+
+```json
+[{ "from": "STAGING", "to": "DEV", "tables": ["countries", "products"], "maxRows": 500 }]
+```
+
+Jede Tabelle wird im Ziel angelegt und gefüllt, höchstens `maxRows` Zeilen (Vorgabe 10 000): ein
+Seed, kein Replikat. Es läuft einmal, kurz nach den Seed-Skripten — ein Skript, das eine Tabelle
+anlegt, soll vorher seine Chance gehabt haben.
+
+Die Regeln der Seed-Skripte gelten, plus eine:
+
+- Nie in eine **schreibgeschützte** Verbindung.
+- Nie in eine **rot** markierte — die Konvention des Studios für Produktion.
+- **Eine Tabelle, die schon existiert, bleibt unangetastet.** Ein Neustart ist kein Grund, zu
+  überschreiben, woran jemand seit einer Stunde arbeitet.
+
+Eine Tabelle, die sich nicht kopieren lässt, wird protokolliert; die übrigen laufen trotzdem.
 
 ## Geheimnisse
 

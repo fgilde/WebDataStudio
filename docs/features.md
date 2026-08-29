@@ -100,6 +100,8 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F12.1 | ER diagram per schema using `@xyflow/react` and `dagre` | done | all | Diagram panel |
 | F12.2 | Table selection, auto layout, export as PNG and SVG | done | all | Diagram panel |
 | F12.3 | Clicking a table in the diagram opens its data or structure | done | all | Diagram panel |
+| F12.4 | Backups on a schedule, kept and pruned per job | done | postgresql, mysql, mongodb, redis | Deployment setting |
+| F12.5 | Seed a connection from another one at start, leaving existing tables alone | done | all | Deployment setting |
 | F13.1 | Command palette (Ctrl+K) covering every action | done | all | Shell, command palette, theme drawer |
 | F13.2 | Keyboard shortcuts throughout with a shortcut help overlay | done | all | Shell, command palette, theme drawer |
 | F13.3 | The 21 AspireUI themes and the theme drawer | done | all | Shell, command palette, theme drawer |

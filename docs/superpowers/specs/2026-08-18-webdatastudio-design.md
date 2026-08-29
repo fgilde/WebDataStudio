@@ -390,6 +390,8 @@ it works for every engine whose capability set claims support for it.
 | F12.1 | ER diagram per schema using `@xyflow/react` and `dagre` |
 | F12.2 | Table selection, auto layout, export as PNG and SVG |
 | F12.3 | Clicking a table in the diagram opens its data or structure |
+| F12.4 | Backups on a schedule, kept and pruned per job |
+| F12.5 | Seed a connection from another one at start |
 
 ### F13 Usability
 | ID | Feature |

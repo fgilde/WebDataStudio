@@ -158,9 +158,21 @@ builder.Services.AddHostedService<SavedQueryImportStartup>();
 builder.Services.AddSingleton(sp => SeedOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<SeedScripts>();
 builder.Services.AddHostedService<SeedScriptStartup>();
+
+// The other kind of seed: not SQL somebody wrote, but tables that already exist somewhere else.
+builder.Services.AddSingleton(sp => SeedFromOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<SeedFromConnection>();
+builder.Services.AddHostedService<SeedFromStartup>();
 builder.Services.AddSingleton(sp => ScheduleOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<ScheduledQueries>();
 builder.Services.AddHostedService<ScheduledQueryRunner>();
+
+// The same idea for dumps: off without a schedule file, so a studio never shells out to pg_dump
+// on its own unless a deployment asked it to.
+builder.Services.AddSingleton(sp =>
+    BackupScheduleOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<BackupSchedule>();
+builder.Services.AddHostedService<BackupScheduleRunner>();
 builder.Services.AddSingleton(sp => ShareOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<ResultShares>();
 

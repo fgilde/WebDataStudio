@@ -28,6 +28,9 @@
 | `WDS_SNIPPETS_FILE` | editor snippets for everybody who opens this studio. A person's own snippet with the same prefix wins for them |
 | `WDS_PREFERENCES_FILE` | what a studio starts with before anybody changed a preference — the time zone, rows per page, and the rest |
 | `WDS_SEED_SQL` | a script, or a folder of `{CONNECTION}.sql`, run once per connection — see [Getting started](getting-started.md) |
+| `WDS_SEED_FROM_FILE` | tables to copy from one connection into another at start, for a development database that should not be empty. A table that already exists is left alone |
+| `WDS_BACKUP_SCHEDULE_FILE` | dumps the studio takes on its own: every so many minutes, or daily at a time in UTC, keeping the newest few |
+| `WDS_BACKUP_DIR` | where those dumps go. `/data/backups` by default — mount a volume there |
 | `WDS_SCHEMA_SNAPSHOT_DIR` | snapshot every connection's schema on start and report the drift — see [Schema editing](schema.md) |
 | `WDS_ARCHIVE_DIR`, `WDS_ARCHIVE_MAX_ROWS` | where kept results are written, and how many rows one keeps — see [Results and export](results.md) |
 | `WDS_ALERT_WEBHOOK`, `WDS_ALERT_INTERVAL_MINUTES`, `WDS_ALERT_MIN_SEVERITY`, `WDS_ALERT_CONNECTIONS` | post new health findings to a webhook — see [Administration](administration.md) |
@@ -139,6 +142,55 @@ if the guess fails — better than attaching it to the wrong driver.
 `readOnly` is enforced in the driver, not only in the UI: a statement that is not a read is
 rejected before it reaches the database. `color` tints the connection's row in the explorer, which
 is the cheapest way to stop a production accident.
+
+## Backups on a schedule
+
+`WDS_BACKUP_SCHEDULE_FILE` names a JSON file of jobs, and `WDS_BACKUP_DIR` says where the dumps go
+(`/data/backups` by default — mount a volume there, or they live exactly as long as the container
+does):
+
+```json
+[
+  { "name": "nightly", "connection": "SHOP", "dailyAtUtc": "02:00", "keep": 7 },
+  { "name": "schema",  "connection": "SHOP", "everyMinutes": 360, "schemaOnly": true, "keep": 4 }
+]
+```
+
+Two ways of saying when — `everyMinutes`, or `dailyAtUtc` — and no cron parser: nobody asked the
+studio to be a scheduler, only to take the dump somebody would otherwise take by hand every morning.
+The file is read on every sweep, so editing it does not need a restart.
+
+The dumping is the engine's own tool, the same one the download uses. A tool that is not installed
+in the image is reported rather than leaving a zero-byte file that looks like an empty database, and
+a run that fails deletes what it half-wrote. `keep` prunes this job's own files and nobody else's, so
+two schedules can share a directory.
+
+**Off without the file.** A studio that shells out to `pg_dump` on its own without being asked is not
+one anybody should deploy. `GET /api/admin/backup-schedule` says what the jobs are and how the last
+run of each went — a schedule nobody can see is one whose failures nobody notices.
+
+## A database that does not start out empty
+
+`WDS_SEED_SQL` is the answer when you can write the data down. `WDS_SEED_FROM_FILE` is the answer
+when you cannot, because the tables already exist somewhere — a staging server, a container the
+stack brought up with a sample database in it:
+
+```json
+[{ "from": "STAGING", "to": "DEV", "tables": ["countries", "products"], "maxRows": 500 }]
+```
+
+Each table is created in the target and filled, at most `maxRows` rows (10 000 by default): a seed,
+not a replica. It runs once, shortly after the seed scripts — a script that creates a table should
+have had its chance first.
+
+The seed script's guards apply, plus one:
+
+- Never into a **read-only** connection.
+- Never into one coloured **red**, the studio's convention for production.
+- **A table that already exists is left alone.** A restart is not a reason to overwrite what somebody
+  has been working on for an hour.
+
+One table that will not copy is logged and the rest still go.
 
 ## Secrets
 

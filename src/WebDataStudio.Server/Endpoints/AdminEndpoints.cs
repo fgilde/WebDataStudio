@@ -259,6 +259,16 @@ public static class AdminEndpoints
             }));
 
         // --- backup and restore ----------------------------------------------
+
+        // What the deployment's backup schedule is doing. A schedule nobody can see is one whose
+        // failures nobody notices, which is the same as not having one.
+        app.MapGet("/api/admin/backup-schedule", (BackupSchedule schedule) => Results.Ok(new
+        {
+            configured = schedule.Configured,
+            jobs = schedule.Read(),
+            runs = schedule.Runs,
+        }));
+        // --- backup and restore ----------------------------------------------
         app.MapPost("/api/admin/backup/{conn}", async (string conn, BackupRequest body, HttpContext ctx,
             SessionFactory factory, CancellationToken ct) =>
         {

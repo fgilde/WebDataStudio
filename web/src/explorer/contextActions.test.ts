@@ -134,7 +134,7 @@ describe("actionsFor", () => {
 
   it("gives a connection row its own short menu", () => {
     expect(connectionActions().map(item => item.action))
-      .toEqual(["new-query", "refresh", "properties"]);
+      .toEqual(["new-query", "refresh", "properties", "data-dictionary"]);
     expect(connectionActions({ multiDatabase: true }).map(item => item.action))
       .toContain("new-database");
   });

@@ -118,9 +118,7 @@ public sealed class ScheduledQueries(
     {
         var now = DateTimeOffset.UtcNow;
 
-        var spec = registry.All().FirstOrDefault(candidate =>
-            candidate.Name.Equals(job.Connection, StringComparison.OrdinalIgnoreCase)
-            || candidate.Id.Equals(job.Connection, StringComparison.OrdinalIgnoreCase));
+        var spec = registry.Find(job.Connection);
 
         if (spec is null)
             return new ScheduleRun(job.Name, now, 0, null, $"there is no connection '{job.Connection}'");

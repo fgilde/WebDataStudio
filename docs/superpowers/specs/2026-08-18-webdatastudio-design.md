@@ -404,6 +404,8 @@ it works for every engine whose capability set claims support for it.
 | F13.6 | Toasts for long-running jobs |
 | F13.7 | Every panel dockable, the explorer included, with a way back to it |
 | F13.8 | The running build visible in the studio and over the API |
+| F13.9 | A draggable split between statement and result, and editor text zoom |
+| F13.10 | Closing many tabs at once leaves the studio's own panels standing |
 
 ### F14 NoSQL (tier 3)
 | ID | Feature |

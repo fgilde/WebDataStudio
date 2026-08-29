@@ -203,15 +203,20 @@ Right-click a tab for:
 | Action | What it does |
 |---|---|
 | Close | closes this panel |
-| Close others | closes every other panel, except pinned and protected ones |
-| Close to the right | closes the tabs after this one in the same group |
-| Close all | closes everything closable |
-| Pin — keep it open | the tab loses its × and survives "close others" and "close all" |
+| Close others | closes the other tabs opened during this session |
+| Close to the right | the same, for the tabs after this one in the same group |
+| Close all | closes every tab opened during this session |
+| Pin — keep it open | the tab loses its × and survives all three |
 | Maximize / Restore | the group fills the studio, or goes back |
 | Open in its own window | the group moves into a separate browser window |
 
-The explorer and the start page are never closed by "close others" or "close all": they are the way
-back to everything else.
+**Closing many at once leaves the furniture standing.** The three closing actions apply to what
+was opened during the session — queries, tables, tools. The explorer, the structure and plan side,
+the history and saved lists and the start page are the window's own arrangement, and closing them
+would mean rebuilding it, which is not what anybody means by closing a dozen query tabs.
+
+Close one of those on purpose and it closes — except the explorer and the start page, which are the
+way back to everything else and have no × at all.
 
 ### A panel in its own window
 

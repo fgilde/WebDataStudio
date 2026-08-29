@@ -90,6 +90,16 @@ server-side and travel with your workspace. A snippet of yours with a built-in's
 completion list: the tenant filter your schema needs, written once. They are read-only here, and a
 snippet of your own with the same prefix wins for you, the way one of your own wins over a built-in.
 
+### The tab is yours to divide
+
+The statement and its result share the tab, and the handle between them says how. Drag it, or
+double-click it to go back to half and half; the ratio is remembered per browser, so the editor you
+made tall stays tall tomorrow.
+
+**Ctrl and the wheel** makes the text larger and smaller, and **Ctrl+0** puts it back — the gesture
+every editor and every browser already has. One size for every editor in the studio, kept in the
+browser, because how big the text is belongs to the screen it is on.
+
 ## Saved queries and history
 
 Every run is written to a searchable history that survives a restart. The **Saved** panel keeps

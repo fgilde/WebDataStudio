@@ -3,6 +3,7 @@ import { DockviewDefaultTab, type IDockviewPanelHeaderProps } from "dockview-rea
 import { createPortal } from "react-dom";
 import { Text, UnstyledButton } from "@mantine/core";
 import { IconPin, IconPinnedOff, IconWindowMaximize } from "@tabler/icons-react";
+import { panelsToClose, type CloseScope } from "./closing";
 
 /// The tab strip, with the menu people expect from one.
 ///
@@ -15,6 +16,10 @@ export interface TabPins {
   isPinned: (panelId: string) => boolean;
   togglePinned: (panelId: string) => void;
   isProtected: (panelId: string) => boolean;
+  /// Part of the arrangement the studio builds itself rather than something opened during the
+  /// session. A "close everything" leaves these alone: closing them meant rebuilding the window,
+  /// which is not what anybody means by closing a dozen query tabs.
+  isLayout: (panelId: string) => boolean;
 }
 
 /// Through a context rather than a prop: dockview keeps the tab component it was given on the
@@ -23,6 +28,7 @@ const TabPinsContext = createContext<TabPins>({
   isPinned: () => false,
   togglePinned: () => {},
   isProtected: () => false,
+  isLayout: () => false,
 });
 
 export const TabPinsProvider = TabPinsContext.Provider;
@@ -47,32 +53,29 @@ export function StudioTab(props: IDockviewPanelHeaderProps) {
 
   const closable = (id: string) => !pins.isProtected(id) && !pins.isPinned(id);
 
+  /// What a close-everything sees: every tab in the window, or in this group for "to the right",
+  /// with the two facts that decide whether it stays.
+  const facts = (panels: readonly { id: string }[]) => panels.map(panel => ({
+    id: panel.id,
+    pinned: pins.isPinned(panel.id),
+    layout: pins.isLayout(panel.id) || pins.isProtected(panel.id),
+  }));
+
+  const closeMany = (scope: CloseScope, panels: readonly { id: string }[]) => {
+    const ids = new Set(panelsToClose(scope, facts(panels), api.id));
+
+    for (const panel of containerApi.panels) if (ids.has(panel.id)) panel.api.close();
+  };
+
   const actions: Action[] = [
     { label: "Close", disabled: !closable(api.id), run: () => api.close() },
-    {
-      label: "Close others",
-      run: () => {
-        for (const panel of containerApi.panels)
-          if (panel.id !== api.id && closable(panel.id)) panel.api.close();
-      },
-    },
+    { label: "Close others", run: () => closeMany("others", containerApi.panels) },
     {
       // "To the right" is the order the tabs are in, which is the group's own panel order.
       label: "Close to the right",
-      run: () => {
-        const panels = api.group.panels;
-        const index = panels.findIndex(panel => panel.id === api.id);
-
-        for (const panel of panels.slice(index + 1))
-          if (closable(panel.id)) panel.api.close();
-      },
+      run: () => closeMany("right", api.group.panels),
     },
-    {
-      label: "Close all",
-      run: () => {
-        for (const panel of containerApi.panels) if (closable(panel.id)) panel.api.close();
-      },
-    },
+    { label: "Close all", run: () => closeMany("all", containerApi.panels) },
     {
       label: pinned ? "Unpin" : "Pin — keep it open",
       icon: pinned ? <IconPinnedOff size={13} /> : <IconPin size={13} />,

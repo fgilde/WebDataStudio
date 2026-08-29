@@ -8,6 +8,7 @@ import { AssistModal } from "../assist/AssistModal";
 import { QueryEditor } from "../editor/QueryEditor";
 import { describeDiff, diffRows } from "../grid/diffRows";
 import { ResultArea } from "./ResultArea";
+import { SplitPane } from "../dock/SplitPane";
 import { runQuery, type QueryRun } from "./runQuery";
 import { applyChunk, createResultState, type ResultState } from "./resultStore";
 import { addHistory, health, inspectSql, type SqlFindingDto } from "../api";
@@ -311,19 +312,19 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
         {result.cancelled && <Text size="xs" c="orange">cancelled</Text>}
       </Group>
 
-      <div style={{ flex: 1, minHeight: 100 }}>
-        <QueryEditor value={sql} dialect={dialect} connectionId={connectionId} error={firstError}
-          language={engine === "mongodb" ? "javascript" : engine === "redis" ? "plaintext" : "sql"}
-          onChange={setSql} onRun={execute} onRunAll={execute} onOpenObject={onOpenObject}
-          snippets={snippets} />
-      </div>
-      <div style={{
-        flex: 1, minHeight: 100,
-        borderTop: "1px solid var(--mantine-color-default-border)",
-      }}>
-        <ResultArea result={result} changed={changed} connectionId={connectionId} sql={sql}
-          onExport={onExport ? () => onExport(sql) : undefined} />
-      </div>
+      {/* The statement and its result share the tab, and how they share it is the reader's
+          business: drag the handle, or double-click it to go back to half and half. */}
+      <SplitPane id="query" minTop={100} minBottom={100}
+        top={
+          <QueryEditor value={sql} dialect={dialect} connectionId={connectionId} error={firstError}
+            language={engine === "mongodb" ? "javascript" : engine === "redis" ? "plaintext" : "sql"}
+            onChange={setSql} onRun={execute} onRunAll={execute} onOpenObject={onOpenObject}
+            snippets={snippets} />
+        }
+        bottom={
+          <ResultArea result={result} changed={changed} connectionId={connectionId} sql={sql}
+            onExport={onExport ? () => onExport(sql) : undefined} />
+        } />
 
       <AssistModal connectionId={connectionId} sql={sql} opened={assistOpen}
         onClose={() => setAssistOpen(false)} onUseStatement={setSql} />

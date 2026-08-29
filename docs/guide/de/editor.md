@@ -96,6 +96,16 @@ Vervollständigung aller: der Mandantenfilter, den euer Schema braucht, einmal g
 sie nur lesbar, und ein eigenes Snippet mit demselben Präfix gewinnt für die eigene Person — so wie
 ein eigenes über einem eingebauten steht.
 
+### Die Aufteilung gehört dir
+
+Statement und Ergebnis teilen sich den Tab, und der Griff dazwischen sagt wie. Ziehen — oder
+doppelklicken, um wieder auf halbe-halbe zu gehen. Das Verhältnis merkt sich der Browser; der hoch
+gezogene Editor ist morgen also immer noch hoch.
+
+**Strg und Mausrad** macht den Text größer und kleiner, **Strg+0** setzt ihn zurück — dieselbe
+Geste, die jeder Editor und jeder Browser schon hat. Eine Größe für alle Editoren des Studios, im
+Browser gespeichert: wie groß der Text ist, gehört zum Bildschirm, auf dem er steht.
+
 ## Gespeicherte Abfragen und Verlauf
 
 Jeder Lauf landet in einem durchsuchbaren Verlauf, der einen Neustart übersteht. Das Panel **Saved**

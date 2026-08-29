@@ -453,9 +453,16 @@ function buildDefaultLayout(
   welcome.api.setActive();
 }
 
-/// Panels a close-everything action must leave alone: the explorer is the way to everything else,
-/// and the start page is what a layout is rebuilt around.
+/// Panels that cannot be closed at all: the explorer is the way to everything else, and the start
+/// page is what a layout is rebuilt around.
 const PROTECTED_PANELS = new Set(["explorer", "welcome"]);
+
+/// The arrangement the studio builds for itself. These can be closed one at a time — somebody who
+/// does not want the plan panel should be able to say so — but a "close everything" leaves them
+/// alone: it is meant for the tabs opened during the session, not for the window's furniture.
+const LAYOUT_PANELS = new Set([
+  "welcome", "explorer", "structure", "plan", "health", "history", "saved",
+]);
 
 /// The orange border on the group a panel lives in. Restarting the animation needs the class off,
 /// a reflow, and the class back on — otherwise activating an already-active panel shows nothing,
@@ -1266,6 +1273,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
   const pins = useMemo<TabPins>(() => ({
     isPinned: id => pinnedPanels.has(id),
     isProtected: id => PROTECTED_PANELS.has(id),
+    isLayout: id => LAYOUT_PANELS.has(id),
     togglePinned: id => setPinnedPanels(current => {
       const next = new Set(current);
       if (!next.delete(id)) next.add(id);

@@ -110,6 +110,8 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F13.6 | Toasts for long-running jobs | done | all | Shell, command palette, theme drawer |
 | F13.7 | The explorer is a dock panel: drag, split or close it, `Ctrl+B` brings it back | done | all | Shell |
 | F13.8 | The running build shown bottom right, with its commit and build time | done | all | Shell |
+| F13.9 | The query tab's split is draggable, and the editor's text zooms with Ctrl and the wheel | done | all | Query tab |
+| F13.10 | Closing many tabs at once leaves the studio's own panels standing | done | all | Tab context menu |
 | F14.1 | MongoDB: collection browser, JSON editor, aggregation pipeline, index management | partial: the command console runs find, aggregate and index commands; there is no separate pipeline builder | mongodb | Query tab on a MongoDB connection |
 | F14.2 | Redis: key tree, type-specific editors, TTL, command console | done | redis | Redis panel, query tab |
 | F14.3 | Result renderer as a JSON tree, switchable to a table for flat documents | done | mongodb | Result area, document view |

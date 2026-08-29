@@ -6,11 +6,11 @@ import {
   IconArrowBackUp, IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
   IconFilter, IconLock, IconPlus, IconRefresh, IconRestore, IconSortAscending, IconSortDescending,
   IconTrash,
-  IconSparkles, IconWand, IconBraces,
+  IconSparkles, IconWand, IconBraces, IconHistory,
 } from "@tabler/icons-react";
 import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
 import {
-  browseData, getMaskPolicy, getUndoState, lookupValues, saveMaskPolicy,
+  browseData, getMaskPolicy, getUndoState, historyAvailable, lookupValues, saveMaskPolicy,
   type DataPageDto, type ForeignKeyDto, type UndoStateDto,
 } from "../api";
 
@@ -26,6 +26,7 @@ import { GenerateDialog } from "./GenerateDialog";
 import { BulkUpdateModal } from "../grid/editing/BulkUpdateModal";
 import { useChangeSet, type RowChange } from "../grid/editing/useChangeSet";
 import { preferences, usePreferences } from "../shell/preferences";
+import { RowHistoryModal } from "./RowHistoryModal";
 import { carriesZone, describeZone } from "../grid/formatTime";
 
 /// The same "14:00" means two different moments in `timestamptz` and in `timestamp`, so the header
@@ -83,6 +84,10 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   // Keyed by name, like every other piece of column state in this tab — the row editor, the key
   // badge and the foreign-key lookup all address columns by name.
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+  // Whether the database itself kept older versions of these rows. Asked once per tab, so a
+  // button that cannot work is never drawn.
+  const [historySupported, setHistorySupported] = useState(false);
+  const [historyOf, setHistoryOf] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<RowChange[] | null>(null);
   const [bulk, setBulk] = useState<{ rowIndex: number; column: string; value: unknown }[] | null>(null);
@@ -130,6 +135,21 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   };
   // Following re-fetches the first page, newest first, and nothing else: a tail that also paged
   // would scroll away from what it is showing.
+  // Only a table with keys can have one row followed through time, and only some engines keep it.
+  useEffect(() => {
+    setHistorySupported(false);
+
+    if (!page || page.keyColumns.length === 0) return;
+
+    let cancelled = false;
+
+    historyAvailable(connectionId, objectRef)
+      .then(state => { if (!cancelled) setHistorySupported(state.supported); })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [connectionId, objectRef, page?.keyColumns.length]);
+
   useEffect(() => {
     if (followColumn === null) return;
 
@@ -383,6 +403,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
         <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%" }}>
           <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--mantine-color-default)" }}>
             <tr>
+              {historySupported && <th style={{ width: 24 }} />}
               {visibleColumns.map(c => (
                 <th key={c.name} title={zoneNote(c.dataType) ?? c.dataType} style={{
                   textAlign: "left", padding: "2px 8px", whiteSpace: "nowrap",
@@ -501,6 +522,23 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                 style={fresh.has(rowIndex)
                   ? { background: "var(--mantine-primary-color-light)" }
                   : undefined}>
+                {historySupported && (
+                  <td style={{
+                    padding: "1px 4px",
+                    borderBottom: "1px solid var(--mantine-color-default-border)",
+                  }}>
+                    <Tooltip label="What this row looked like before">
+                      <ActionIcon size="xs" variant="subtle"
+                        aria-label={`History of row ${rowIndex + 1}`}
+                        onClick={() => setHistoryOf(Object.fromEntries(page.keyColumns.map(column => [
+                          column,
+                          String(row[page.columns.findIndex(one => one.name === column)] ?? ""),
+                        ])))}>
+                        <IconHistory size={12} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </td>
+                )}
                 {visibleColumns.map((c, colIndex) => {
                   const fk = fkForColumn(c.name);
                   const isSelected = selected.some(s => s.row === rowIndex && s.col === colIndex);
@@ -567,6 +605,9 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
         <JsonColumnDialog connectionId={connectionId} objectRef={objectRef} column={jsonColumn}
           onClose={() => setJsonColumn(null)} onFlatten={onOpenInEditor} />
       )}
+
+      <RowHistoryModal connectionId={connectionId} objectRef={objectRef} keyValues={historyOf}
+        label={tableName} onClose={() => setHistoryOf(null)} />
 
       <GenerateDialog connectionId={connectionId} objectRef={objectRef} tableName={tableName}
         opened={generateOpen} onClose={() => setGenerateOpen(false)}

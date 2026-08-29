@@ -105,6 +105,12 @@ docker run -d -p 8080:8080 -v wds-data:/data \
           columns, written in this engine's own spelling.</p>
       </div>
       <div class="card">
+        <h3>What this row looked like before</h3>
+        <p>Read from what the database itself kept — a system-versioned table, MariaDB's system
+          versioning, Oracle's flashback — with the columns that moved between versions highlighted.
+          Where an engine keeps no history, it says so instead of inventing one.</p>
+      </div>
+      <div class="card">
         <h3>A seatbelt for the editor</h3>
         <p>Hold a transaction open across statements: run the <code>UPDATE</code>, look at what it
           did while nobody else can see it, then commit — or roll it back. The studio ends one

@@ -1257,6 +1257,38 @@ export const driftScript = (conn: string): Promise<DriftScriptDto> =>
 export const takeSnapshot = (): Promise<{ moved: number }> =>
   fetch(`${base}/schema/snapshot`, json("POST", {})).then(r => ok<{ moved: number }>(r));
 
+/// One version of a row, as the database kept it.
+export interface RowVersionDto {
+  from: string | null;
+  to: string | null;
+  values: unknown[];
+  /// Which columns differ from the version before this one.
+  changed: string[];
+}
+
+export interface RowHistoryDto {
+  supported: boolean;
+  columns: DataColumnDto[];
+  versions: RowVersionDto[];
+  note: string | null;
+}
+
+/// Whether this table keeps a history the database itself wrote. Asked once when a data tab opens,
+/// so a button that cannot work is never drawn.
+export const historyAvailable = (conn: string, ref: string):
+  Promise<{ supported: boolean; note: string | null }> =>
+  fetch(`${base}/data/${conn}/history/available?${refQuery(ref)}`)
+    .then(r => ok<{ supported: boolean; note: string | null }>(r));
+
+export const rowHistory = (conn: string, ref: string, key: Record<string, string>):
+  Promise<RowHistoryDto> => {
+  // One `key=column:value` per key column: which row is being followed through time.
+  const params = new URLSearchParams({ ref });
+  for (const [column, value] of Object.entries(key)) params.append("key", `${column}:${value}`);
+
+  return fetch(`${base}/data/${conn}/history?${params}`).then(r => ok<RowHistoryDto>(r));
+};
+
 /// One box on a dashboard: a statement, and what to draw with what comes back.
 export interface DashboardTileDto {
   title: string;

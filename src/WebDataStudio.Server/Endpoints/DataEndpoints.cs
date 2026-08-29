@@ -324,6 +324,71 @@ public static class DataEndpoints
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
 
+        // "What did this row look like yesterday?" — only where the database kept the answer
+        // itself. Asked once when a data tab opens, so a button that cannot work is never drawn.
+        app.MapGet("/api/data/{conn}/history/available", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var target = SchemaEndpoints.ParseObjectRef(objectRef);
+                    var (supported, note) = await RowHistory.SupportsAsync(driver, session, target, ct);
+
+                    return Results.Ok(new { supported, note });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // The versions of one row, newest first, each with what changed since the one before it.
+        app.MapGet("/api/data/{conn}/history", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, [FromQuery(Name = "key")] string[]? key,
+            int? limit, SessionFactory factory, MaskPolicyStore policies, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    var target = SchemaEndpoints.ParseObjectRef(objectRef);
+
+                    // `key=id:42` per column: the values that address one row.
+                    var values = (key ?? [])
+                        .Select(pair => pair.Split(':', 2))
+                        .Where(parts => parts.Length == 2)
+                        .ToDictionary(parts => parts[0], parts => (string?)parts[1]);
+
+                    var history = await RowHistory.ReadAsync(driver, session, target, values,
+                        Math.Clamp(limit ?? RowHistory.MaxVersions, 1, RowHistory.MaxVersions), ct);
+
+                    // The same masking the grid applies: a history is the same data, older.
+                    var masked = Masking.IndexesOf(history.Columns, policies.For(conn));
+
+                    return Results.Ok(new
+                    {
+                        history.Supported,
+                        columns = Masking.Describe(history.Columns, masked),
+                        versions = history.Versions.Select(version => new
+                        {
+                            version.From,
+                            version.To,
+                            values = Masking.Apply([version.Values.ToArray()], masked)[0],
+                            version.Changed,
+                        }),
+                        history.Note,
+                    });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
         // The values a column actually holds, most common first — the checkbox list that saves
         // guessing what to type into the filter. A masked column is refused rather than counted:
         // the distinct values of a column of secrets are the secrets.

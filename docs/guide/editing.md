@@ -22,6 +22,30 @@ apply is refused instead of running something you did not read.
 They are not editable, and the tab says so with the reason: without a key there is no safe way to
 address a single row. Add a key, or edit through a statement you write yourself.
 
+## What this row looked like before
+
+Where the database kept the answer itself, a clock next to each row opens its versions: when each
+one was the truth, and what changed between them, with the columns that moved highlighted. The most
+recent is marked `now`.
+
+It reads what the *database* wrote, not what the studio saw:
+
+| | |
+|---|---|
+| SQL Server | a system-versioned table (`SYSTEM_VERSIONING = ON`), read with `FOR SYSTEM_TIME ALL` |
+| MariaDB | a table `WITH SYSTEM VERSIONING`, the same way |
+| Oracle | flashback, so how far back it reaches is the server's undo retention — and the panel says so |
+| everything else | nothing: PostgreSQL, MySQL, SQLite and the rest keep no history of a row |
+
+The clock only appears where it can work — the table has key columns and the engine kept something —
+so there is no button that answers "not supported" after a click.
+
+Two things this deliberately is not. It is not the [audit trail](administration.md#audit): that one
+knows what went through *this studio*, and the row somebody changed from an application is exactly
+the one being asked about. And it is not an undo: the versions are read, never written back. Copying
+a value out of an old version and pasting it into the grid is an edit like any other, with the same
+preview.
+
 ## A column that holds a file
 
 A binary column — `bytea`, `blob`, `varbinary`, `image` — shows what it weighs and two buttons: save

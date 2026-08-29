@@ -538,6 +538,7 @@ it works for every engine whose capability set claims support for it.
 | F30.38 | Timestamps read by a person, on the clock they chose, and never converted when they carry no zone |
 | F30.39 | The schema drift as a script: what to run where the change has not happened yet |
 | F30.40 | A dashboard: statements side by side, running themselves |
+| F30.41 | What a row looked like before, where the database itself kept it |
 
 ## 10. Safety behaviour
 

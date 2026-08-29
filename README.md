@@ -89,6 +89,12 @@ their expiry and their size, or a hash as field and value.
 - **Object storage** — S3, Azure Blob, Google Cloud Storage or a folder as a connection: containers
   and prefixes in the tree, an object previewed, a Parquet, CSV or JSON file — or a whole prefix —
   queried as a table through DuckDB, and a file turned into a real table in the database next to it.
+- **A dashboard** — the statements somebody asks for every morning, side by side and running
+  themselves: a number, a table, a bar per row. Each tile goes through the same endpoint, row cap,
+  masking and audit line as a query tab.
+- **What a row looked like before** — read from what the database itself kept: a system-versioned
+  table on SQL Server, system versioning on MariaDB, flashback on Oracle. With what changed between
+  the versions, and nothing invented where an engine keeps none.
 - **A seatbelt for the editor** — hold a transaction open across statements: run the `UPDATE`, look
   at what it did while nobody else can see it, then commit or roll it back. Plus "keep going on
   error" for the script of a hundred inserts, a pivot over the rows on screen, and the plan of a

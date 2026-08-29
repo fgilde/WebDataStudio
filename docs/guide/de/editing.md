@@ -24,6 +24,30 @@ Sie sind nicht bearbeitbar, und der Tab sagt den Grund: ohne Schlüssel gibt es 
 eine einzelne Zeile anzusprechen. Also einen Schlüssel anlegen — oder über ein selbst geschriebenes
 Statement arbeiten.
 
+## Wie diese Zeile vorher aussah
+
+Wo die Datenbank die Antwort selbst aufbewahrt hat, öffnet eine Uhr neben jeder Zeile ihre
+Versionen: wann welche die Wahrheit war und was sich dazwischen geändert hat — die bewegten Spalten
+sind hervorgehoben, die neueste trägt `now`.
+
+Gelesen wird, was die *Datenbank* geschrieben hat, nicht, was das Studio gesehen hat:
+
+| | |
+|---|---|
+| SQL Server | eine systemversionierte Tabelle (`SYSTEM_VERSIONING = ON`), gelesen mit `FOR SYSTEM_TIME ALL` |
+| MariaDB | eine Tabelle `WITH SYSTEM VERSIONING`, genauso |
+| Oracle | Flashback — wie weit es zurückreicht, hängt an der Undo-Retention des Servers, und das Panel sagt es |
+| alles andere | nichts: PostgreSQL, MySQL, SQLite und der Rest führen keine Zeilenhistorie |
+
+Die Uhr erscheint nur dort, wo sie etwas kann — die Tabelle hat Schlüsselspalten und die Engine hat
+etwas aufbewahrt —, es gibt also keinen Knopf, der nach dem Klick „nicht unterstützt“ sagt.
+
+Zweierlei ist es bewusst nicht. Es ist nicht der [Audit-Trail](administration.md): der weiß, was
+durch *dieses Studio* ging, und die Zeile, die jemand aus einer Anwendung heraus geändert hat, ist
+genau die, nach der gefragt wird. Und es ist kein Undo: die Versionen werden gelesen, nie
+zurückgeschrieben. Einen Wert aus einer alten Version zu kopieren und ins Gitter zu setzen, ist eine
+Änderung wie jede andere — mit derselben Vorschau.
+
 ## Eine Spalte, in der eine Datei steckt
 
 Eine Binärspalte — `bytea`, `blob`, `varbinary`, `image` — zeigt, wie groß ihr Inhalt ist, und zwei

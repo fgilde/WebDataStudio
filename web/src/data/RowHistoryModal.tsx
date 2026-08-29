@@ -23,12 +23,17 @@ export function RowHistoryModal({ connectionId, objectRef, keyValues, label, onC
   useEffect(() => {
     if (!keyValues) return;
 
+    let cancelled = false;
     setHistory(null);
     setError(null);
 
     rowHistory(connectionId, objectRef, keyValues)
-      .then(setHistory)
-      .catch(e => setError(e instanceof Error ? e.message : String(e)));
+      .then(answer => { if (!cancelled) setHistory(answer); })
+      .catch(e => {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      });
+
+    return () => { cancelled = true; };
   }, [connectionId, objectRef, keyValues]);
 
   return (

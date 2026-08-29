@@ -35,15 +35,23 @@ export function DashboardPanel({ onOpenInEditor }: {
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+
     listDashboards()
       .then(state => {
+        if (cancelled) return;
+
         setAvailable(state.available);
         setDashboards(state.dashboards);
         setCurrent(one => one ?? state.dashboards[0]?.id ?? null);
       })
-      .catch(() => setDashboards([]));
+      .catch(() => { if (!cancelled) setDashboards([]); });
 
-    listConnections().then(setConnections).catch(() => setConnections([]));
+    listConnections()
+      .then(list => { if (!cancelled) setConnections(list); })
+      .catch(() => { if (!cancelled) setConnections([]); });
+
+    return () => { cancelled = true; };
   }, [nonce]);
 
   const dashboard = dashboards?.find(one => one.id === current) ?? null;
@@ -142,6 +150,10 @@ function Tile({ tile, refreshSeconds, nonce, onOpenInEditor }: {
   const [error, setError] = useState<string | null>(null);
   const running = useRef(false);
 
+  // A tile whose dashboard was closed mid-query must not set state afterwards.
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+
   const run = useCallback(async () => {
     // One run at a time: a tile whose query takes longer than the interval must not pile up.
     if (running.current) return;
@@ -155,12 +167,14 @@ function Tile({ tile, refreshSeconds, nonce, onOpenInEditor }: {
 
     try {
       await active.done;
+      if (!alive.current) return;
+
       setResult(state);
 
       const failed = state.statements.find(statement => statement.error);
       if (failed?.error) setError(failed.error.text);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (alive.current) setError(e instanceof Error ? e.message : String(e));
     } finally {
       running.current = false;
     }

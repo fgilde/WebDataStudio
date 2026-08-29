@@ -18,8 +18,16 @@ export function SchemaDrift({ connectionId, onOpenInEditor }: {
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     setState(null);
-    schemaDrift(connectionId).then(setState).catch(() => setState({ configured: false, drift: null }));
+
+    // A panel somebody closed while this was in flight must not set state afterwards: React then
+    // schedules work against a document that is gone.
+    schemaDrift(connectionId)
+      .then(answer => { if (!cancelled) setState(answer); })
+      .catch(() => { if (!cancelled) setState({ configured: false, drift: null }); });
+
+    return () => { cancelled = true; };
   }, [connectionId, nonce]);
 
   const snapshot = async () => {

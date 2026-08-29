@@ -84,16 +84,18 @@ describe("a page of statements", () => {
     expect(await screen.findByText(/a page of statements/i)).toBeTruthy();
   });
 
-  it("saves a new one with its tiles", async () => {
+  /// A new dashboard opens with one empty tile in it: an editor with nothing in it looks like an
+  /// editor that cannot do anything, which is exactly how it read.
+  it("saves a new one with the tile it started with", async () => {
     listDashboards.mockResolvedValue({ available: true, dashboards: [] });
     saveDashboard.mockResolvedValue({ ...dashboard, id: "d2", name: "Evening" });
 
     wrap();
 
-    fireEvent.click(await screen.findByRole("button", { name: "New" }));
+    fireEvent.click(await screen.findByRole("button", { name: "New dashboard" }));
     fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Evening" } });
 
-    fireEvent.click(screen.getByRole("button", { name: "Add a tile" }));
+    // No hunting for "add a tile" first: there is already a row to fill in.
     fireEvent.change(await screen.findByLabelText("Statement of tile 1"),
       { target: { value: "SELECT 1" } });
 
@@ -101,7 +103,32 @@ describe("a page of statements", () => {
 
     await waitFor(() => expect(saveDashboard).toHaveBeenCalledWith("", expect.objectContaining({
       name: "Evening",
-      tiles: [expect.objectContaining({ sql: "SELECT 1" })],
+      tiles: [expect.objectContaining({ sql: "SELECT 1", connectionId: "c1" })],
     })));
+  });
+
+  /// The way from "I made a dashboard" to "there is something in it" was a small pencil icon, and
+  /// somebody looking for it did not find it.
+  it("says what to do next when a dashboard has no tiles", async () => {
+    listDashboards.mockResolvedValue({
+      available: true,
+      dashboards: [{ ...dashboard, tiles: [] }],
+    });
+
+    wrap();
+
+    expect(await screen.findByText(/has no tiles yet/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add the first tile" }));
+    expect(await screen.findByLabelText("Statement of tile 1")).toBeTruthy();
+  });
+
+  it("puts the tiles of an existing dashboard one click away", async () => {
+    wrap();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit tiles" }));
+
+    const statement = await screen.findByLabelText("Statement of tile 1");
+    expect((statement as HTMLInputElement).value).toBe("SELECT count(*)");
   });
 });

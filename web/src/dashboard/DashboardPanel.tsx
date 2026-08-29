@@ -83,16 +83,16 @@ export function DashboardPanel({ onOpenInEditor }: {
           value={current} onChange={setCurrent} />
 
         <Button size="compact-xs" leftSection={<IconPlus size={13} />}
-          onClick={() => setEditing({ id: "", name: "", tiles: [], refreshSeconds: 0, updatedAt: "" })}>
-          New
+          onClick={() => setEditing(blank(connections))}>
+          New dashboard
         </Button>
 
         {dashboard && (
           <>
-            <ActionIcon size="sm" variant="subtle" aria-label="Edit this dashboard"
+            <Button size="compact-xs" variant="default" leftSection={<IconPencil size={13} />}
               onClick={() => setEditing(dashboard)}>
-              <IconPencil size={14} />
-            </ActionIcon>
+              Edit tiles
+            </Button>
             <ActionIcon size="sm" variant="subtle" aria-label="Reload the tiles"
               onClick={() => setNonce(n => n + 1)}>
               <IconRefresh size={14} />
@@ -114,6 +114,19 @@ export function DashboardPanel({ onOpenInEditor }: {
           A dashboard is a page of statements: the number somebody asks for every morning, the table
           they check after a deployment. Make one, and it runs itself.
         </Text>
+      )}
+
+      {dashboard && dashboard.tiles.length === 0 && (
+        <Stack gap={6} align="flex-start">
+          <Text size="xs" c="dimmed">
+            {dashboard.name} has no tiles yet. A tile is a statement and what to draw with it — one
+            number, a table, or a bar per row.
+          </Text>
+          <Button size="compact-xs" leftSection={<IconPlus size={13} />}
+            onClick={() => setEditing({ ...dashboard, tiles: [emptyTile(connections)] })}>
+            Add the first tile
+          </Button>
+        </Stack>
       )}
 
       {dashboard && (
@@ -138,6 +151,18 @@ export function DashboardPanel({ onOpenInEditor }: {
     </Stack>
   );
 }
+
+/// A tile with nothing in it yet, on the first connection there is — which is the one somebody
+/// means nine times out of ten.
+const emptyTile = (connections: Connection[]): DashboardTileDto => ({
+  title: "", connectionId: connections[0]?.id ?? "", sql: "", view: "number", width: 1,
+});
+
+/// A new dashboard already holds one empty tile: an editor with nothing in it looks like an editor
+/// that cannot do anything.
+const blank = (connections: Connection[]): DashboardDto => ({
+  id: "", name: "", tiles: [emptyTile(connections)], refreshSeconds: 0, updatedAt: "",
+});
 
 /// One box: its statement runs on mount, on the dashboard's interval, and on a reload.
 function Tile({ tile, refreshSeconds, nonce, onOpenInEditor }: {
@@ -307,6 +332,15 @@ function DashboardEditor({ dashboard, connections, onClose, onSaved }: {
             description="0 means only when asked" value={refresh} onChange={setRefresh} />
         </Group>
 
+        <Text size="10px" c="dimmed">
+          One row per tile: a title, what to draw, which connection, how many of the four columns it
+          takes — and below it the statement.
+        </Text>
+
+        {tiles.length === 0 && (
+          <Text size="xs" c="dimmed">No tiles yet. Add one below.</Text>
+        )}
+
         {tiles.map((tile, index) => (
           <Stack key={index} gap={4} p={6}
             style={{ border: "1px solid var(--mantine-color-default-border)", borderRadius: 4 }}>
@@ -339,9 +373,7 @@ function DashboardEditor({ dashboard, connections, onClose, onSaved }: {
 
         <Group justify="space-between">
           <Button size="compact-xs" variant="default" leftSection={<IconPlus size={13} />}
-            onClick={() => setTiles(list => [...list, {
-              title: "", connectionId: connections[0]?.id ?? "", sql: "", view: "number", width: 1,
-            }])}>
+            onClick={() => setTiles(list => [...list, emptyTile(connections)])}>
             Add a tile
           </Button>
 

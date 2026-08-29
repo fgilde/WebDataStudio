@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { MantineProvider } from "@mantine/core";
 import { emit, onShell, publishShell, resetShell } from "./bus";
 import { ToolsMenu } from "./ToolsMenu";
+import { visibleTools } from "./tools";
 
 window.matchMedia ??= ((query: string) => ({
   matches: false, media: query, onchange: null,
@@ -42,6 +43,17 @@ describe("ToolsMenu", () => {
     expect(screen.getByText("Find a value in any table")).toBeTruthy();
     expect(screen.getByText("Ctrl+D")).toBeTruthy();
     expect(screen.getByText("Command palette")).toBeTruthy();
+  });
+
+  /// The groups and the registry used to be two independent lists, and a tool nobody added to a
+  /// group here was simply invisible — which is what happened to the dashboard.
+  it("shows every tool there is, whether or not a group claims it", async () => {
+    publishShell({ activeConnection: "c1", engine: "postgresql", admin: true, commands: [] });
+    draw();
+    await open();
+
+    for (const tool of visibleTools({ admin: true, engine: "postgresql" }))
+      expect(screen.getByText(tool.label)).toBeTruthy();
   });
 
   it("asks the dock to run the command rather than opening anything itself", async () => {

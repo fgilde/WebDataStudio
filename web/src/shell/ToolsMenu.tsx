@@ -44,12 +44,23 @@ export function ToolsMenu({ size = "sm", label = "Tools" }: {
 
   // Grouped the way somebody looks for them: what you do with the data, then what you do with the
   // server, then the panels that are always there.
+  const named: [string, string[]][] = [
+    ["Data", ["tool.datasearch", "tool.diagram", "tool.builder", "tool.notebook",
+      "tool.perspective", "tool.compare", "tool.federate", "tool.archive", "tool.redis"]],
+    ["Server", ["tool.admin", "tool.jobs", "tool.capture"]],
+    ["Panels", ["tool.dashboard", "tool.health", "tool.history", "tool.saved", "tool.reports"]],
+  ];
+
+  // Anything a group forgot still shows up. These two lists used to be independent, and a tool
+  // nobody added to a group here was simply invisible — which is exactly what happened to the
+  // dashboard and to the reports page.
+  const placed = new Set(named.flatMap(([, ids]) => ids));
+  const rest = tools.filter(tool => !placed.has(tool.id));
+
   const groups: [string, ToolDefinition[]][] = [
-    ["Data", tools.filter(tool => ["tool.datasearch", "tool.diagram", "tool.builder",
-      "tool.notebook", "tool.perspective", "tool.compare", "tool.federate", "tool.archive",
-      "tool.redis"].includes(tool.id))],
-    ["Server", tools.filter(tool => ["tool.admin", "tool.jobs", "tool.capture"].includes(tool.id))],
-    ["Panels", tools.filter(tool => ["tool.health", "tool.history", "tool.saved"].includes(tool.id))],
+    ...named.map<[string, ToolDefinition[]]>(([name, ids]) =>
+      [name, tools.filter(tool => ids.includes(tool.id))]),
+    ...(rest.length > 0 ? [["More", rest] as [string, ToolDefinition[]]] : []),
   ];
 
   return (

@@ -399,6 +399,7 @@ app.MapDdlEndpoints();
 app.MapCompareEndpoints();
 app.MapAdminEndpoints();
 app.MapRedisEndpoints();
+app.MapNotifyEndpoints();
 app.MapDiagramEndpoints();
 app.MapSavedQueryEndpoints();
 app.MapDashboardEndpoints();

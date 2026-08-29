@@ -29,6 +29,7 @@ import { ComparePanel } from "../compare/ComparePanel";
 import { DataSearchPanel } from "../explorer/DataSearchPanel";
 import { QueryDesigner } from "../designer/QueryDesigner";
 import { RedisPanel } from "../redis/RedisPanel";
+import { NotifyPanel } from "../notify/NotifyPanel";
 import { parseModel } from "../designer/buildSelect";
 import { SavedQueriesPanel } from "../query/SavedQueriesPanel";
 import { SnippetManager } from "../editor/SnippetManager";
@@ -259,6 +260,16 @@ function RedisDockPanel(
   );
 }
 
+function NotifyDockPanel(props: IDockviewPanelProps<{ connectionId: string }>) {
+  const shell = useShell();
+  const [connection, setConnection] = useState(props.params.connectionId);
+
+  return (
+    <NotifyPanel connections={shell.connections} connectionId={connection}
+      onConnectionChange={setConnection} />
+  );
+}
+
 function FederationDockPanel() {
   const shell = useShell();
   return <FederationPanel connections={shell.connections} />;
@@ -385,6 +396,7 @@ const toolComponents: Record<ToolComponent, DockPanel> = {
   federate: FederationDockPanel as DockPanel,
   archive: ArchiveDockPanel as DockPanel,
   redis: RedisDockPanel as DockPanel,
+  notify: NotifyDockPanel as DockPanel,
   admin: AdminDockPanel as DockPanel,
   health: HealthDockPanel as DockPanel,
   history: HistoryDockPanel as DockPanel,

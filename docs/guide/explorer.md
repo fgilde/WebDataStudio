@@ -67,6 +67,20 @@ They are read-only listings — the studio names what is there rather than offer
 other engines show their schemas as before; a folder they have no catalogue for is left out rather
 than shown empty.
 
+## Is this server still there?
+
+A dot in front of every connection says what the studio knows about it. Grey for "nobody has asked
+yet", green for a server that answered, red for one that did not — hover it for how long the answer
+took, or for what went wrong when it did not come.
+
+It is not a poll. A studio with ten connections would open ten of them, some through an SSH tunnel,
+for a row of dots nobody was looking at. Instead it asks once when a connection is expanded — the
+moment somebody shows interest in it — and again whenever the dot is clicked.
+
+The reading is a real round trip, not "a pooled connection object exists": the smallest statement
+the engine has, timed. A green dot with a yellow ring means the server answered and took longer
+than a quarter of a second about it.
+
 ## Privileges for a whole schema
 
 **Privileges on everything here…** on a schema builds one script instead of one dialog per table:

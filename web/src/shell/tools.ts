@@ -71,6 +71,13 @@ export const TOOLS: ToolDefinition[] = [
     label: "Redis key browser", requiresConnection: true, engine: "redis",
   },
   {
+    // PostgreSQL's own message bus: the same idea Redis pub/sub has, for the other half of most
+    // stacks, so it sits next to it.
+    id: "tool.notify", component: "notify", dock: "tool", title: "Notifications",
+    label: "LISTEN / NOTIFY — PostgreSQL's message bus", requiresConnection: true,
+    engine: "postgresql",
+  },
+  {
     id: "tool.admin", component: "admin", dock: "tool", title: "Admin",
     label: "Administration", requiresConnection: true, adminOnly: true,
   },
@@ -113,5 +120,6 @@ export function visibleTools(options: { admin: boolean; engine?: string }): Tool
 /// The components the dock has to provide. Typing the dock's map against this is what makes a tool
 /// without a panel a compile error rather than a click that does nothing.
 export type ToolComponent = "datasearch" | "diagram" | "builder" | "notebook" | "perspective"
-  | "compare" | "federate" | "archive" | "redis" | "admin" | "health" | "history" | "saved"
+  | "compare" | "federate" | "archive" | "redis" | "notify" | "admin" | "health" | "history"
+  | "saved"
   | "dashboard";

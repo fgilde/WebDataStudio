@@ -126,6 +126,25 @@ dropped that" is a table name in the box.
 
 It is described in full, with its variables, in [Safety](safety.md#who-did-what).
 
+## LISTEN / NOTIFY
+
+**Tools → Notifications** watches PostgreSQL's own message bus: the channel a job queue announces
+itself on, the one a trigger fires, the one a cache listens to. Name the channels, press *Listen*,
+and what arrives is shown as it arrives — with the time, the channel, the payload, and the backend
+process that sent it, which is the answer to "was that me, or the application?"
+
+**Send** publishes one, for trying the other end without writing a client. A read-only connection
+listens and does not send.
+
+Two things worth knowing:
+
+- A channel is an **identifier**, not a string. `MixedCase` stays `MixedCase` rather than being
+  folded to lower case, so it matches an application that spells it that way.
+- Nothing is stored. A notification that arrives while nobody is listening is gone — that is
+  PostgreSQL's design, not the studio's.
+
+Redis has the same idea under another name, in its own panel.
+
 ## Sessions
 
 The session list shows who is connected, what they are running, how long it has taken and who is

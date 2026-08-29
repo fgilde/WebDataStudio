@@ -132,6 +132,25 @@ Tabellenname im Feld.
 Aufzeichnung und Aufbewahrung steuern `WDS_AUDIT` und `WDS_AUDIT_DAYS`; siehe
 [Umgebungsvariablen](environment.md#wer-was-getan-hat).
 
+## LISTEN / NOTIFY
+
+**Tools → Notifications** beobachtet den Nachrichtenbus von PostgreSQL selbst: den Kanal, über den
+sich eine Job-Queue meldet, den ein Trigger auslöst, den ein Cache abhört. Kanäle eintragen,
+*Listen* drücken — und was ankommt, erscheint, während es ankommt: Uhrzeit, Kanal, Nutzlast und der
+Backend-Prozess, der gesendet hat. Letzteres beantwortet die Frage „war das ich oder die Anwendung?"
+
+**Send** verschickt selbst eine, um die andere Seite auszuprobieren, ohne einen Client zu schreiben.
+Eine schreibgeschützte Verbindung hört zu und sendet nicht.
+
+Zwei Dinge, die man wissen sollte:
+
+- Ein Kanal ist ein **Bezeichner**, kein String. `MixedCase` bleibt `MixedCase` und wird nicht auf
+  Kleinschreibung gefaltet — so trifft es die Anwendung, die es genauso schreibt.
+- Es wird nichts gespeichert. Eine Benachrichtigung, die eintrifft, während niemand zuhört, ist weg.
+  Das ist PostgreSQLs Entwurf, nicht der des Studios.
+
+Redis hat dieselbe Idee unter anderem Namen, in seinem eigenen Panel.
+
 ## Sitzungen
 
 Die Sitzungsliste zeigt, wer verbunden ist, was läuft, wie lange es schon dauert und wer wen

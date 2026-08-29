@@ -184,6 +184,51 @@ public static class ConnectionEndpoints
             return Results.Ok(new { imported, skipped });
         });
 
+        // Is this server still there, and how far away is it? Asked about a connection that
+        // already exists, so nothing has to be typed and nothing is stored: the answer is one
+        // round trip, now.
+        //
+        // A pool makes opening a session nearly free, which would make every server look equally
+        // close. So the probe runs the smallest statement the engine has and times that.
+        api.MapGet("/{id}/health", async (string id, SessionFactory factory, CancellationToken ct) =>
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(id, ct);
+                await using (session)
+                {
+                    var note = await ProbeAsync(driver, session, ct);
+                    clock.Stop();
+
+                    return Results.Ok(new
+                    {
+                        ok = true,
+                        milliseconds = (int)clock.ElapsedMilliseconds,
+                        message = note ?? $"connected to {driver.Info.Label}",
+                    });
+                }
+            }
+            catch (UnknownConnectionException e)
+            {
+                return Results.NotFound(new { message = e.Message });
+            }
+            catch (Exception e)
+            {
+                clock.Stop();
+
+                // A server that is down is information, not a fault of this one: 200 with ok=false
+                // keeps the explorer's dot simple.
+                return Results.Ok(new
+                {
+                    ok = false,
+                    milliseconds = (int)clock.ElapsedMilliseconds,
+                    message = e.Message,
+                });
+            }
+        });
+
         api.MapPost("/test", async (ConnectionRequest body, DriverRegistry drivers,
             TunnelManager tunnels, CancellationToken ct) =>
         {
@@ -258,6 +303,31 @@ public static class ConnectionEndpoints
 
         return new PortableConnection(spec.Name, spec.Engine, spec.ReadOnly, spec.Color, spec.Group,
             Value("Host", "Server", "Data Source"), Value("Database", "Initial Catalog"), true);
+    }
+
+    /// One round trip that proves the server is answering, not merely that a pooled connection
+    /// object exists. Returns a note worth showing, or null for "nothing to add".
+    ///
+    /// Opening a storage connection proves nothing at all — it builds a client and a DuckDB and
+    /// never touches the bucket — so that one lists a page instead.
+    private static async Task<string?> ProbeAsync(IDbDriver driver, IDbSession session,
+        CancellationToken ct)
+    {
+        if (session.Unwrap() is StorageSession storage)
+        {
+            var page = await storage.Store.ListAsync("", null, 1, ct);
+            return $"reached {storage.Store.Target.Container}: {page.Entries.Count} entry(ies)";
+        }
+
+        if (!driver.Caps.Sql) return null;
+
+        await foreach (var chunk in driver.ExecuteAsync(session,
+            new ScriptRequest(driver.Dialect.Ping, 1, 10), ct))
+        {
+            if (chunk is ResultChunk.Error error) throw new InvalidOperationException(error.Text);
+        }
+
+        return null;
     }
 
     private static IResult EnvironmentIsReadOnly() =>

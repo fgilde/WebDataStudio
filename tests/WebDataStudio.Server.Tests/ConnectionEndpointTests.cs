@@ -108,4 +108,54 @@ public class ConnectionEndpointTests : IDisposable
             .GetFromJsonAsync<List<Dto>>("/api/connections", TestContext.Current.CancellationToken);
         Assert.True(Assert.Single(list!).ReadOnly);
     }
+
+    // --- is this server still there? ---------------------------------------------------------------
+
+    [Fact]
+    public async Task Health_measures_one_round_trip_to_a_server_that_answers()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var db = Path.Combine(_dir, "health.db");
+
+        using var factory = Factory(("WDS_CONN_LOCAL", $"sqlite:///{db.Replace('\\', '/')}"));
+        var client = factory.CreateClient();
+
+        var list = await client.GetFromJsonAsync<List<Dto>>("/api/connections", ct);
+        var health = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/connections/{list![0].Id}/health", ct);
+
+        Assert.True(health.GetProperty("ok").GetBoolean());
+        Assert.True(health.GetProperty("milliseconds").GetInt32() >= 0);
+    }
+
+    [Fact]
+    public async Task A_server_that_is_down_is_an_answer_not_a_fault()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Nothing is listening there, and the studio itself is fine: 200 with ok=false, so the
+        // explorer's dot has something to say rather than an exception to swallow.
+        using var factory = Factory(("WDS_CONN_GONE", "postgres://app:pw@127.0.0.1:1/shop"));
+        var client = factory.CreateClient();
+
+        var list = await client.GetFromJsonAsync<List<Dto>>("/api/connections", ct);
+        var response = await client.GetAsync($"/api/connections/{list![0].Id}/health", ct);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var health = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+        Assert.False(health.GetProperty("ok").GetBoolean());
+        Assert.NotEmpty(health.GetProperty("message").GetString()!);
+    }
+
+    [Fact]
+    public async Task Health_of_a_connection_that_does_not_exist_is_a_404()
+    {
+        using var factory = Factory();
+
+        var response = await factory.CreateClient()
+            .GetAsync("/api/connections/nope/health", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }

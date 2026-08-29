@@ -10,6 +10,9 @@ public sealed class OracleDialect : SqlDialect
     public override string QuoteIdentifier(string name) => "\"" + name.Replace("\"", "\"\"") + "\"";
     public override string TextType => "VARCHAR2(4000)";
 
+    // Oracle has no SELECT without a FROM.
+    public override string Ping => "SELECT 1 FROM dual";
+
     public override string? RowAddress => "ROWID";
     public override string RowAddressPredicate(string parameter) => $"ROWID = CHARTOROWID({parameter})";
 

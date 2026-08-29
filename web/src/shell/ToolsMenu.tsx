@@ -2,7 +2,8 @@ import {
   ActionIcon, Menu, Text, Tooltip,
 } from "@mantine/core";
 import {
-  IconArchive, IconArrowsJoin, IconBinaryTree, IconBookmarks, IconGitCompare, IconHeartRateMonitor,
+  IconArchive, IconArrowsJoin, IconBell, IconBinaryTree, IconBookmarks, IconGitCompare,
+  IconHeartRateMonitor,
   IconHistory, IconKey, IconNotebook, IconSettingsCog, IconSitemap, IconStopwatch, IconTable,
   IconTools, IconWaveSine, IconZoomCode,
 } from "@tabler/icons-react";
@@ -21,6 +22,7 @@ const ICONS: Record<string, React.ReactNode> = {
   "tool.federate": <IconArrowsJoin size={15} />,
   "tool.archive": <IconArchive size={15} />,
   "tool.redis": <IconKey size={15} />,
+  "tool.notify": <IconBell size={15} />,
   "tool.admin": <IconSettingsCog size={15} />,
   "tool.jobs": <IconStopwatch size={15} />,
   "tool.capture": <IconWaveSine size={15} />,
@@ -46,7 +48,8 @@ export function ToolsMenu({ size = "sm", label = "Tools" }: {
   // server, then the panels that are always there.
   const named: [string, string[]][] = [
     ["Data", ["tool.datasearch", "tool.diagram", "tool.builder", "tool.notebook",
-      "tool.perspective", "tool.compare", "tool.federate", "tool.archive", "tool.redis"]],
+      "tool.perspective", "tool.compare", "tool.federate", "tool.archive", "tool.redis",
+      "tool.notify"]],
     ["Server", ["tool.admin", "tool.jobs", "tool.capture"]],
     ["Panels", ["tool.dashboard", "tool.health", "tool.history", "tool.saved", "tool.reports"]],
   ];

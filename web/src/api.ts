@@ -84,6 +84,13 @@ export const login = (username: string, password: string): Promise<Me> =>
 
 export const logout = (): Promise<void> => fetch(`${base}/auth/logout`, { method: "POST" }).then(() => undefined);
 
+/// Is this server still there, and how far away is it? One round trip, measured now — nothing is
+/// stored and nothing is remembered between calls.
+export interface ConnectionHealthDto { ok: boolean; milliseconds: number; message: string }
+
+export const checkConnectionHealth = (id: string): Promise<ConnectionHealthDto> =>
+  fetch(`${base}/connections/${id}/health`).then(r => ok<ConnectionHealthDto>(r));
+
 export const listConnections = (): Promise<Connection[]> =>
   fetch(`${base}/connections`).then(r => ok<Connection[]>(r));
 export const createConnection = (body: ConnectionInput): Promise<Connection> =>
@@ -1626,6 +1633,14 @@ export const redisPublish = (conn: string, channel: string, message: string):
 /// The subscription is server-sent events, so the browser's own EventSource carries it.
 export const redisSubscribeUrl = (conn: string, channels: string) =>
   `${base}/redis/${conn}/subscribe?channels=${encodeURIComponent(channels)}`;
+
+/// PostgreSQL's own message bus. Same shape as the Redis subscription, because it is the same
+/// question: is anything actually coming through?
+export const notifyListenUrl = (conn: string, channels: string) =>
+  `${base}/notify/${conn}/listen?channels=${encodeURIComponent(channels)}`;
+
+export const sendNotification = (conn: string, channel: string, payload: string): Promise<void> =>
+  fetch(`${base}/notify/${conn}/send`, json("POST", { channel, payload })).then(r => ok<void>(r));
 
 export interface StoragePreviewDto {
   name: string;

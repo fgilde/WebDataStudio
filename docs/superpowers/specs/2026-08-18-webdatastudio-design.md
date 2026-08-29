@@ -272,6 +272,8 @@ it works for every engine whose capability set claims support for it.
 | F2.4 | Object detail panel: columns, indexes, foreign keys, triggers, size, row count, comments |
 | F2.5 | Dependencies in both directions |
 | F2.6 | Several connections open at once |
+| F2.7 | A connection's health in the tree: reachable, how long it took, why not |
+| F2.8 | PostgreSQL LISTEN/NOTIFY: watch the channels, and send one |
 
 ### F3 Query editor
 | ID | Feature |

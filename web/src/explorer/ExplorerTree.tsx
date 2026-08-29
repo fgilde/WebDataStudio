@@ -6,6 +6,7 @@ import { IconChevronDown, IconChevronRight, IconRefresh, IconSearch } from "@tab
 import { listConnections, listDrivers, listSchema, type Connection, type SchemaNodeDto } from "../api";
 import { nodeIcon } from "./nodeIcons";
 import { ObjectSearch } from "./ObjectSearch";
+import { HealthDot } from "./HealthDot";
 import { schemaCache } from "../editor/schemaCache";
 import {
   actionsFor, connectionActions, type ContextItem, type ExplorerAction, type MenuCapabilities,
@@ -308,6 +309,8 @@ export function ExplorerTree({ refresh = 0, onSelect, onAction, onDropFiles }: {
                 } : undefined}>
                 <Group gap={4} wrap="nowrap">
                   {open[c.id] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />}
+                  {/* Whether the server is answering, and how far away it is. */}
+                  <HealthDot id={c.id} auto={open[c.id] === true} />
                   <Text size="xs" fw={600} c={c.color ?? undefined} truncate>{c.name}</Text>
                   {c.readOnly && <Badge size="xs" variant="light" color="orange">RO</Badge>}
                   {c.tunnelled && <Badge size="xs" variant="light" color="blue">SSH</Badge>}

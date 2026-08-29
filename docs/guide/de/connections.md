@@ -61,6 +61,21 @@ Treffer zuerst. Ein Klick öffnet diese Tabelle, schon auf die passende Spalte g
 sagt die Antwort, wie viele Tabellen durchsucht, wie viele übersprungen wurden und warum, und ob sie
 am Tabellenlimit aufgehört hat.
 
+## Ist der Server noch da?
+
+Vor jeder Verbindung steht ein Punkt mit dem, was das Studio über sie weiß. Grau heißt „hat noch
+niemand gefragt", grün steht für einen Server, der geantwortet hat, rot für einen, der es nicht tat.
+Der Tooltip nennt die Dauer der Antwort — oder, wenn keine kam, woran es lag.
+
+Das ist bewusst kein Polling. Ein Studio mit zehn Verbindungen würde zehn davon öffnen, manche durch
+einen SSH-Tunnel, für eine Reihe Punkte, die gerade niemand ansieht. Stattdessen fragt es einmal,
+wenn eine Verbindung aufgeklappt wird — in dem Moment, in dem jemand Interesse zeigt — und erneut
+bei jedem Klick auf den Punkt.
+
+Gemessen wird ein echter Round-Trip, nicht „ein Verbindungsobjekt aus dem Pool existiert": das
+kleinste Statement, das die Engine kennt, mit Uhr. Ein grüner Punkt mit gelbem Ring heißt, der
+Server hat geantwortet und dafür länger als eine Viertelsekunde gebraucht.
+
 ## Nur die Schemas, in denen gearbeitet wird
 
 Ein Server mit fünftausend Tabellen lässt jedes Studio für alle bezahlen: die erste Ebene des Baums,

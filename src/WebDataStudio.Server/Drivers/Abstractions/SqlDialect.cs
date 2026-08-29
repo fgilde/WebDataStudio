@@ -5,6 +5,10 @@ public abstract class SqlDialect
 {
     public abstract string QuoteIdentifier(string name);
 
+    /// The cheapest statement that proves the server answered. A pool makes opening a session
+    /// nearly free, so this is what a latency reading actually measures.
+    public virtual string Ping => "SELECT 1";
+
     /// What this engine calls "where the row physically is", for a table that has no key at all.
     /// Null where there is no usable answer: MySQL keeps its row id to itself, and SQL Server's
     /// %%physloc%% is undocumented. See RowIdentity, which only reaches for this as a last resort.

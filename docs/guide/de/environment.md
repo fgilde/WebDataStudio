@@ -39,6 +39,7 @@
 | `WDS_SEED_FROM_FILE` | Tabellen, die beim Start aus einer Verbindung in eine andere kopiert werden — für eine Entwicklungsdatenbank, die nicht leer sein soll. Eine vorhandene Tabelle bleibt unangetastet |
 | `WDS_BACKUP_SCHEDULE_FILE` | Dumps, die das Studio selbst zieht: alle N Minuten oder täglich zu einer UTC-Zeit, wobei die neuesten aufgehoben werden |
 | `WDS_BACKUP_DIR` | wohin diese Dumps gehen. Vorgabe `/data/backups` — dort ein Volume einhängen |
+| `WDS_FILE_VIEWER_URL` | woher der Datei-Viewer geholt wird, wenn jemand eine Datei im Bucket ansieht. Vorgabe ist das öffentliche CDN; leer schaltet ihn aus |
 | `WDS_APP_WINDOW` | `false` öffnet einen normalen Browser-Tab statt eines eigenen Fensters — siehe [Erste Schritte](getting-started.md) |
 | `DB_PATH` | Anwendungsdatenbank (SQLite), Vorgabe `/data/webdatastudio.db` |
 | `ASPNETCORE_URLS` | Listen-Adresse, Vorgabe `http://0.0.0.0:8080` |

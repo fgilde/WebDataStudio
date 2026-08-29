@@ -120,6 +120,29 @@ als eine Datei, der niemand traut.
 
 Die Bytes sind die des Providers — das Studio streamt sie durch und behält nichts.
 
+## Eine Datei ansehen
+
+**View** steht neben *Download* und *Save as…* — bei einem Objekt im Bucket, in dessen Kontextmenü
+und bei einer Zelle, in der eine Datei steckt. Die Datei öffnet sich im Studio statt im
+Download-Ordner.
+
+Die eingebaute Vorschau zeigt schon, was ein Browser von sich aus darstellt: Bilder, PDFs, Video,
+Audio und Text. **View** ist für den Rest — eine Tabellenkalkulation, ein Word-Dokument, eine
+Markdown-Datei, ein Archiv — über die File-Display-Komponente von
+[MudEx](https://www.mudex.org/webcomponents.html).
+
+Sie bringt eine WebAssembly-Laufzeit mit; das ist viel zu viel, um es in ein Studio zu bündeln, das
+größtenteils ein Grid ist. Deshalb wird sie erst geholt, wenn jemand sie das erste Mal braucht — und
+vorher nie. Daraus folgt zweierlei:
+
+- Ein Studio ohne Weg ins Internet sagt das, statt eine leere Fläche zu zeigen; alles andere —
+  Vorschau, Download, *Save as…* — funktioniert weiterhin.
+- `WDS_FILE_VIEWER_URL` zeigt auf eine eigene Kopie, wenn die Bereitstellung kein CDN erreicht. Auf
+  leer gesetzt ist der Viewer aus, und der *View*-Knopf sagt warum.
+
+Eine Datei in einer Zelle verlässt dafür nie den Browser: ihre Bytes werden zu einem Blob, den die
+Seite selbst liest, und der freigegeben wird, sobald der Viewer zugeht.
+
 ## Eine Datei abfragen
 
 Doppelklick auf eine Datei oder **Open data**, und sie öffnet sich im Datentab: Sortieren, die

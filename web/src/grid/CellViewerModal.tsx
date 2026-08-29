@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { Button, Group, Modal, ScrollArea, Tabs, Text } from "@mantine/core";
+import { IconZoomScan } from "@tabler/icons-react";
 import { fileNameFor, looksBinary, saveCell, size, toBytes } from "./binaryCell";
+import { FileViewerModal, type ViewableFile } from "../storage/FileViewerModal";
 
 export interface CellRef { row: number; col: number; column: string; value: unknown }
 
@@ -29,6 +32,16 @@ function base64(hexString: string): string {
 }
 
 export function CellViewerModal({ cell, onClose }: { cell: CellRef | null; onClose: () => void }) {
+  // A cell's bytes are not a URL, and the viewer wants one: they become a blob the browser can
+  // fetch from itself, revoked as soon as the viewer is closed so nothing is held.
+  const [viewing, setViewing] = useState<ViewableFile | null>(null);
+
+  useEffect(() => {
+    if (!viewing) return;
+    const url = viewing.url;
+    return () => URL.revokeObjectURL(url);
+  }, [viewing]);
+
   if (!cell) return null;
 
   const text = cell.value === null || cell.value === undefined ? "" : String(cell.value);
@@ -81,7 +94,24 @@ export function CellViewerModal({ cell, onClose }: { cell: CellRef | null; onClo
         )}
       </Tabs>
 
+      <FileViewerModal file={viewing} onClose={() => setViewing(null)} />
+
       <Group justify="flex-end" mt="sm">
+        {looksBinary(cell.value) && (
+          // The file in a cell, looked at rather than saved and opened somewhere else.
+          <Button variant="default" size="xs" leftSection={<IconZoomScan size={13} />}
+            onClick={() => {
+              const bytes = toBytes(String(cell.value));
+              const name = fileNameFor(cell.column, bytes);
+
+              setViewing({
+                url: URL.createObjectURL(new Blob([new Uint8Array(bytes)])),
+                name,
+              });
+            }}>
+            View
+          </Button>
+        )}
         <Button variant="default" size="xs" onClick={download}>
           {looksBinary(cell.value)
             ? `Save as ${fileNameFor(cell.column, toBytes(cell.value))}`

@@ -3,11 +3,13 @@ import {
   Badge, Button, Code, Group, Loader, ScrollArea, Stack, Table, Text,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
+import { IconZoomScan } from "@tabler/icons-react";
 import {
   describeObject, objectUrl, previewObject,
   type ObjectDetailDto, type StoragePreviewDto,
 } from "../api";
 import { saveAs } from "./saveAs";
+import { FileViewerModal, type ViewableFile } from "./FileViewerModal";
 
 /// What one object in a bucket is: its own facts, the front of its content, and — where a reader
 /// understands it — the columns it would have as a table.
@@ -23,6 +25,7 @@ export function StoragePreview({ connectionId, objectRef, onOpenData }: {
   const [detail, setDetail] = useState<ObjectDetailDto | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [viewing, setViewing] = useState<ViewableFile | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +61,8 @@ export function StoragePreview({ connectionId, objectRef, onOpenData }: {
 
   return (
     <ScrollArea h="100%" p="xs">
+      <FileViewerModal file={viewing} onClose={() => setViewing(null)} />
+
       <Stack gap="xs">
         <Group gap="xs">
           <Text size="sm" fw={600}>{preview.name}</Text>
@@ -69,6 +74,13 @@ export function StoragePreview({ connectionId, objectRef, onOpenData }: {
         <Group gap="xs">
           {preview.queryable && onOpenData &&
             <Button size="compact-xs" variant="light" onClick={onOpenData}>Open data</Button>}
+          {/* The spreadsheets, documents and archives a browser will not render by itself. */}
+          <Button size="compact-xs" variant="default" leftSection={<IconZoomScan size={13} />}
+            onClick={() => setViewing({
+              url: inline, name: preview.name, contentType: preview.contentType,
+            })}>
+            View
+          </Button>
           <Button size="compact-xs" variant="default"
             component="a" href={objectUrl(connectionId, objectRef)} download={preview.name}>
             Download

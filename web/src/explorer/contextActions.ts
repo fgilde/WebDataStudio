@@ -17,7 +17,8 @@ export type ExplorerAction =
   | "new-schema" | "drop-schema" | "set-comment" | "drop-object"
   | "trigger-enable" | "trigger-disable"
   // Object storage: the object itself rather than the rows in it.
-  | "download-object" | "save-object" | "upload-object" | "delete-object" | "query-as-table"
+  | "download-object" | "save-object" | "view-object"
+  | "upload-object" | "delete-object" | "query-as-table"
   | "copy-uri" | "import-object" | "download-prefix" | "save-prefix";
 
 export interface ContextItem {
@@ -93,6 +94,8 @@ const CONTAINER: ContextItem[] = [
 const STORAGE_OBJECT: ContextItem[] = [
   { action: "open-data", label: "Open data" },
   { action: "new-query", label: "New query (SELECT *)" },
+  // Looking at it beats fetching it: a spreadsheet or a document opens in the studio.
+  { action: "view-object", label: "View…" },
   { action: "download-object", label: "Download" },
   { action: "save-object", label: "Save as…" },
   // A file in a bucket that should be a table in a database.

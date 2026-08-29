@@ -71,6 +71,8 @@ export interface HealthDto {
   mcp?: {
     path: string; writes: boolean; needsKey: boolean; enabled: boolean; reason: string | null;
   } | null;
+  /// Where the rich file viewer is fetched from, or null for a studio without one.
+  fileViewer?: { script: string } | null;
 }
 
 export const health = (): Promise<HealthDto> => fetch(`${base}/health`).then(r => ok<HealthDto>(r));

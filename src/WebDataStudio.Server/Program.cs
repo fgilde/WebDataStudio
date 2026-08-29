@@ -162,6 +162,8 @@ builder.Services.AddHostedService<SeedScriptStartup>();
 // The other kind of seed: not SQL somebody wrote, but tables that already exist somewhere else.
 builder.Services.AddSingleton(sp => SeedFromOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<SeedFromConnection>();
+builder.Services.AddSingleton(sp =>
+    FileViewerOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddHostedService<SeedFromStartup>();
 builder.Services.AddSingleton(sp => ScheduleOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<ScheduledQueries>();
@@ -291,7 +293,7 @@ foreach (var (label, path, error) in new[]
 
 app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assistantOptions,
     McpAvailability mcpAvailability, AlertOptions alertOptions,
-    ShareOptions shareOptions, TelemetryOptions telemetry) => Results.Ok(new
+    ShareOptions shareOptions, TelemetryOptions telemetry, FileViewerOptions fileViewer) => Results.Ok(new
 {
     status = connectionStore.Available && workspaceStore.Available ? "ok" : "degraded",
     version,
@@ -322,6 +324,9 @@ app.MapGet("/api/health", (ConnectionRegistry registry, AssistantOptions assista
     // The MCP endpoint, so a client can find it without being told where to look — and so a
     // studio that refuses to serve it says why instead of advertising a path that answers HTML.
     mcp = mcpAvailability.Describe(),
+    // Where the rich file viewer is fetched from when somebody asks to look at a file in a bucket,
+    // or null for a studio that was told to do without one.
+    fileViewer = fileViewer.Enabled ? new { script = fileViewer.ScriptUrl } : null,
 })).AllowAnonymous();
 
 // A stuck data directory is a dependency failure, not a bug in the request: say so, with the path

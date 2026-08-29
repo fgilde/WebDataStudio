@@ -68,6 +68,7 @@ import { ScriptConfirm, type PendingScript } from "../ddl/ScriptConfirm";
 import { ObjectEditor, type ObjectEditorTarget, type EditableKind } from "../ddl/ObjectEditor";
 import { SequenceDialog, type SequenceTarget } from "../ddl/SequenceDialog";
 import { saveAs } from "../storage/saveAs";
+import { FileViewerModal, type ViewableFile } from "../storage/FileViewerModal";
 import type { DialectId } from "../sql/splitStatements";
 
 interface TabState {
@@ -533,6 +534,7 @@ export function DockShell() {
   const [dropDatabaseTarget, setDropDatabaseTarget] = useState<DatabaseTarget | null>(null);
   const [propertiesFor, setPropertiesFor] = useState<{ connectionId: string; label: string } | null>(null);
   const [dictionaryFor, setDictionaryFor] = useState<{ connectionId: string; label: string } | null>(null);
+  const [viewingFile, setViewingFile] = useState<ViewableFile | null>(null);
   // Held here, not in the modal: the Ctrl+L chord has to reach the same list the modal numbers.
   const { presets, save: savePresets } = useLayoutPresets();
 
@@ -821,6 +823,15 @@ export function DockShell() {
           source: {
             storageConnection: s.connectionId, objectRef: s.node.ref, name: s.node.label,
           },
+        });
+        break;
+
+      case "view-object":
+        setViewingFile({
+          // The inline URL: the same bytes the download serves, without the header that tells the
+          // browser to put them in the downloads folder.
+          url: `${objectUrl(s.connectionId, s.node.ref)}&inline=true`,
+          name: s.node.label,
         });
         break;
 
@@ -1518,6 +1529,8 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       </Modal>
 
       <DataDictionaryModal target={dictionaryFor} onClose={() => setDictionaryFor(null)} />
+
+      <FileViewerModal file={viewingFile} onClose={() => setViewingFile(null)} />
 
       <PropertiesDialog connectionId={propertiesFor?.connectionId ?? null}
         label={propertiesFor?.label ?? ""} onClose={() => setPropertiesFor(null)}

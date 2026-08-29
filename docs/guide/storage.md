@@ -116,6 +116,27 @@ file nobody can trust.
 
 The bytes are the provider's own — the studio streams them through and keeps nothing.
 
+## Looking at a file
+
+**View** sits next to *Download* and *Save as…* — on an object in a bucket, in its context menu, and
+on a cell that holds a file. It opens the file in the studio instead of in your downloads folder.
+
+The built-in preview already shows what a browser renders by itself: images, PDFs, video, audio and
+text. **View** is for the rest of them — a spreadsheet, a Word document, a markdown file, an
+archive — through [MudEx](https://www.mudex.org/webcomponents.html)'s file display.
+
+It carries a WebAssembly runtime, which is far too much to bundle into a studio that is mostly a
+grid, so it is fetched the first time somebody asks for it and never before. That has two
+consequences worth knowing:
+
+- A studio with no way out to the internet says so instead of showing an empty box, and everything
+  else — the preview, the download, *Save as…* — still works.
+- `WDS_FILE_VIEWER_URL` points it at your own copy for a deployment that cannot reach a CDN.
+  Setting it to nothing switches the viewer off, and the *View* button then says why.
+
+A file in a cell never leaves the browser for this: its bytes become a blob the page reads from
+itself, released as soon as the viewer is closed.
+
 ## Querying a file
 
 Double-click a file, or **Open data**, and it opens in the data tab: sorting, the

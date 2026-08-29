@@ -10,6 +10,9 @@ public sealed class OracleDialect : SqlDialect
     public override string QuoteIdentifier(string name) => "\"" + name.Replace("\"", "\"\"") + "\"";
     public override string TextType => "VARCHAR2(4000)";
 
+    public override string? RowAddress => "ROWID";
+    public override string RowAddressPredicate(string parameter) => $"ROWID = CHARTOROWID({parameter})";
+
     public override string NumberCast => "CAST({0} AS NUMBER)";
 
     // Oracle reads a timestamp by the session's NLS format, which is not something to rely on, so

@@ -218,7 +218,7 @@ public static class DataEndpoints
                     }
 
                     var detail = await driver.DescribeAsync(session, target, ct);
-                    var identity = RowIdentity.Resolve(detail);
+                    var identity = RowIdentity.Resolve(detail, driver.Dialect);
 
                     // A table is selected from by name; a file in a bucket by a reader over it.
                     // The driver says which, and a file no reader understands says so instead of
@@ -270,6 +270,13 @@ public static class DataEndpoints
                     var projection = alias is null
                         ? "*"
                         : $"{alias}.*, {string.Join(", ", lookups.Select(l => l.Projection))}";
+
+                    // A table with no key is addressed by where its rows physically are, and that
+                    // only works if the address comes back with them. Quoted, so Oracle does not
+                    // hand it back upper-cased and the grid loses track of which column it is.
+                    if (identity.RowAddress is { } rowAddress)
+                        projection = $"{(alias is null ? "" : alias + ".")}{rowAddress} AS " +
+                                     $"{driver.Dialect.QuoteIdentifier(RowIdentity.AddressColumn)}, {projection}";
 
                     var from = alias is null
                         ? table
@@ -517,7 +524,7 @@ public static class DataEndpoints
                 {
                     var target = SchemaEndpoints.ParseObjectRef(objectRef);
                     var detail = await driver.DescribeAsync(session, target, ct);
-                    var identity = RowIdentity.Resolve(detail);
+                    var identity = RowIdentity.Resolve(detail, driver.Dialect);
 
                     if (!identity.Editable)
                         return Results.BadRequest(new { message = identity.Reason });
@@ -674,7 +681,7 @@ public static class DataEndpoints
                 {
                     var target = SchemaEndpoints.ParseObjectRef(objectRef);
                     var detail = await driver.DescribeAsync(session, target, ct);
-                    var identity = RowIdentity.Resolve(detail);
+                    var identity = RowIdentity.Resolve(detail, driver.Dialect);
 
                     var changeSet = new ChangeSet(conn, target.ToString(), entry.Changes);
                     var script = ChangeScriptBuilder.Build(changeSet, detail, driver.Dialect);
@@ -748,7 +755,7 @@ public static class DataEndpoints
                 {
                     var target = SchemaEndpoints.ParseObjectRef(objectRef);
                     var detail = await driver.DescribeAsync(session, target, ct);
-                    var identity = RowIdentity.Resolve(detail);
+                    var identity = RowIdentity.Resolve(detail, driver.Dialect);
 
                     if (!identity.Editable)
                         return Results.BadRequest(new { message = identity.Reason });

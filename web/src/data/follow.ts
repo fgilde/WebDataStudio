@@ -9,6 +9,10 @@ import type { DataColumnDto } from "../api";
 
 /// A column that can order a tail: a timestamp, a date, or an increasing key. Anything else would
 /// scroll to a random place and call it "latest".
+/// The column the server selects for a table with no key at all: the row's physical address.
+/// It addresses the row and means nothing to a reader, so the grid keeps it and does not show it.
+export const ROW_ADDRESS = "wds_row_address";
+
 export function followColumns(columns: DataColumnDto[], keyColumns: string[] = []): string[] {
   const temporal = columns.filter(column => /date|time|stamp/i.test(column.dataType));
 

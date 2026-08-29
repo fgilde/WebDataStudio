@@ -1,6 +1,7 @@
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Drivers.MySql;
 using WebDataStudio.Server.Drivers.PostgreSql;
+using WebDataStudio.Server.Drivers.Sqlite;
 using WebDataStudio.Server.Drivers.SqlServer;
 using WebDataStudio.Server.Editing;
 
@@ -59,6 +60,38 @@ public class RowIdentityTests
     {
         var result = RowIdentity.Resolve(Table([Column("id", pk: true)], null, SchemaNodeKind.View));
         Assert.False(result.Editable);
+    }
+
+    [Fact]
+    public void A_key_less_table_is_editable_by_where_the_row_physically_is()
+    {
+        var result = RowIdentity.Resolve(Table([Column("name")]), new PostgreSqlDialect());
+
+        Assert.True(result.Editable);
+        Assert.Equal([RowIdentity.AddressColumn], result.KeyColumns);
+        Assert.Equal("ctid", result.RowAddress);
+
+        // It works and it is not free: the reason says what moves under you.
+        Assert.Contains("moves when the row is updated", result.Reason);
+    }
+
+    [Fact]
+    public void An_engine_without_an_address_still_says_no()
+    {
+        // SQL Server's %%physloc%% is undocumented and moves; MySQL keeps its row id to itself.
+        var result = RowIdentity.Resolve(Table([Column("name")]), new SqlServerDialect());
+
+        Assert.False(result.Editable);
+        Assert.Null(result.RowAddress);
+    }
+
+    [Fact]
+    public void A_key_still_wins_over_the_address()
+    {
+        var result = RowIdentity.Resolve(Table([Column("id", pk: true)]), new PostgreSqlDialect());
+
+        Assert.Equal(["id"], result.KeyColumns);
+        Assert.Null(result.RowAddress);
     }
 }
 
@@ -127,6 +160,49 @@ public class ChangeScriptBuilderTests
         Assert.Equal("UPDATE \"public\".\"people\" SET \"name\" = @p0 WHERE \"id\" = @k0", statement.Sql);
         Assert.Equal("ada", statement.Parameters["p0"]);
         Assert.Equal(1, statement.Parameters["k0"]);
+    }
+
+    [Fact]
+    public void An_update_by_physical_address_is_not_an_update_by_a_column()
+    {
+        var change = new RowChange("update",
+            new Dictionary<string, object?> { [RowIdentity.AddressColumn] = "(0,7)" },
+            new Dictionary<string, object?> { ["name"] = "ada" });
+
+        var statement = Assert.Single(Build(new PostgreSqlDialect(), change).Statements);
+
+        // Unquoted, and cast: ctid is not text, and PostgreSQL refuses `tid = text` rather than
+        // guessing. The value still travels as a parameter.
+        Assert.Equal("UPDATE \"public\".\"people\" SET \"name\" = @p0 WHERE ctid = CAST(@k0 AS tid)",
+            statement.Sql);
+        Assert.Equal("(0,7)", statement.Parameters["k0"]);
+    }
+
+    [Fact]
+    public void A_delete_by_physical_address_says_it_the_same_way()
+    {
+        var change = new RowChange("delete",
+            new Dictionary<string, object?> { [RowIdentity.AddressColumn] = "42" },
+            new Dictionary<string, object?>());
+
+        var statement = Assert.Single(Build(new SqliteDialect(), change).Statements);
+
+        // SQLite applies integer affinity to the comparison, so no cast is needed or wanted.
+        Assert.Equal("DELETE FROM \"public\".\"people\" WHERE rowid = $k0", statement.Sql);
+        Assert.True(statement.Destructive);
+    }
+
+    [Fact]
+    public void An_engine_with_no_address_treats_that_name_as_a_column()
+    {
+        // Nothing here can produce this change set, and if something did, quoting it as the column
+        // it claims to be fails loudly instead of writing the wrong row.
+        var change = new RowChange("update",
+            new Dictionary<string, object?> { [RowIdentity.AddressColumn] = "x" },
+            new Dictionary<string, object?> { ["name"] = "ada" });
+
+        var statement = Assert.Single(Build(new SqlServerDialect(), change).Statements);
+        Assert.Contains("[wds_row_address] = @k0", statement.Sql);
     }
 
     /// A table with the types a string is not: this is where "column is of type date but expression

@@ -42,6 +42,13 @@ public static class Undo
 
                 // Back to the old values of exactly the columns that were written, addressed by the
                 // same key. Columns nobody touched stay out of it.
+                // An update addressed by where the row physically is cannot be undone: the
+                // write moves the address, so the inverse would find nothing — or, worse, whatever
+                // ends up at that address later. A delete still can: its inverse carries the whole
+                // row and needs no address at all.
+                case "update" when change.Key.ContainsKey(RowIdentity.AddressColumn):
+                    break;
+
                 case "update" when row is not null:
                 {
                     var values = Subset(row, [.. change.Values.Keys]);
@@ -81,7 +88,8 @@ public static class Undo
             var i = 0;
             foreach (var (name, value) in change.Key)
             {
-                predicates.Add($"{dialect.QuoteIdentifier(name)} = {dialect.ParameterPrefix}k{i}");
+                predicates.Add(ChangeScriptBuilder.KeyPredicate(
+                    dialect, name, $"{dialect.ParameterPrefix}k{i}"));
                 var parameter = command.CreateParameter();
                 parameter.ParameterName = $"k{i}";
                 parameter.Value = ChangeScriptBuilder.Normalize(value) ?? DBNull.Value;

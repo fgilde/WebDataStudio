@@ -3,7 +3,7 @@ import {
   ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Pagination, Select, Text, Tooltip,
 } from "@mantine/core";
 import {
-  IconArrowBackUp, IconArrowRight, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
+  IconArrowBackUp, IconArrowRight, IconClipboardPlus, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
   IconFilter, IconLock, IconPlus, IconRefresh, IconRestore, IconSortAscending, IconSortDescending,
   IconTrash,
   IconSparkles, IconWand, IconBraces, IconHistory,
@@ -19,7 +19,8 @@ import { MenuFilterInput } from "../grid/MenuFilterInput";
 import { DistinctValues } from "../grid/DistinctValues";
 import { LookupPicker } from "../grid/LookupPicker";
 import { JsonColumnDialog } from "./JsonColumnDialog";
-import { followColumns, newRows } from "./follow";
+import { followColumns, newRows, ROW_ADDRESS } from "./follow";
+import { parsePastedRows } from "../export/pasteRows";
 import { EditableCell } from "../grid/editing/EditableCell";
 import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
 import { GenerateDialog } from "./GenerateDialog";
@@ -89,6 +90,8 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   const [historySupported, setHistorySupported] = useState(false);
   const [historyOf, setHistoryOf] = useState<Record<string, string> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // What a paste did, said once rather than as a toast that is gone before it is read.
+  const [pasteNote, setPasteNote] = useState<string | null>(null);
   const [pending, setPending] = useState<RowChange[] | null>(null);
   const [bulk, setBulk] = useState<{ rowIndex: number; column: string; value: unknown }[] | null>(null);
   const [selected, setSelected] = useState<{ row: number; col: number }[]>([]);
@@ -215,7 +218,37 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   const copy = (text: string) => navigator.clipboard.writeText(text);
   // Hidden columns are dropped from the render, not from the fetch: the row editor still needs
   // the key columns, and the server has no idea what the browser is showing.
-  const visibleColumns = page ? page.columns.filter(c => !hidden.has(c.name)) : [];
+  const visibleColumns = page
+    ? page.columns.filter(c => !hidden.has(c.name) && c.name !== ROW_ADDRESS)
+    : [];
+
+  // Rows on their way in: what somebody copied out of a spreadsheet becomes pending inserts,
+  // which the preview then shows as the statements they are. Nothing is written by pasting.
+  const pasteRows = async () => {
+    setPasteNote(null);
+    let text = "";
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      setPasteNote("the browser did not allow reading the clipboard");
+      return;
+    }
+
+    const insertable = page.columns.filter(c => c.name !== ROW_ADDRESS && !isLookup(c.name));
+    const parsed = parsePastedRows(text, insertable);
+
+    if (parsed.rows.length === 0) {
+      setPasteNote("there was nothing to paste");
+      return;
+    }
+
+    for (const row of parsed.rows) changeSet.insertRow(row);
+
+    setPasteNote(`${parsed.rows.length} row${parsed.rows.length === 1 ? "" : "s"} pasted` +
+      `${parsed.usedHeader ? " by column name" : ""}` +
+      `${parsed.ignored.length > 0 ? `, ignoring ${parsed.ignored.join(", ")}` : ""}` +
+      " — review them and apply");
+  };
 
   const fkForColumn = (column: string) => foreignKeys.find(fk => fk.columns.includes(column));
 
@@ -275,6 +308,10 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
         <Tooltip label="Insert row">
           <ActionIcon size="sm" variant="subtle" aria-label="Insert row" disabled={!page.editable}
             onClick={() => changeSet.insertRow({})}><IconPlus size={14} /></ActionIcon>
+        </Tooltip>
+        <Tooltip label="Paste rows from the clipboard as inserts">
+          <ActionIcon size="sm" variant="subtle" aria-label="Paste rows" disabled={!page.editable}
+            onClick={pasteRows}><IconClipboardPlus size={14} /></ActionIcon>
         </Tooltip>
         <Tooltip label="Duplicate selected row">
           <ActionIcon size="sm" variant="subtle" aria-label="Duplicate row"
@@ -393,8 +430,16 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
         </Text>
       </Group>
 
-      {!page.editable && page.reason && (
-        <Alert color="gray" p={6} mx={4} mb={4}>
+      {pasteNote && (
+        <Alert color="blue" p={6} mx={4} mb={4} withCloseButton onClose={() => setPasteNote(null)}>
+          <Text size="xs">{pasteNote}</Text>
+        </Alert>
+      )}
+
+      {/* Why this table is not editable — or, when it is editable by physical address only,
+          what that costs: the address moves when somebody else writes the row. */}
+      {page.reason && (
+        <Alert color={page.editable ? "yellow" : "gray"} p={6} mx={4} mb={4}>
           <Text size="xs">{page.reason}</Text>
         </Alert>
       )}

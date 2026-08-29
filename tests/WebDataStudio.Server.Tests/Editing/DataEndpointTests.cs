@@ -23,6 +23,7 @@ public class DataEndpointTests : IAsyncLifetime
             INSERT INTO people VALUES (1,'ada',1),(2,'linus',1),(3,'grace',0);
             CREATE VIEW active_people AS SELECT id, name FROM people WHERE active = 1;
             CREATE TABLE notes (body TEXT);
+            INSERT INTO notes VALUES ('first'),('second');
             """;
         await cmd.ExecuteNonQueryAsync();
     }
@@ -105,7 +106,7 @@ public class DataEndpointTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_key_less_table_reports_why_it_cannot_be_edited()
+    public async Task A_key_less_table_is_edited_by_where_its_rows_physically_are()
     {
         var ct = TestContext.Current.CancellationToken;
         using var factory = Factory();
@@ -114,8 +115,56 @@ public class DataEndpointTests : IAsyncLifetime
 
         var body = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}?ref=Table%3Amain%2Fnotes", ct);
 
-        Assert.False(body.GetProperty("editable").GetBoolean());
-        Assert.Contains("no primary key", body.GetProperty("reason").GetString());
+        Assert.True(body.GetProperty("editable").GetBoolean());
+        Assert.Equal(["wds_row_address"],
+            body.GetProperty("keyColumns").EnumerateArray().Select(k => k.GetString()));
+
+        // The address is selected with the rows, because an UPDATE cannot find the row without it.
+        Assert.Contains("wds_row_address",
+            body.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString()));
+
+        // And the tab says what that costs rather than pretending it is a key.
+        Assert.Contains("moves when the row is updated", body.GetProperty("reason").GetString());
+    }
+
+    [Fact]
+    public async Task A_row_of_a_key_less_table_can_actually_be_written()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var conn = await ConnectionIdAsync(client);
+
+        const string notes = "Table%3Amain%2Fnotes";
+        var page = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}?ref={notes}", ct);
+        // SQLite hands its rowid back as the number it is; PostgreSQL hands ctid back as text.
+        var address = page.GetProperty("rows")[0][0].GetInt64();
+
+        var change = new
+        {
+            changes = new[]
+            {
+                new
+                {
+                    kind = "update",
+                    key = new Dictionary<string, object?> { ["wds_row_address"] = address },
+                    values = new Dictionary<string, object?> { ["body"] = "rewritten" },
+                },
+            },
+        };
+
+        var preview = await (await client.PostAsJsonAsync(
+            $"/api/data/{conn}/preview-changes?ref={notes}", change, ct)).Content
+            .ReadFromJsonAsync<JsonElement>(ct);
+
+        Assert.Contains("rowid = ", preview.GetProperty("script").GetString());
+
+        var applied = await client.PostAsJsonAsync($"/api/data/{conn}/apply-changes?ref={notes}",
+            new { hash = preview.GetProperty("hash").GetString() }, ct);
+        Assert.Equal(HttpStatusCode.OK, applied.StatusCode);
+
+        var after = await client.GetFromJsonAsync<JsonElement>($"/api/data/{conn}?ref={notes}", ct);
+        Assert.Equal("rewritten", after.GetProperty("rows")[0][1].GetString());
     }
 
     [Fact]

@@ -15,6 +15,37 @@ public class UndoTests
     private static Dictionary<int, IReadOnlyDictionary<string, object?>> Nothing() => [];
 
     [Fact]
+    public void An_update_addressed_by_where_the_row_is_cannot_be_undone()
+    {
+        // The write moves the address, so the inverse would find nothing — or, after a vacuum,
+        // whatever ended up there since. Offering that undo would be worse than not offering one.
+        var set = Set(new RowChange("update",
+            Row((RowIdentity.AddressColumn, "(0,7)")), Row(("name", "Grace"))));
+
+        var before = new Dictionary<int, IReadOnlyDictionary<string, object?>>
+        {
+            [0] = Row(("name", "Ada")),
+        };
+
+        Assert.Empty(Undo.BuildInverse(set, [RowIdentity.AddressColumn], before));
+    }
+
+    [Fact]
+    public void A_delete_of_such_a_row_still_comes_back_whole()
+    {
+        // The inverse of a delete is an insert of the row itself: no address involved.
+        var set = Set(new RowChange("delete", Row((RowIdentity.AddressColumn, "(0,7)")), Row()));
+        var before = new Dictionary<int, IReadOnlyDictionary<string, object?>>
+        {
+            [0] = Row(("name", "Ada"), ("city", "London")),
+        };
+
+        var change = Assert.Single(Undo.BuildInverse(set, [RowIdentity.AddressColumn], before));
+        Assert.Equal("insert", change.Kind);
+        Assert.Equal("Ada", change.Values["name"]);
+    }
+
+    [Fact]
     public void An_update_goes_back_to_the_values_that_were_there()
     {
         var set = Set(new RowChange("update", Row(("id", 1)), Row(("name", "Grace"))));

@@ -4,6 +4,14 @@ namespace WebDataStudio.Server.Drivers.Abstractions;
 public abstract class SqlDialect
 {
     public abstract string QuoteIdentifier(string name);
+
+    /// What this engine calls "where the row physically is", for a table that has no key at all.
+    /// Null where there is no usable answer: MySQL keeps its row id to itself, and SQL Server's
+    /// %%physloc%% is undocumented. See RowIdentity, which only reaches for this as a last resort.
+    public virtual string? RowAddress => null;
+
+    /// The predicate that finds that row again. The address is not text, and most engines say so.
+    public virtual string RowAddressPredicate(string parameter) => $"{RowAddress} = {parameter}";
     public abstract string ParameterPrefix { get; }
 
     /// True when this engine separates batches with a standalone GO line (SQL Server).

@@ -20,8 +20,27 @@ bewegt, wird das Anwenden abgelehnt, statt etwas auszuführen, das du nicht gele
 
 ## Tabellen ohne Primärschlüssel
 
-Sie sind nicht bearbeitbar, und der Tab sagt den Grund: ohne Schlüssel gibt es keinen sicheren Weg,
-eine einzelne Zeile anzusprechen. Also einen Schlüssel anlegen — oder über ein selbst geschriebenes
+Ein Schlüssel ist die erste Wahl. Fehlt er, spricht ein eindeutiger Index über Spalten, die nicht
+`NULL` sein können, eine Zeile genauso eindeutig an — das Studio nutzt ihn.
+
+Fehlt beides, bleibt die Antwort der Engine selbst auf „welche Zeile ist das": `ctid` in PostgreSQL,
+`ROWID` in Oracle, `rowid` in SQLite. Das Studio liest sie zur Zeile mit, blendet sie im Grid aus
+und schreibt `WHERE ctid = …` — damit ist die Heap-Tabelle, der nie jemand einen Schlüssel gegeben
+hat, doch bearbeitbar.
+
+Was das kostet, steht als Hinweis über dem Grid: **eine physische Adresse wandert, wenn die Zeile
+geschrieben wird**, in PostgreSQL zusätzlich beim `VACUUM`. Also:
+
+- Neu laden, bevor man weiterbearbeitet, wenn jemand anderes in die Tabelle geschrieben hat.
+- Ein so gemachtes Update lässt sich nicht rückgängig machen. Die Adresse ist mit dem Schreiben
+  gewandert; ein Undo über die alte träfe nichts — oder nach einem Vacuum irgendetwas anderes. Ein
+  *Delete* lässt sich weiterhin zurücknehmen: die Zeile zurückzulegen braucht keine Adresse.
+
+MySQL und SQL Server haben keine brauchbare Antwort — InnoDB behält seine Row-ID für sich, und
+`%%physloc%%` ist undokumentiert und wandert. Dort sagt der Tab weiterhin, dass die Tabelle nicht
+bearbeitbar ist, und meint es.
+
+Alternativ: einen Schlüssel anlegen — oder über ein selbst geschriebenes
 Statement arbeiten.
 
 ## Wie diese Zeile vorher aussah
@@ -63,6 +82,24 @@ Zellen-Editor ist nicht der Ort, um ein Video zu bewegen. Die Änderung geht dur
 wie jede andere; dort steht der Wert als `0x89504e47… (12463 bytes)` statt als bildschirmfüllendes
 Hex, und das Statement schreibt das Binärliteral der jeweiligen Engine (`0x…`, `'\x…'::bytea`,
 `X'…'`), damit Bytes als Bytes ankommen.
+
+## Zeilen aus der Zwischenablage
+
+Der Zwischenablage-Knopf neben *Zeile einfügen* macht aus dem, was kopiert wurde — ein Block Zellen
+aus Excel, ein paar Zeilen CSV, eine Auswahl aus einem anderen Grid — anstehende Inserts.
+
+- **Tabulator oder Komma**, je nachdem, was in der ersten Zeile steht. Genau das kopiert eine
+  Tabellenkalkulation, und genau das steht in einer CSV-Datei; beides muss niemand einstellen.
+- **Eine Kopfzeile, aber nur eine echte.** Die erste Zeile gilt als Kopfzeile, wenn *jede* ihrer
+  Zellen eine Spalte dieser Tabelle benennt; dann geht jeder Wert dorthin, wo sein Name hinzeigt,
+  statt nach Position. `1,ada` sind Daten — `id,nonsense` ebenfalls.
+- **Zitierte Zellen bleiben heil**: ein Komma in Anführungszeichen bleibt in der Zelle, `""` ist ein
+  Anführungszeichen, und ein Zeilenumbruch innerhalb einer zitierten Zelle zerreißt die Zeile nicht.
+- **Eine leere Zelle ist `NULL`**, nicht der leere String. Eine Tabellenkalkulation kann „null" nicht
+  ausdrücken, und ein Leerfeld in einer Datumsspalte war noch nie `''`.
+
+Durch Einfügen wird nichts geschrieben. Die Zeilen liegen als anstehende Inserts vor, genau wie
+getippte — und die Vorschau des Änderungsskripts zeigt die `INSERT`-Anweisungen, bevor etwas läuft.
 
 ## Massenänderung
 

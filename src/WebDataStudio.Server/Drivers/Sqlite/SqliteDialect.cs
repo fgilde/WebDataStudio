@@ -6,6 +6,10 @@ public sealed class SqliteDialect : SqlDialect
 {
     public override string QuoteIdentifier(string name) => "\"" + name.Replace("\"", "\"\"") + "\"";
     public override string ParameterPrefix => "$";
+
+    // Integer affinity applies to the comparison, so the text a parameter carries is read as the
+    // number it is. No cast, which is good: CAST('5' AS integer) is fine, CAST(x AS rowid) is not.
+    public override string? RowAddress => "rowid";
     // SQLite keeps a timestamp as ISO text, where a comparison already sorts correctly. Casting it
     // would be worse than useless: CAST('2026-08-23' AS timestamp) has numeric affinity here, and
     // that reads the string as the number 2026.

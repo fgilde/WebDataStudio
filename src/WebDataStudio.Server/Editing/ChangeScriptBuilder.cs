@@ -71,10 +71,7 @@ public static partial class ChangeScriptBuilder
             assignments.Add($"{dialect.QuoteIdentifier(setColumns[i])} = " +
                 Bind(dialect, parameters, $"p{i}", Type(types, setColumns[i]), change.Values[setColumns[i]]));
 
-        var predicates = new List<string>();
-        for (var i = 0; i < keyColumns.Count; i++)
-            predicates.Add($"{dialect.QuoteIdentifier(keyColumns[i])} = " +
-                Bind(dialect, parameters, $"k{i}", Type(types, keyColumns[i]), change.Key[keyColumns[i]]));
+        var predicates = Predicates(keyColumns, change, dialect, parameters, types);
 
         var sql = $"UPDATE {table} SET {string.Join(", ", assignments)} WHERE {string.Join(" AND ", predicates)}";
         return new ScriptStatement(sql, parameters, index, false);
@@ -86,14 +83,45 @@ public static partial class ChangeScriptBuilder
         var keyColumns = change.Key.Keys.ToList();
         var parameters = new Dictionary<string, object?>();
 
-        var predicates = new List<string>();
-        for (var i = 0; i < keyColumns.Count; i++)
-            predicates.Add($"{dialect.QuoteIdentifier(keyColumns[i])} = " +
-                Bind(dialect, parameters, $"k{i}", Type(types, keyColumns[i]), change.Key[keyColumns[i]]));
+        var predicates = Predicates(keyColumns, change, dialect, parameters, types);
 
         return new ScriptStatement($"DELETE FROM {table} WHERE {string.Join(" AND ", predicates)}",
             parameters, index, true);
     }
+
+    /// Which row this statement means. Normally a key column per predicate; for a table with no
+    /// key at all, the one physical address the grid selected alongside the row (see RowIdentity).
+    private static List<string> Predicates(List<string> keyColumns, RowChange change,
+        SqlDialect dialect, Dictionary<string, object?> parameters,
+        IReadOnlyDictionary<string, string> types)
+    {
+        var predicates = new List<string>();
+        for (var i = 0; i < keyColumns.Count; i++)
+        {
+            var parameter = dialect.ParameterPrefix + $"k{i}";
+            var value = change.Key[keyColumns[i]];
+
+            if (keyColumns[i] == RowIdentity.AddressColumn && dialect.RowAddress is not null)
+            {
+                parameters[$"k{i}"] = value;
+                predicates.Add(KeyPredicate(dialect, keyColumns[i], parameter));
+                continue;
+            }
+
+            predicates.Add($"{dialect.QuoteIdentifier(keyColumns[i])} = " +
+                Bind(dialect, parameters, $"k{i}", Type(types, keyColumns[i]), value));
+        }
+
+        return predicates;
+    }
+
+    /// Which row a statement means, written the way this engine spells it. The physical address
+    /// is not a column: it is not quoted, and its type is the engine's own rather than anything the
+    /// table declares. The undo capture asks the same question, so it asks here.
+    internal static string KeyPredicate(SqlDialect dialect, string column, string parameter) =>
+        column == RowIdentity.AddressColumn && dialect.RowAddress is not null
+            ? dialect.RowAddressPredicate(parameter)
+            : $"{dialect.QuoteIdentifier(column)} = {parameter}";
 
     private static string? Type(IReadOnlyDictionary<string, string> types, string column) =>
         types.TryGetValue(column, out var type) ? type : null;

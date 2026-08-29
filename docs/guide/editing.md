@@ -19,8 +19,23 @@ apply is refused instead of running something you did not read.
 
 ## Tables without a primary key
 
-They are not editable, and the tab says so with the reason: without a key there is no safe way to
-address a single row. Add a key, or edit through a statement you write yourself.
+A key is the first choice. Without one, a unique index over columns that cannot be null addresses a
+row just as well, and the studio uses it.
+
+With neither, there is still the engine's own answer to "which row is this": PostgreSQL's `ctid`,
+Oracle's `ROWID`, SQLite's `rowid`. The studio selects it alongside the row, hides it from the grid
+and writes `WHERE ctid = …` — so the heap table nobody ever gave a key is editable after all.
+
+It says what that costs, in a note above the grid: **a physical address moves when the row is
+updated**, and PostgreSQL moves it again on `VACUUM`. So:
+
+- Reload before editing again after somebody else has written to the table.
+- An update made this way cannot be undone. The address moved with the write, and undoing by the old
+  one would find nothing — or, after a vacuum, whatever ended up there since. A *delete* still can be
+  undone: putting the row back needs no address.
+
+MySQL and SQL Server have no usable answer — InnoDB keeps its row id to itself, and `%%physloc%%` is
+undocumented and moves under you. There the tab still says the table is not editable, and means it.
 
 ## What this row looked like before
 
@@ -61,6 +76,24 @@ editor is not the place to move a video. The change goes through the same previe
 does; in it the value reads as `0x89504e47… (12463 bytes)` rather than as a screen of hex, and the
 statement writes the engine's own binary literal (`0x…`, `'\x…'::bytea`, `X'…'`) so the bytes arrive
 as bytes.
+
+## Rows from the clipboard
+
+The clipboard button next to *insert row* turns whatever you copied — a block of cells out of Excel,
+a few lines of CSV, a selection from another grid — into pending inserts.
+
+- **Tab or comma**, whichever the first line uses. That is what a spreadsheet copies and what a CSV
+  file holds, so neither needs saying.
+- **A header, but only a real one.** The first line counts as a header when *every* cell of it names
+  a column of this table; then each value goes where its name says rather than by position. `1,ada`
+  is data, and `id,nonsense` is data too.
+- **Quoted cells survive**: a comma inside quotes stays in the cell, `""` is one quote, and a line
+  break inside a quoted cell does not tear the row in half.
+- **An empty cell is null**, not the empty string. A spreadsheet has no way to say null, and a blank
+  in a date column never meant `''`.
+
+Nothing is written by pasting. The rows land as pending inserts, the same as typing them, and the
+change-script preview shows the `INSERT` statements before anything runs.
 
 ## Bulk update
 

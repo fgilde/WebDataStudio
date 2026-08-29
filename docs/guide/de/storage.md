@@ -120,6 +120,11 @@ als eine Datei, der niemand traut.
 
 Die Bytes sind die des Providers — das Studio streamt sie durch und behält nichts.
 
+**Ein Container, den es nicht gibt, sagt das in einem Satz.** Eine Verbindung kann einen benennen,
+den nie jemand angelegt hat — ein AppHost, der das Konto deklariert hat und nicht den Container, ein
+Tippfehler im Namen. Jeder Anbieter antwortet darauf mit einer Seite XML; das Studio liest sie und
+sagt stattdessen: *there is no container called 'exports' here*.
+
 ## Eine Datei ansehen
 
 **View** steht neben *Download* und *Save as…* — bei einem Objekt im Bucket, in dessen Kontextmenü

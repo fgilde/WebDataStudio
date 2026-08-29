@@ -39,6 +39,12 @@ public static class SchemaEndpoints
                         driver, session, ParseObjectRef(objectRef), ct));
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Storage.StorageContainerMissingException e)
+            {
+                // A bucket the connection names and the account does not have: the tree says
+                // that sentence rather than the provider's page of XML about it.
+                return Results.NotFound(new { message = e.Message });
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -56,6 +62,12 @@ public static class SchemaEndpoints
                         driver, session, ParseObjectRef(objectRef), ct));
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Storage.StorageContainerMissingException e)
+            {
+                // A bucket the connection names and the account does not have: the tree says
+                // that sentence rather than the provider's page of XML about it.
+                return Results.NotFound(new { message = e.Message });
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -73,6 +85,12 @@ public static class SchemaEndpoints
                         driver, session, ParseObjectRef(objectRef), ct));
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Storage.StorageContainerMissingException e)
+            {
+                // A bucket the connection names and the account does not have: the tree says
+                // that sentence rather than the provider's page of XML about it.
+                return Results.NotFound(new { message = e.Message });
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -101,6 +119,12 @@ public static class SchemaEndpoints
             catch (ArgumentException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Storage.StorageContainerMissingException e)
+            {
+                // A bucket the connection names and the account does not have: the tree says
+                // that sentence rather than the provider's page of XML about it.
+                return Results.NotFound(new { message = e.Message });
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -119,6 +143,12 @@ public static class SchemaEndpoints
                         driver, session, ParseObjectRef(objectRef), ct));
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Storage.StorageContainerMissingException e)
+            {
+                // A bucket the connection names and the account does not have: the tree says
+                // that sentence rather than the provider's page of XML about it.
+                return Results.NotFound(new { message = e.Message });
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -146,6 +176,12 @@ public static class SchemaEndpoints
                         driver, session, ParseObjectRef(objectRef), ct));
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Storage.StorageContainerMissingException e)
+            {
+                // A bucket the connection names and the account does not have: the tree says
+                // that sentence rather than the provider's page of XML about it.
+                return Results.NotFound(new { message = e.Message });
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -215,6 +251,12 @@ public static class SchemaEndpoints
             }
             catch (ArgumentException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Storage.StorageContainerMissingException e)
+            {
+                // A bucket the connection names and the account does not have: the tree says
+                // that sentence rather than the provider's page of XML about it.
+                return Results.NotFound(new { message = e.Message });
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -409,6 +451,12 @@ public static class SchemaEndpoints
                 }
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Storage.StorageContainerMissingException e)
+            {
+                // A bucket the connection names and the account does not have: the tree says
+                // that sentence rather than the provider's page of XML about it.
+                return Results.NotFound(new { message = e.Message });
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -428,6 +476,12 @@ public static class SchemaEndpoints
                     return Results.Ok(await driver.DescribeAsync(session, ParseObjectRef(objectRef), ct));
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (Storage.StorageContainerMissingException e)
+            {
+                // A bucket the connection names and the account does not have: the tree says
+                // that sentence rather than the provider's page of XML about it.
+                return Results.NotFound(new { message = e.Message });
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });

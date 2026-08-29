@@ -75,6 +75,9 @@ public static class StorageEndpoints
                 }
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            // A container that was never created: one sentence, rather than the provider's
+            // page of XML about it.
+            catch (StorageContainerMissingException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -120,6 +123,9 @@ public static class StorageEndpoints
                         fileDownloadName: target.Name, enableRangeProcessing: false);
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            // A container that was never created: one sentence, rather than the provider's
+            // page of XML about it.
+            catch (StorageContainerMissingException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -175,6 +181,9 @@ public static class StorageEndpoints
                 }, "application/zip", fileDownloadName: name);
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            // A container that was never created: one sentence, rather than the provider's
+            // page of XML about it.
+            catch (StorageContainerMissingException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -224,6 +233,9 @@ public static class StorageEndpoints
                 }
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            // A container that was never created: one sentence, rather than the provider's
+            // page of XML about it.
+            catch (StorageContainerMissingException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -258,6 +270,9 @@ public static class StorageEndpoints
                 }
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            // A container that was never created: one sentence, rather than the provider's
+            // page of XML about it.
+            catch (StorageContainerMissingException e) { return Results.NotFound(new { message = e.Message }); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });

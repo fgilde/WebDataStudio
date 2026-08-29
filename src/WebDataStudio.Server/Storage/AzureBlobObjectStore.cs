@@ -72,6 +72,8 @@ public sealed class AzureBlobObjectStore : IObjectStore
             .GetBlobsByHierarchyAsync(BlobTraits.None, BlobStates.None, "/", search, ct)
             .AsPages(cursor, max);
 
+        try
+        {
         await foreach (var page in pages)
         {
             foreach (var item in page.Values)
@@ -93,6 +95,12 @@ public sealed class AzureBlobObjectStore : IObjectStore
             break;
         }
 
+        }
+        catch (RequestFailedException e) when (e.ErrorCode == "ContainerNotFound")
+        {
+            throw new StorageContainerMissingException(Target.Container, e);
+        }
+
         return new StoragePage(entries, string.IsNullOrEmpty(next) ? null : next);
     }
 
@@ -107,8 +115,13 @@ public sealed class AzureBlobObjectStore : IObjectStore
                 properties.Value.ContentType, properties.Value.LastModified,
                 properties.Value.ETag.ToString(), properties.Value.AccessTier);
         }
+        catch (RequestFailedException e) when (e.ErrorCode == "ContainerNotFound")
+        {
+            throw new StorageContainerMissingException(Target.Container, e);
+        }
         catch (RequestFailedException e) when (e.Status == 404)
         {
+            // The container is there and this key is not, which is an ordinary answer.
             return null;
         }
     }

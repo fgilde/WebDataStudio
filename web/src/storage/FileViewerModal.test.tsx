@@ -43,12 +43,55 @@ describe("FileViewerModal", () => {
     expect(element()!.getAttribute("dense")).toBe("true");
   });
 
+  it("puts the element there by hand, outside what React manages", async () => {
+    show();
+    await waitFor(() => expect(element()).toBeTruthy());
+
+    // The component starts a WebAssembly runtime and rewrites what is inside its tag. React
+    // expecting to own that node is what turned the whole page grey, so the node is not React's.
+    const parent = element()!.parentElement!;
+    expect(parent.tagName).toBe("DIV");
+
+    // Whatever the component does to its own contents, React has nothing to reconcile.
+    element()!.append(document.createElement("span"));
+    expect(element()!.childElementCount).toBe(1);
+  });
+
+  it("takes the element away again when the file changes", async () => {
+    const { rerender } = show();
+    await waitFor(() => expect(element()).toBeTruthy());
+
+    rerender(
+      <MantineProvider>
+        <FileViewerModal file={{ ...file, url: "/other", name: "other.docx" }} onClose={() => {}} />
+      </MantineProvider>);
+
+    await waitFor(() => expect(document.querySelectorAll("mudex-file-display")).toHaveLength(1));
+    expect(element()!.getAttribute("url")).toBe("/other");
+  });
+
+  it("does not take the studio with it when the viewer throws", async () => {
+    // Rendering the element is what fails here — the boundary is the difference between a message
+    // in a modal and a grey page.
+    const create = document.createElement.bind(document);
+
+    vi.spyOn(document, "createElement").mockImplementation(tag => {
+      if (tag === "mudex-file-display") throw new Error("boom");
+      return create(tag);
+    });
+
+    show();
+
+    await waitFor(() =>
+      expect(screen.getByText(/file viewer could not be shown/i)).toBeTruthy());
+  });
+
   it("says what happened when the viewer cannot be fetched", async () => {
     loadFileViewer.mockResolvedValue(false);
     show();
 
     await waitFor(() =>
-      expect(screen.getByText(/file viewer could not be loaded/i)).toBeTruthy());
+      expect(screen.getByText(/file viewer could not be shown/i)).toBeTruthy());
 
     expect(element()).toBeNull();
   });
@@ -58,7 +101,7 @@ describe("FileViewerModal", () => {
     show();
 
     await waitFor(() =>
-      expect(screen.getByText(/file viewer could not be loaded/i)).toBeTruthy());
+      expect(screen.getByText(/file viewer could not be shown/i)).toBeTruthy());
   });
 
   it("shows the file's name as the title", async () => {

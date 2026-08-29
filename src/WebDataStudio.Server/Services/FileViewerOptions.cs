@@ -12,7 +12,10 @@ namespace WebDataStudio.Server.Services;
 /// PDF, video, audio, text — is what remains.
 public sealed record FileViewerOptions(string? ScriptUrl)
 {
-    public const string Default = "https://cdn.jsdelivr.net/npm/mudex-webcomponents/mudex.js";
+    /// The project's own copy rather than the npm mirror: the loader fetches its runtime from
+    /// wherever the script came from, and the mirror lagged behind far enough to answer a
+    /// string attribute with a deserialisation error from inside WebAssembly.
+    public const string Default = "https://www.mudex.org/wc/mudex.js";
 
     public bool Enabled => ScriptUrl is { Length: > 0 };
 

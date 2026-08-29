@@ -42,3 +42,16 @@ public interface IObjectStore
     /// the same credential chain.
     string? SecretStatement();
 }
+
+/// The bucket or container itself is not there.
+///
+/// Every provider says this in its own words, and all of them say it in a page of XML or JSON that
+/// nobody should have to read to learn one sentence. A connection can name a container that was
+/// never created — an app host that declared the account but not the container, a name with a typo
+/// — and the answer is that sentence, not the wire format.
+public sealed class StorageContainerMissingException(string container, Exception? inner = null)
+    : Exception($"there is no container called '{container}' here — it has to be created first, " +
+                "or the connection has to name one that exists", inner)
+{
+    public string Container { get; } = container;
+}

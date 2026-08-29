@@ -60,7 +60,17 @@ public sealed class S3ObjectStore : IObjectStore, IDisposable
             ContinuationToken = cursor,
         };
 
-        var response = await _client.ListObjectsV2Async(request, ct);
+        ListObjectsV2Response response;
+
+        try
+        {
+            response = await _client.ListObjectsV2Async(request, ct);
+        }
+        catch (AmazonS3Exception e) when (e.ErrorCode == "NoSuchBucket")
+        {
+            throw new StorageContainerMissingException(Target.Container, e);
+        }
+
         var entries = new List<StorageEntry>();
 
         foreach (var folder in response.CommonPrefixes ?? [])

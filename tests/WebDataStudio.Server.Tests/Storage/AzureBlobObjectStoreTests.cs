@@ -35,6 +35,31 @@ public class AzureBlobObjectStoreTests : ObjectStoreContract, IAsyncLifetime
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();
 
     [Fact]
+    public async Task A_container_that_was_never_created_is_one_sentence()
+    {
+        // An app host that declared the account and not the container, or a name with a typo. The
+        // provider answers with a page of XML about it; nobody should have to read that to learn
+        // that the container is not there.
+        var missing = new AzureBlobObjectStore(StorageUrl.Parse(
+            "azblob://devstoreaccount1/not-created?connectionstring="
+            + Uri.EscapeDataString(_container.GetConnectionString())));
+
+        var failure = await Assert.ThrowsAsync<StorageContainerMissingException>(
+            () => missing.ListAsync("", null, 10, TestContext.Current.CancellationToken));
+
+        Assert.Equal("not-created", failure.Container);
+        Assert.Contains("no container called 'not-created'", failure.Message);
+        Assert.DoesNotContain("<?xml", failure.Message);
+    }
+
+    [Fact]
+    public async Task A_key_that_is_not_there_is_still_an_ordinary_nothing()
+    {
+        // The container exists and the file does not, which is not the same question.
+        Assert.Null(await Store.HeadAsync("nothing/here.csv", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public void The_uri_is_the_one_duckdb_reads() =>
         Assert.Equal("az://lake/exports/2026/a.csv", Store.SqlUri("exports/2026/a.csv"));
 

@@ -116,6 +116,11 @@ file nobody can trust.
 
 The bytes are the provider's own — the studio streams them through and keeps nothing.
 
+**A container that is not there says so in a sentence.** A connection can name one that was never
+created — an app host that declared the account and not the container, a name with a typo — and every
+provider answers that with a page of XML. The studio reads it for you: *there is no container called
+'exports' here*.
+
 ## Looking at a file
 
 **View** sits next to *Download* and *Save as…* — on an object in a bucket, in its context menu, and

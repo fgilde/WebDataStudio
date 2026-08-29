@@ -40,10 +40,20 @@ public sealed class GcsObjectStore : IObjectStore
         string? next = null;
 
         var options = new ListObjectsOptions { Delimiter = "/", PageSize = max, PageToken = cursor };
-        var page = await Client
-            .ListObjectsAsync(Target.Container, search, options)
-            .AsRawResponses()
-            .FirstOrDefaultAsync(ct);
+
+        Google.Apis.Storage.v1.Data.Objects? page;
+
+        try
+        {
+            page = await Client
+                .ListObjectsAsync(Target.Container, search, options)
+                .AsRawResponses()
+                .FirstOrDefaultAsync(ct);
+        }
+        catch (Google.GoogleApiException e) when (e.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            throw new StorageContainerMissingException(Target.Container, e);
+        }
 
         if (page is null) return new StoragePage(entries, null);
 

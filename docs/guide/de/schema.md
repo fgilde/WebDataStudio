@@ -95,6 +95,21 @@ Tabellenänderung — deshalb ist ein Drop, der einen View zerlegen würde, eine
 Die Objekt-Editoren sind ausgeblendet, wo das Studio kein DDL schreibt: PostgreSQL, MySQL, SQL Server
 und SQLite haben einen Writer, alles andere nimmt ein Statement im Abfrage-Tab.
 
+## Ein Data Dictionary
+
+**Data dictionary…** im Kontextmenü einer Verbindung schreibt das Dokument, nach dem jemand fragt,
+der neu ins Team kommt: eine Markdown-Datei, die sagt, was in dieser Datenbank steht.
+
+- Zuerst eine Übersicht — jede Tabelle mit Zeilenzahl, Größe und wofür sie da ist.
+- Dann jede einzeln und vollständig: Spalten mit Typ, Nullbarkeit, Vorgabewert und Kommentar; worauf
+  sie zeigt; ihre Indizes.
+- Und die **Notizen**, die hier an Objekten hinterlassen wurden. Das ist der Teil, der sich noch nie
+  aus dem Schema ableiten ließ — genau deshalb gehört er ins Dokument.
+
+Kopieren oder als `.md` herunterladen. Eine Tabelle zu beschreiben kostet mehrere Round-Trips,
+deshalb hört das Dokument nach zweihundert auf und sagt, wie viele es ausgelassen hat, statt so zu
+tun, als wäre das alles gewesen.
+
 ## Snapshots und Drift
 
 Ist `WDS_SCHEMA_SNAPSHOT_DIR` gesetzt, schreibt das Studio kurz nach dem Start eine Momentaufnahme

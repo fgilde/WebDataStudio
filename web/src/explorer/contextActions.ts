@@ -10,7 +10,7 @@ export type ExplorerAction =
   | "script-drop-index" | "script-reindex"
   | "script-drop-constraint"
   | "script-execute" | "script-refresh-matview" | "script-refresh-matview-live"
-  | "grant-schema" | "archive-table" | "dev-subset"
+  | "grant-schema" | "archive-table" | "dev-subset" | "data-dictionary"
   // Objects other than tables: their source, their name, their description, and dropping them
   // through the same preview a table goes through.
   | "edit-source" | "new-view" | "new-routine" | "new-sequence" | "alter-sequence"
@@ -275,5 +275,7 @@ export const connectionActions = (caps: MenuCapabilities = {}): ContextItem[] =>
   { action: "new-query", label: "New query" },
   { action: "refresh", label: "Refresh" },
   { action: "properties", label: "Properties…", divider: true },
+  // The document somebody asks for when they join the team.
+  { action: "data-dictionary", label: "Data dictionary…" },
   ...(caps.multiDatabase ? [{ action: "new-database" as const, label: "New database…", divider: true }] : []),
 ];

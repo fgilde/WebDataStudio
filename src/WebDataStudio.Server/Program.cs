@@ -400,6 +400,7 @@ app.MapCompareEndpoints();
 app.MapAdminEndpoints();
 app.MapRedisEndpoints();
 app.MapNotifyEndpoints();
+app.MapDictionaryEndpoints();
 app.MapDiagramEndpoints();
 app.MapSavedQueryEndpoints();
 app.MapDashboardEndpoints();

@@ -274,6 +274,7 @@ it works for every engine whose capability set claims support for it.
 | F2.6 | Several connections open at once |
 | F2.7 | A connection's health in the tree: reachable, how long it took, why not |
 | F2.8 | PostgreSQL LISTEN/NOTIFY: watch the channels, and send one |
+| F2.9 | A data dictionary: tables, columns, keys and notes as one document |
 
 ### F3 Query editor
 | ID | Feature |

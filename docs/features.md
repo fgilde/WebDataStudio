@@ -24,6 +24,7 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F2.6 | Several connections open at once | done | all | Explorer, structure panel |
 | F2.7 | A connection's health in the tree: reachable, how long it took, why not | done | all | Explorer |
 | F2.8 | PostgreSQL LISTEN/NOTIFY: watch the channels an application talks on, and send one | done | postgresql | Tools → Notifications |
+| F2.9 | A data dictionary: every table, column, key and studio note as one Markdown document | done | all | Explorer context menu |
 | F3.1 | Dialect-aware SQL highlighting | done | all | Query tab, saved queries, query builder |
 | F3.2 | Schema-aware completion: tables, columns, aliases, functions, keywords | done | all | Query tab, saved queries, query builder |
 | F3.3 | Execute selection (F5 / Ctrl+Enter); with no selection, execute the statement under the cursor | done | all | Query tab, saved queries, query builder |

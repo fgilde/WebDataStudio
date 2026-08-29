@@ -91,6 +91,12 @@ export interface ConnectionHealthDto { ok: boolean; milliseconds: number; messag
 export const checkConnectionHealth = (id: string): Promise<ConnectionHealthDto> =>
   fetch(`${base}/connections/${id}/health`).then(r => ok<ConnectionHealthDto>(r));
 
+/// What is in this database, in one Markdown file: every table, its columns, what points where,
+/// and the notes people left on objects here.
+export const readDataDictionary = (id: string, schema?: string): Promise<string> =>
+  fetch(`${base}/dictionary/${id}${schema ? `?schema=${encodeURIComponent(schema)}` : ""}`)
+    .then(async r => (r.ok ? r.text() : fail(r)));
+
 export const listConnections = (): Promise<Connection[]> =>
   fetch(`${base}/connections`).then(r => ok<Connection[]>(r));
 export const createConnection = (body: ConnectionInput): Promise<Connection> =>

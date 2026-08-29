@@ -47,6 +47,7 @@ import { buildDeepLink, parseDeepLink } from "../shell/deepLink";
 import { GoToObject } from "../shell/GoToObject";
 import { NewDatabaseDialog, DropDatabaseDialog, type DatabaseTarget } from "../explorer/DatabaseDialogs";
 import { PropertiesDialog } from "../explorer/PropertiesDialog";
+import { DataDictionaryModal } from "../explorer/DataDictionaryModal";
 import { GrantDialog, type GrantTarget } from "../explorer/GrantDialog";
 import {
   dropColumn, dropConstraint, dropIndex, executeRoutine, rebuildIndex,
@@ -524,6 +525,7 @@ export function DockShell() {
   const [newDatabase, setNewDatabase] = useState<DatabaseTarget | null>(null);
   const [dropDatabaseTarget, setDropDatabaseTarget] = useState<DatabaseTarget | null>(null);
   const [propertiesFor, setPropertiesFor] = useState<{ connectionId: string; label: string } | null>(null);
+  const [dictionaryFor, setDictionaryFor] = useState<{ connectionId: string; label: string } | null>(null);
   // Held here, not in the modal: the Ctrl+L chord has to reach the same list the modal numbers.
   const { presets, save: savePresets } = useLayoutPresets();
 
@@ -1157,6 +1159,13 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         setDropDatabaseTarget({ connectionId: s.connectionId, name: s.node.label });
         break;
 
+      case "data-dictionary":
+        setDictionaryFor({
+          connectionId: s.connectionId,
+          label: connections.find(c => c.id === s.connectionId)?.name ?? s.node.label,
+        });
+        break;
+
       case "properties":
         setPropertiesFor({
           connectionId: s.connectionId,
@@ -1499,6 +1508,8 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
           </div>
         ) : null}
       </Modal>
+
+      <DataDictionaryModal target={dictionaryFor} onClose={() => setDictionaryFor(null)} />
 
       <PropertiesDialog connectionId={propertiesFor?.connectionId ?? null}
         label={propertiesFor?.label ?? ""} onClose={() => setPropertiesFor(null)}

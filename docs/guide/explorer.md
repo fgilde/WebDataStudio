@@ -102,6 +102,20 @@ the view readable while it rebuilds and needs a unique index on it; plain is fas
 Both come back as statements from the server, which knows how the engine spells it — Oracle's is
 `DBMS_MVIEW.REFRESH` — and refuses to build one for an object that is not a materialised view.
 
+## A data dictionary
+
+**Data dictionary…** in a connection's context menu writes the document somebody asks for when they
+join the team: one Markdown file that says what is in this database.
+
+- An overview table first — every table with its row count, its size and what it is for.
+- Then each one in full: columns with their types, nullability, defaults and comments; what it
+  points at; its indexes.
+- And the **notes** people left on objects here. That is the part that was never derivable from the
+  schema in the first place, which is exactly why it belongs in the document.
+
+Copy it, or download it as a `.md`. Describing a table costs several round trips, so the document
+stops at two hundred of them and says how many it left out rather than pretending that was all.
+
 ## Notes on an object
 
 A database has `COMMENT ON`, which needs a DDL right and a migration — so what somebody learns about a

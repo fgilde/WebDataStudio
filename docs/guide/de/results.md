@@ -74,6 +74,25 @@ Das Menü **Copy** legt das Ergebnis als CSV, JSON oder Markdown-Tabelle in die 
 eine Markierung als SQL-`IN`-Liste, der schnellste Weg, eine Menge Ids in die nächste Abfrage zu
 bekommen.
 
+## Dieses Ergebnis als Tabelle behalten
+
+**As table** neben einem Ergebnis schreibt es als eigene Tabelle in eine Datenbank zurück: der Join,
+den man sich gerade erarbeitet hat, aufgehoben für das nächste Mal.
+
+Der Dialog fragt nach Namen, optional einem Schema und der Zielverbindung — standardmäßig die
+aktuelle, auf Wunsch jede andere. Bevor etwas entsteht, zeigt er das exakte `CREATE TABLE`, und:
+
+- **Gleiche Engine auf beiden Seiten**: die Spalten behalten die Typen, die sie schon haben.
+- **Andere Engine**: jede Spalte bekommt den nächstliegenden Typ der Zielengine — eher weiter
+  gefasst als geraten, denn eine Spalte, die man nachträglich enger macht, ist besser als eine, die
+  still gerundet hat.
+- Eine Spalte ohne Namen wird `column1`; zwei Spalten gleichen Namens werden `name` und `name_2`.
+  Beides ist in einem Ergebnis normal und in einer Tabelle unmöglich.
+
+Die Zeilen werden erneut aus der Datenbank gelesen, nicht vom Bildschirm kopiert: in der Tabelle
+landet das ganze Ergebnis, nicht dessen erste Seite. Eine schreibgeschützte Verbindung lehnt ab und
+sagt es.
+
 ## Import
 
 **Import into this table…** im Kontextmenü des Explorers liest CSV, Excel, JSON oder SQL, zeigt eine

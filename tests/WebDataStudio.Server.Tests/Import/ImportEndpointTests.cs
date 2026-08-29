@@ -173,4 +173,133 @@ public class ImportEndpointTests : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
         Assert.Equal(2, body.GetProperty("inserted").GetInt32());
     }
+
+    // --- a result, kept as a table ----------------------------------------------------------------
+
+    [Fact]
+    public async Task Plans_the_table_a_result_would_become_without_creating_it()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var ids = await IdsAsync(client);
+
+        var response = await client.PostAsJsonAsync("/api/result-table/plan", new
+        {
+            connectionId = ids["SRC"],
+            sql = "SELECT id, upper(name) AS shouted FROM people",
+            table = "shouted_people",
+        }, ct);
+
+        response.EnsureSuccessStatusCode();
+        var plan = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        Assert.Contains("CREATE TABLE", plan.GetProperty("createSql").GetString());
+        Assert.Contains("shouted", plan.GetProperty("createSql").GetString());
+
+        // Same engine on both sides, so nothing is approximated.
+        Assert.True(plan.GetProperty("exactTypes").GetBoolean());
+
+        // A plan creates nothing.
+        var tables = await client.GetStringAsync($"/api/schema/{ids["SRC"]}?parent=Schema%3Amain", ct);
+        Assert.DoesNotContain("shouted_people", tables);
+    }
+
+    [Fact]
+    public async Task Keeps_a_result_as_a_table_in_the_same_connection()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var ids = await IdsAsync(client);
+
+        var response = await client.PostAsJsonAsync("/api/result-table", new
+        {
+            connectionId = ids["SRC"],
+            sql = "SELECT id, name FROM people WHERE id = 1",
+            table = "just_ada",
+        }, ct);
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal(1, (await response.Content.ReadFromJsonAsync<JsonElement>(ct))
+            .GetProperty("rows").GetInt32());
+
+        var page = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/data/{ids["SRC"]}?ref=Table%3Amain%2Fjust_ada", ct);
+
+        // The new table has no key, so the first column is the row address the studio selected;
+        // find the one that was asked for by name rather than by position.
+        var names = page.GetProperty("columns").EnumerateArray()
+            .Select(c => c.GetProperty("name").GetString()).ToList();
+
+        Assert.Equal("ada", page.GetProperty("rows")[0][names.IndexOf("name")].GetString());
+    }
+
+    [Fact]
+    public async Task Keeps_a_result_as_a_table_in_another_connection()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var ids = await IdsAsync(client);
+
+        var response = await client.PostAsJsonAsync("/api/result-table", new
+        {
+            connectionId = ids["SRC"],
+            sql = "SELECT id, name FROM people",
+            targetConnectionId = ids["DST"],
+            table = "copied_people",
+        }, ct);
+
+        response.EnsureSuccessStatusCode();
+        Assert.Equal(2, (await response.Content.ReadFromJsonAsync<JsonElement>(ct))
+            .GetProperty("rows").GetInt32());
+
+        var rows = await client.GetFromJsonAsync<JsonElement>(
+            $"/api/data/{ids["DST"]}?ref=Table%3Amain%2Fcopied_people", ct);
+
+        Assert.Equal(2, rows.GetProperty("rows").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_result_with_two_columns_of_the_same_name_still_becomes_a_table()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var ids = await IdsAsync(client);
+
+        // Ordinary in a result, impossible in a table: the second one is renamed rather than
+        // refused.
+        var response = await client.PostAsJsonAsync("/api/result-table/plan", new
+        {
+            connectionId = ids["SRC"],
+            sql = "SELECT name, name FROM people",
+            table = "twice",
+        }, ct);
+
+        response.EnsureSuccessStatusCode();
+        var plan = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
+
+        Assert.Equal(["name", "name_2"],
+            plan.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString()));
+    }
+
+    [Fact]
+    public async Task A_new_table_needs_a_name()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var ids = await IdsAsync(client);
+
+        var response = await client.PostAsJsonAsync("/api/result-table", new
+        {
+            connectionId = ids["SRC"],
+            sql = "SELECT 1",
+            table = "",
+        }, ct);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
 }

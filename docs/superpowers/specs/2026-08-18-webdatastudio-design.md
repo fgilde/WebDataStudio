@@ -325,9 +325,11 @@ it works for every engine whose capability set claims support for it.
 | F6.1 | Inline editing in the grid, spreadsheet-like, batched |
 | F6.2 | Insert, delete and duplicate rows |
 | F6.3 | Change-script preview before applying — always, not optional |
-| F6.4 | Tables without a primary key: editing blocked with a clear reason |
+| F6.4 | Tables without a primary key: a unique index, then the engine's own row address; blocked with a clear reason where there is neither |
 | F6.5 | Foreign-key lookup dropdown while editing |
 | F6.6 | Bulk update over a selection via macro or expression |
+| F6.7 | Paste rows from the clipboard as inserts |
+| F6.8 | Keep a result as a new table, here or in another connection |
 
 ### F7 Export and import
 | ID | Feature |

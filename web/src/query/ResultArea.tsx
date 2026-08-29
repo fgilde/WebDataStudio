@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { Badge, Button, Group, Menu, ScrollArea, SegmentedControl, Tabs, Text } from "@mantine/core";
 import { IconAlertTriangle, IconCopy, IconDownload, IconTable } from "@tabler/icons-react";
 import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
+import { KeepAsTableButton } from "./KeepAsTableButton";
 import { ResultGrid } from "../grid/ResultGrid";
 import { RowFormView } from "../grid/RowFormView";
 import { DocumentResultArea } from "../documents/DocumentResultArea";
@@ -109,9 +110,13 @@ export function ResultArea({ result, onExport, changed, connectionId, sql }: {
                     </Menu.Dropdown>
                   </Menu>
                   {connectionId && sql && <ShareButton connectionId={connectionId} sql={sql} />}
-                  {/* A share is a link to a snapshot; an archive is a file the studio keeps. */}
+                  {/* A share is a link to a snapshot; an archive is a file the studio keeps; a
+                      table is the result itself, back in a database. */}
                   {connectionId && sql && (
                     <KeepArchiveButton connectionId={connectionId} sql={sql} />
+                  )}
+                  {connectionId && sql && (
+                    <KeepAsTableButton connectionId={connectionId} sql={sql} />
                   )}
                   {onExport && (
                     <Button size="compact-xs" variant="default" leftSection={<IconDownload size={13} />}

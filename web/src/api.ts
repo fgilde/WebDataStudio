@@ -825,6 +825,33 @@ export const saveArchive = (name: string, body: {
   fetch(`${base}/archives/${encodeURIComponent(name)}`, json("POST", body))
     .then(r => ok<ArchiveInfoDto>(r));
 
+/// A statement's result, kept as a table — here, or in another connection.
+export interface ResultTableRequest {
+  connectionId: string;
+  sql: string;
+  table: string;
+  schema?: string;
+  targetConnectionId?: string;
+  maxRows?: number;
+}
+
+export interface ResultTablePlanDto {
+  schema: string;
+  table: string;
+  columns: { name: string; sourceType: string; targetType: string }[];
+  createSql: string;
+  /// True when both sides are the same engine, which is when the types are exactly the source's.
+  exactTypes: boolean;
+}
+
+export interface ResultTableOutcomeDto { table: string; rows: number; createSql: string }
+
+export const planResultTable = (body: ResultTableRequest): Promise<ResultTablePlanDto> =>
+  fetch(`${base}/result-table/plan`, json("POST", body)).then(r => ok<ResultTablePlanDto>(r));
+
+export const keepResultAsTable = (body: ResultTableRequest): Promise<ResultTableOutcomeDto> =>
+  fetch(`${base}/result-table`, json("POST", body)).then(r => ok<ResultTableOutcomeDto>(r));
+
 export const deleteArchive = (name: string): Promise<void> =>
   fetch(`${base}/archives/${encodeURIComponent(name)}`, { method: "DELETE" }).then(r => ok<void>(r));
 

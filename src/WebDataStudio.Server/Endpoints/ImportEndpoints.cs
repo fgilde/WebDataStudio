@@ -33,6 +33,11 @@ public static class ImportEndpoints
     public record CopyTableRequest(string SourceConnectionId, string SourceRef,
         string TargetConnectionId, string TargetTable, int? MaxRows);
 
+    /// A statement's result, kept as a table. The target defaults to the connection the statement
+    /// ran on, which is what "keep this" usually means.
+    public record ResultTableRequest(string ConnectionId, string Sql, string Table,
+        string? Schema, string? TargetConnectionId, int? MaxRows);
+
     private const long MaxUploadBytes = 512L * 1024 * 1024;
 
     public static void MapImportEndpoints(this WebApplication app)
@@ -236,6 +241,50 @@ public static class ImportEndpoints
             }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         }).DisableAntiforgery();
+
+        // "I have just worked out this join and I will need it again." The result of any statement,
+        // kept as a table — here, or in another connection.
+        app.MapPost("/api/result-table/plan", async (ResultTableRequest body, SessionFactory factory,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var plan = await new ResultTableImport(factory).PlanAsync(
+                    body.ConnectionId, body.Sql, body.TargetConnectionId ?? body.ConnectionId,
+                    body.Schema ?? "", body.Table, ct);
+
+                return Results.Ok(plan);
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (InvalidOperationException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        app.MapPost("/api/result-table", async (ResultTableRequest body, SessionFactory factory,
+            CancellationToken ct) =>
+        {
+            if (body.Table is not { Length: > 0 })
+                return Results.BadRequest(new { message = "the new table needs a name" });
+
+            try
+            {
+                var outcome = await new ResultTableImport(factory).RunAsync(
+                    body.ConnectionId, body.Sql, body.TargetConnectionId ?? body.ConnectionId,
+                    body.Schema ?? "", body.Table, body.MaxRows ?? int.MaxValue, ct);
+
+                return Results.Ok(outcome);
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (NotSupportedException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (InvalidOperationException e)
+            {
+                // A read-only target and a statement with no columns land here: the caller's
+                // mistake, not the engine's.
+                return Results.Json(new { message = e.Message }, statusCode: StatusCodes.Status403Forbidden);
+            }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
 
         app.MapPost("/api/copy-table", async (CopyTableRequest body, SessionFactory factory, CancellationToken ct) =>
         {

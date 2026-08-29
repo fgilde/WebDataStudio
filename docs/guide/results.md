@@ -187,6 +187,24 @@ those are read-only in the UI — a copy under another id is the way to change o
 The **Copy** menu puts the result on the clipboard as CSV, JSON or a Markdown table, and a
 selection as a SQL `IN` list — the fastest way to move a set of ids into the next query.
 
+## Keep this result as a table
+
+**As table** next to a result writes it back into a database as a table of its own: the join you
+have just worked out, kept for the next time somebody asks.
+
+The dialog names it, offers a schema, and asks which connection it goes into — this one by default,
+any other if the answer belongs somewhere else. Before anything is created it shows the exact
+`CREATE TABLE`, and:
+
+- **Same engine on both sides**, and the columns keep the types they already have.
+- **Another engine**, and each column gets the nearest type the target has — widened rather than
+  guessed at, because a column you can narrow afterwards beats one that quietly rounded.
+- A column with no name becomes `column1`; two columns with the same name become `name` and
+  `name_2`. Both are ordinary in a result and impossible in a table.
+
+The rows are read from the database again rather than copied off the screen, so what lands in the
+table is the whole result and not the first page of it. A read-only connection refuses, and says so.
+
 ## Import
 
 **Import into this table…** in the explorer's context menu reads CSV, Excel, JSON or SQL, shows a

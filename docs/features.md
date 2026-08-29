@@ -61,8 +61,9 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F6.3 | Change-script preview before applying — always, not optional | done | all | Data tab |
 | F6.4 | Tables without a primary key: a unique index, then the engine's own row address (`ctid`, `ROWID`, `rowid`); blocked with a clear reason where there is neither | done | all | Data tab |
 | F6.5 | Foreign-key lookup dropdown while editing | done | all | Data tab |
-| F6.14 | Paste rows from the clipboard as inserts — tab or comma, header by name, quoted cells, blank means null | done | all | Data tab |
 | F6.6 | Bulk update over a selection via macro or expression | done | all | Data tab |
+| F6.7 | Paste rows from the clipboard as inserts — tab or comma, header by name, quoted cells, blank means null | done | all | Data tab |
+| F6.8 | Keep a result as a new table, in this connection or another one, with the `CREATE TABLE` shown first | done | all | Result toolbar |
 | F7.1 | Export to CSV, TSV, Excel (xlsx), JSON, NDJSON, XML, YAML, Markdown, HTML, SQL INSERTs, SQL CREATE+INSERT, Parquet | done | all | Export and import dialogs |
 | F7.2 | Export scope: selection, current page, whole result, whole table, whole schema | partial: the dialog exports the result, a table or a whole schema; a selection goes through the copy actions | all | Export dialog, result copy menu |
 | F7.3 | Streaming export with no server-side materialisation | done | all | Export and import dialogs |

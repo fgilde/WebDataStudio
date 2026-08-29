@@ -77,17 +77,23 @@ public sealed class SeedScripts(
     {
         try
         {
-            if (File.Exists(options.Path)) return File.ReadAllText(options.Path);
-            if (!Directory.Exists(options.Path)) return null;
-
-            var candidates = new[]
+            // The setting may name several files or folders: what the repository ships and what an
+            // app host wrote. The first one that has a script for this connection wins.
+            foreach (var path in ConfiguredPaths.Split(options.Path))
             {
-                Path.Combine(options.Path, $"{connectionName}.sql"),
-                Path.Combine(options.Path, $"{connectionName.ToLowerInvariant()}.sql"),
-            };
+                if (File.Exists(path)) return File.ReadAllText(path);
+                if (!Directory.Exists(path)) continue;
 
-            var file = candidates.FirstOrDefault(File.Exists);
-            return file is null ? null : File.ReadAllText(file);
+                var file = new[]
+                {
+                    Path.Combine(path, $"{connectionName}.sql"),
+                    Path.Combine(path, $"{connectionName.ToLowerInvariant()}.sql"),
+                }.FirstOrDefault(File.Exists);
+
+                if (file is not null) return File.ReadAllText(file);
+            }
+
+            return null;
         }
         catch (Exception e)
         {

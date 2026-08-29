@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using WebDataStudio.Server.Drivers.Abstractions;
+using WebDataStudio.Server.Services;
 
 namespace WebDataStudio.Server.Export;
 
@@ -202,7 +203,8 @@ public sealed class ExportTemplates
 
         try
         {
-            foreach (var file in Directory.EnumerateFiles(directory, "*.json"))
+            // One setting, one or more folders — a repository's templates and an app host's own.
+            foreach (var file in ConfiguredPaths.Files(directory, "*.json", SearchOption.TopDirectoryOnly))
                 if (JsonSerializer.Deserialize<ExportTemplate>(File.ReadAllText(file), Json)
                     is { } template)
                     _fromDisk.Add(template);

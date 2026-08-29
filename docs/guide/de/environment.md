@@ -46,6 +46,18 @@ WDS_CONN_LOCAL=sqlite:///data/local.db
 Erkannte Schemata: `postgres`, `postgresql`, `mysql`, `mariadb`, `sqlserver`, `mssql`, `sqlite`,
 `oracle`, `duckdb`, `clickhouse`, `mongodb`, `redis`.
 
+**Mehrere Pfade in einer Einstellung.** `WDS_SAVED_QUERIES_DIR`, `WDS_EXPORT_TEMPLATES_DIR`,
+`WDS_QUALITY_FILE` und `WDS_SEED_SQL` nehmen je einen Pfad oder eine Liste davon, getrennt durch
+`;`. So zählt beides — was ein Repository mitliefert und was ein App-Host geschrieben hat —, statt
+dass das zweite das erste stillschweigend ersetzt:
+
+```bash
+WDS_SAVED_QUERIES_DIR=/data/queries;/data/queries-inline
+```
+
+Aus einem Aspire-AppHost sind das `WithSavedQueriesFromDirectory(...)` und `WithSavedQueries(...)`
+zusammen.
+
 ## Verbindungen als Provider-Verbindungszeichenfolge
 
 Dieselbe Variable nimmt auch die Verbindungszeichenfolge, die ein Provider erzeugt — genau das, was

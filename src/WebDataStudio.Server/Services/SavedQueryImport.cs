@@ -40,7 +40,12 @@ public sealed partial class SavedQueryImport(
     {
         if (!options.Configured) return 0;
 
-        if (!Directory.Exists(options.Directory))
+        // One setting, one or more folders: what the repository ships and what an app host wrote
+        // both belong here, and neither should push the other out.
+        var files = ConfiguredPaths.Files(options.Directory, "*.sql").Take(500).ToList();
+
+        if (files.Count == 0 && ConfiguredPaths.Split(options.Directory)
+            .All(path => !Directory.Exists(path) && !File.Exists(path)))
         {
             log.LogWarning("the saved-query directory {Directory} does not exist", options.Directory);
             return 0;
@@ -49,9 +54,7 @@ public sealed partial class SavedQueryImport(
         var existing = SafeList();
         var written = 0;
 
-        foreach (var file in Directory.EnumerateFiles(options.Directory, "*.sql", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .Take(500))
+        foreach (var file in files)
         {
             try
             {

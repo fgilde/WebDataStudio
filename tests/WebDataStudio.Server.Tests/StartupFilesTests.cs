@@ -92,6 +92,31 @@ public class StartupFilesTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, byName["stray"].GetProperty("folder").ValueKind);
     }
 
+    /// One setting, two folders: what the repository ships and what an app host wrote. Before this
+    /// the second one silently replaced the first.
+    [Fact]
+    public async Task Two_folders_of_queries_both_arrive()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        WriteQuery("from-the-repo.sql", "SELECT 1");
+
+        var second = Path.Combine(_dir, "queries-inline");
+        Directory.CreateDirectory(second);
+        await File.WriteAllTextAsync(Path.Combine(second, "from-the-app-host.sql"), "SELECT 2", ct);
+
+        using var factory = Factory(extra: ("WDS_SAVED_QUERIES_DIR", $"{Queries};{second}"));
+        var client = factory.CreateClient();
+
+        Assert.Equal(2, factory.Services.GetRequiredService<SavedQueryImport>().Import());
+
+        var saved = await client.GetFromJsonAsync<JsonElement>("/api/saved-queries", ct);
+        var names = saved.EnumerateArray()
+            .Select(query => query.GetProperty("name").GetString()).ToList();
+
+        Assert.Contains("from-the-repo", names);
+        Assert.Contains("from-the-app-host", names);
+    }
+
     /// A restart must not grow the list — the same file is the same query.
     [Fact]
     public void Importing_twice_replaces_rather_than_duplicates()

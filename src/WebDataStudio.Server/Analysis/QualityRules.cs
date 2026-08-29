@@ -260,11 +260,9 @@ public sealed class QualityRunner(
 
         try
         {
-            var paths = File.Exists(file.Path)
-                ? [file.Path]
-                : Directory.Exists(file.Path)
-                    ? Directory.GetFiles(file.Path, "*.json").OrderBy(name => name).ToArray()
-                    : Array.Empty<string>();
+            // A file counts as itself, a folder as its .json files — and the setting may name
+            // several of either, so a repository's rules and an app host's own can live together.
+            var paths = ConfiguredPaths.Files(file.Path, "*.json", SearchOption.TopDirectoryOnly).ToArray();
 
             foreach (var path in paths)
                 foreach (var entry in JsonSerializer.Deserialize<List<QualityFileRule>>(

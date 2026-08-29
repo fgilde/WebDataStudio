@@ -64,6 +64,18 @@ or ids; empty means all of them. The secret is either a PBKDF2 hash or a literal
 of columns that look like secrets is on by default and has no variable — it is corrected per column
 from the data tab, which is described in [Safety](safety.md).
 
+**Several paths in one setting.** `WDS_SAVED_QUERIES_DIR`, `WDS_EXPORT_TEMPLATES_DIR`,
+`WDS_QUALITY_FILE` and `WDS_SEED_SQL` each take one path or a list of them separated by `;`, so what
+a repository ships and what an app host wrote both count rather than the second silently replacing
+the first:
+
+```bash
+WDS_SAVED_QUERIES_DIR=/data/queries;/data/queries-inline
+```
+
+From an Aspire app host that is `WithSavedQueriesFromDirectory(...)` and `WithSavedQueries(...)`
+together — see the [package](https://github.com/fgilde/Nextended).
+
 ## Signing in with a provider
 
 ```bash

@@ -32,7 +32,7 @@
 | `WDS_PREFERENCES_FILE` | womit ein Studio startet, bevor jemand eine Einstellung geändert hat — Zeitzone, Zeilen pro Seite und der Rest |
 | `WDS_SAFETY_NET`, `WDS_SAFETY_MAX_ROWS` | die Zeilen sichern, bevor ein Statement alle nimmt: `DELETE`/`UPDATE` ohne `WHERE`, `TRUNCATE` |
 | `WDS_PUBLIC_URL` | unter welcher Adresse dieses Studio von außen erreichbar ist, damit ein Alert zurück auf den Fundort verlinken kann |
-| `WDS_MAX_SESSIONS` | offene Sitzungen je Verbindung, Vorgabe `8` |
+| `WDS_MAX_SESSIONS` | offene Sitzungen je Verbindung, Vorgabe `8`. Eine Anfrage wartet bis zu 30 Sekunden auf eine freie und bekommt dann gesagt, dass alle belegt sind — ein Warten ohne Ende sieht genauso aus wie ein eingefrorenes Studio |
 | `WDS_IDLE_TIMEOUT_SECONDS` | wie lange eine ungenutzte Sitzung offen bleibt, Vorgabe `300` |
 | `WDS_OPEN_BROWSER` | `true` öffnet beim Start einen Browser (Vorgabe der Desktop-Builds) |
 | `WDS_ARCHIVE_DIR`, `WDS_ARCHIVE_MAX_ROWS` | wohin behaltene Ergebnisse geschrieben werden und wie viele Zeilen eines behält — siehe [Ergebnisse](results.md) |

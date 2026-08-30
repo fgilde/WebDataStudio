@@ -27,6 +27,16 @@ internal sealed class PooledSession(IDbSession inner, SessionPool pool, string c
 /// Keeps open sessions around between requests and caps how many a single connection may hold.
 /// The ADO providers pool their own connections underneath; this layer exists for the cap and for
 /// the engines whose clients do not pool at all.
+/// Every session this connection allows is in use, and none came free.
+///
+/// Usually somebody is running something long on the same connection. Where it is not, it is a
+/// session that was borrowed and never given back — which is worth saying plainly, because the
+/// symptom on its own is a studio that appears to have frozen.
+public sealed class SessionsBusyException(int limit, TimeSpan waited)
+    : Exception($"all {limit} session(s) this connection allows are in use, and none came free "
+                + $"within {waited.TotalSeconds:0} seconds. Something long may still be running on "
+                + "it; raise WDS_MAX_SESSIONS if this connection needs more at once.");
+
 public sealed class SessionPool : IAsyncDisposable
 {
     private sealed record Idle(IDbSession Session, DateTimeOffset Since);
@@ -49,11 +59,20 @@ public sealed class SessionPool : IAsyncDisposable
         _sweeper = new Timer(_ => Sweep(), null, interval, interval);
     }
 
+    /// How long a request waits for a session before the studio says what is going on.
+    ///
+    /// A wait is normal — somebody's report is running and this connection allows four at a time.
+    /// An endless wait is not: it looks exactly like a studio that has frozen, and a browser only
+    /// gives one host six connections at once, so a handful of them takes the whole window down
+    /// with them. After this, the answer is a sentence.
+    public static readonly TimeSpan SlotWait = TimeSpan.FromSeconds(30);
+
     /// Waits for a slot, then reuses an idle session or opens a fresh one through `open`.
     public async Task<IDbSession> RentAsync(string connectionId, Func<CancellationToken, Task<IDbSession>> open,
         CancellationToken ct)
     {
-        await Slot(connectionId).WaitAsync(ct);
+        if (!await Slot(connectionId).WaitAsync(SlotWait, ct))
+            throw new SessionsBusyException(MaxSessions, SlotWait);
 
         try
         {

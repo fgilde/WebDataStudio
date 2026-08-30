@@ -49,7 +49,7 @@
 | `WDS_CONN_<NAME>_SCHEMAS` | read only these schemas on that connection — see [Explorer and panels](explorer.md) |
 | `WDS_EXPORT_TEMPLATES_DIR` | folder of export templates the deployment ships — see [Results and export](results.md) |
 | `WDS_QUALITY_FILE` | data quality rules the deployment owns, as JSON — see [Administration](administration.md#data-quality) |
-| `WDS_MAX_SESSIONS` | open sessions per connection, default `8` |
+| `WDS_MAX_SESSIONS` | open sessions per connection, default `8`. A request waits up to 30 seconds for one and is then told that they are all in use — a wait without an end looks exactly like a studio that has frozen |
 | `WDS_IDLE_TIMEOUT_SECONDS` | how long an unused session stays open, default `300` |
 | `WDS_OPEN_BROWSER` | `true` opens the studio on start (the default for desktop builds); `false` opens nothing |
 | `WDS_APP_WINDOW` | `false` opens a plain browser tab instead of a window of its own — see [Getting started](getting-started.md#as-a-desktop-application) |

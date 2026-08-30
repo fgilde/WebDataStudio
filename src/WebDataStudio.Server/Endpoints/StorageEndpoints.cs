@@ -99,8 +99,6 @@ public static class StorageEndpoints
             try
             {
                 var (_, session) = await factory.OpenAsync(conn, ct);
-                // The session goes back to the pool when the response has been written; the stream
-                // it produced is what the response body is.
                 var store = StoreOf(session);
                 if (store is null)
                 {
@@ -118,7 +116,12 @@ public static class StorageEndpoints
                     return Results.NotFound(new { message = $"no object '{key}'" });
                 }
 
-                var stream = await store.OpenReadAsync(key, ct);
+                // The body outlives this handler: the bytes are still being read from the bucket
+                // long after it returns. So the session travels with the stream and is handed back
+                // when ASP.NET closes it — which it does whether the response finished or the
+                // client went away. Without that, every file downloaded costs the connection one
+                // of its session slots, permanently, and the fourth one makes it hang.
+                var stream = new SessionOwningStream(await store.OpenReadAsync(key, ct), session);
 
                 // A range-enabled response is what a video player needs to seek, and it needs a
                 // seekable stream to answer one — which is why only the shown-in-place case asks for

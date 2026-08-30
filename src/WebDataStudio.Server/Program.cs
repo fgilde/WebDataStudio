@@ -352,6 +352,22 @@ app.Use(async (ctx, next) =>
         ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
         await ctx.Response.WriteAsJsonAsync(new { message = e.Message });
     }
+    // Every session a connection allows is in use. Said here rather than in each of twenty
+    // endpoints, and said at all: a request that waits forever looks like a studio that has frozen,
+    // and a browser gives one host six connections — a handful of these takes the window with them.
+    catch (SessionsBusyException e) when (!ctx.Response.HasStarted)
+    {
+        startupLog.LogWarning("{Path}: {Message}", ctx.Request.Path, e.Message);
+        ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        await ctx.Response.WriteAsJsonAsync(new { message = e.Message });
+    }
+    // Something this studio reads from stopped answering. Not its fault, and not a bad request.
+    catch (WebDataStudio.Server.Storage.StorageUnreachableException e) when (!ctx.Response.HasStarted)
+    {
+        startupLog.LogWarning("{Path}: {Message}", ctx.Request.Path, e.Message);
+        ctx.Response.StatusCode = StatusCodes.Status504GatewayTimeout;
+        await ctx.Response.WriteAsJsonAsync(new { message = e.Message });
+    }
 });
 
 app.UseDefaultFiles();

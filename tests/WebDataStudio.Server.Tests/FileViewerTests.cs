@@ -1,7 +1,9 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
+using WebDataStudio.Server.Endpoints;
 using WebDataStudio.Server.Services;
 
 namespace WebDataStudio.Server.Tests;
@@ -65,6 +67,76 @@ public class FileViewerTests : IDisposable
 
         Assert.Equal("https://intranet/mudex.js",
             body.GetProperty("fileViewer").GetProperty("script").GetString());
+    }
+
+    // --- the page the viewer runs on ---------------------------------------------------------------
+
+    [Fact]
+    public async Task The_frame_is_a_page_of_its_own_that_loads_the_viewer()
+    {
+        using var factory = Factory(null);
+
+        var page = await factory.CreateClient().GetStringAsync(
+            "/api/viewer/frame?url=%2Fapi%2Fstorage%2Fc1%2Fdownload%3Fref%3Dx&name=q.xlsx"
+            + "&type=application%2Fvnd.ms-excel&dark=true", Ct);
+
+        Assert.Contains(FileViewerOptions.Default, page);
+        Assert.Contains("mudex-file-display", page);
+        Assert.Contains("/api/storage/c1/download?ref=x", page);
+        Assert.Contains("\"dark\": true", page.Replace(" ", "").Replace("\"dark\":true", "\"dark\": true"));
+
+        // As an attribute: this element has a `style` property of its own, a string, and setting
+        // `style.display` on it throws — which is what turned the studio's page grey.
+        Assert.Contains("setAttribute(\"style\"", page);
+        Assert.DoesNotContain("element.style.", page);
+
+        // The two the component needs said as attributes, the way its own documentation shows.
+        Assert.Contains("\"dense\", \"true\"", page);
+        Assert.Contains("\"show-file-name\", \"false\"", page);
+    }
+
+    [Fact]
+    public async Task The_frame_opens_only_what_this_studio_serves()
+    {
+        using var factory = Factory(null);
+        var client = factory.CreateClient();
+
+        // A link to this page must not become a way to frame somebody else's site, or to have the
+        // viewer fetch an address a visitor picked.
+        foreach (var elsewhere in new[]
+        {
+            "https://example.org/x.pdf", "//example.org/x.pdf", "http://localhost:9/x", "",
+        })
+        {
+            var response = await client.GetAsync(
+                $"/api/viewer/frame?url={Uri.EscapeDataString(elsewhere)}&name=x", Ct);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+    }
+
+    [Fact]
+    public void What_counts_as_ours()
+    {
+        Assert.True(ViewerEndpoints.IsOurs("/api/storage/c1/download?ref=x"));
+        // A file the browser made for itself, out of a cell's bytes.
+        Assert.True(ViewerEndpoints.IsOurs("blob:http://localhost:8080/2b6f0"));
+
+        Assert.False(ViewerEndpoints.IsOurs("//example.org/x"));
+        Assert.False(ViewerEndpoints.IsOurs("https://example.org/x"));
+        Assert.False(ViewerEndpoints.IsOurs("javascript:alert(1)"));
+        Assert.False(ViewerEndpoints.IsOurs(""));
+    }
+
+    [Fact]
+    public async Task A_studio_without_a_viewer_has_no_page_either()
+    {
+        using var factory = Factory("");
+
+        var response = await factory.CreateClient().GetAsync(
+            "/api/viewer/frame?url=%2Fapi%2Fstorage%2Fx&name=a.csv", Ct);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]

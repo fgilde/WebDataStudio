@@ -130,9 +130,14 @@ The built-in preview already shows what a browser renders by itself: images, PDF
 text. **View** is for the rest of them — a spreadsheet, a Word document, a markdown file, an
 archive — through [MudEx](https://www.mudex.org/webcomponents.html)'s file display.
 
-It carries a WebAssembly runtime, which is far too much to bundle into a studio that is mostly a
-grid, so it is fetched the first time somebody asks for it and never before. That has two
-consequences worth knowing:
+It runs on a page of its own, inside a frame, and that is not an accident. The component puts its
+stylesheets — MudBlazor, Roboto and five more — into whatever document loads it, which repaints the
+studio white and changes its font; and its WebAssembly runtime refuses to start in a frame without
+a real address of its own. A page the studio serves at `/api/viewer/frame` gives it a document to
+redecorate and takes the runtime away again when the window closes.
+
+It is fetched the first time somebody asks for it and never before. That has two consequences worth
+knowing:
 
 - A studio with no way out to the internet says so instead of showing an empty box, and everything
   else — the preview, the download, *Save as…* — still works.

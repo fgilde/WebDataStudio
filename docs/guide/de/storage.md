@@ -136,9 +136,13 @@ Audio und Text. **View** ist für den Rest — eine Tabellenkalkulation, ein Wor
 Markdown-Datei, ein Archiv — über die File-Display-Komponente von
 [MudEx](https://www.mudex.org/webcomponents.html).
 
-Sie bringt eine WebAssembly-Laufzeit mit; das ist viel zu viel, um es in ein Studio zu bündeln, das
-größtenteils ein Grid ist. Deshalb wird sie erst geholt, wenn jemand sie das erste Mal braucht — und
-vorher nie. Daraus folgt zweierlei:
+Sie läuft auf einer eigenen Seite in einem Frame, und das hat Gründe. Die Komponente legt ihre
+Stylesheets — MudBlazor, Roboto und fünf weitere — in das Dokument, das sie lädt; das färbt das
+Studio weiß und ändert seine Schrift. Und ihre WebAssembly-Laufzeit startet nicht in einem Frame
+ohne eigene Adresse. Die Seite, die das Studio unter `/api/viewer/frame` ausliefert, gibt ihr ein
+Dokument zum Umdekorieren — und räumt die Laufzeit wieder weg, wenn das Fenster zugeht.
+
+Geholt wird sie erst, wenn jemand sie das erste Mal braucht — vorher nie. Daraus folgt zweierlei:
 
 - Ein Studio ohne Weg ins Internet sagt das, statt eine leere Fläche zu zeigen; alles andere —
   Vorschau, Download, *Save as…* — funktioniert weiterhin.

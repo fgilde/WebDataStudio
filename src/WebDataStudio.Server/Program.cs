@@ -418,6 +418,7 @@ app.MapAdminEndpoints();
 app.MapRedisEndpoints();
 app.MapNotifyEndpoints();
 app.MapDictionaryEndpoints();
+app.MapViewerEndpoints();
 app.MapDiagramEndpoints();
 app.MapSavedQueryEndpoints();
 app.MapDashboardEndpoints();

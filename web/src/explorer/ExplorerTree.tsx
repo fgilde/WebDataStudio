@@ -114,6 +114,11 @@ function TreeLevel({ conn, parent, depth, caps, refresh, onSelect, onAction, onD
     onAction(action, { connectionId: conn, node });
   };
 
+  // A level that answered with nothing said nothing at all: the chevron opened onto blank space,
+  // and an empty container looked exactly like one that failed to load.
+  if (visible.length === 0)
+    return <Text c="dimmed" size="xs" pl={pad + 8} py={2}>empty</Text>;
+
   return (
     <>
       {visible.map(node => (

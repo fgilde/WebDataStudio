@@ -4,104 +4,106 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
 import { FileViewerModal } from "./FileViewerModal";
 
-const loadFileViewer = vi.fn();
+const viewerAvailable = vi.fn();
 
-vi.mock("./fileViewer", () => ({ loadFileViewer: () => loadFileViewer() }));
+vi.mock("./fileViewer", () => ({
+  viewerAvailable: () => viewerAvailable(),
+  viewerFrameUrl: (file: { url: string; name: string }, dark: boolean) =>
+    `/api/viewer/frame?url=${encodeURIComponent(file.url)}&name=${file.name}${dark ? "&dark=true" : ""}`,
+}));
 
-const file = { url: "/api/storage/o?inline=true", name: "quarter.xlsx", contentType: "application/vnd.ms-excel" };
+const file = {
+  url: "/api/storage/c1/download?ref=x&inline=true",
+  name: "quarter.xlsx",
+  contentType: "application/vnd.ms-excel",
+};
 
 const show = (open = true) => render(
   <MantineProvider>
     <FileViewerModal file={open ? file : null} onClose={() => {}} />
   </MantineProvider>);
 
-const element = () => document.querySelector("mudex-file-display");
+const frame = () => document.querySelector("iframe");
+
+/// The frame reports on itself, and only the frame's own words count.
+const say = (mudex: string, detail?: string, from: Window | null | undefined = undefined) =>
+  window.dispatchEvent(new MessageEvent("message", {
+    data: { mudex, detail },
+    source: (from === undefined ? frame()?.contentWindow : from) as MessageEventSource | null,
+  }));
 
 beforeEach(() => {
   cleanup();
   vi.clearAllMocks();
-  loadFileViewer.mockResolvedValue(true);
+  viewerAvailable.mockResolvedValue(true);
 });
 
 describe("FileViewerModal", () => {
-  it("fetches the viewer only when something is opened", () => {
+  it("asks for the viewer only when something is opened", () => {
     show(false);
-    expect(loadFileViewer).not.toHaveBeenCalled();
+    expect(viewerAvailable).not.toHaveBeenCalled();
   });
 
-  it("hands the component the file, dense, with its name and type", async () => {
+  it("keeps the component in a frame, so its stylesheets stay off the studio", async () => {
     show();
 
-    await waitFor(() => expect(element()).toBeTruthy());
+    await waitFor(() => expect(frame()).toBeTruthy());
 
-    expect(element()!.getAttribute("url")).toBe(file.url);
-    expect(element()!.getAttribute("file-name")).toBe(file.name);
-    expect(element()!.getAttribute("content-type")).toBe(file.contentType);
-
-    // The modal has the name in its title already.
-    expect(element()!.getAttribute("show-file-name")).toBe("false");
-    expect(element()!.getAttribute("dense")).toBe("true");
+    // Nothing of the component's is in this document: no element, no script, no stylesheet. The
+    // WebAssembly runtime also refuses to start in a srcdoc frame, so the page has a real URL.
+    expect(document.querySelector("mudex-file-display")).toBeNull();
+    expect(document.querySelector("head script[src*='mudex']")).toBeNull();
+    expect(frame()!.getAttribute("srcdoc")).toBeNull();
+    expect(frame()!.getAttribute("src")).toContain("/api/viewer/frame");
   });
 
-  it("puts the element there by hand, outside what React manages", async () => {
+  it("hands the frame the file it is meant to show", async () => {
     show();
-    await waitFor(() => expect(element()).toBeTruthy());
+    await waitFor(() => expect(frame()).toBeTruthy());
 
-    // The component starts a WebAssembly runtime and rewrites what is inside its tag. React
-    // expecting to own that node is what turned the whole page grey, so the node is not React's.
-    const parent = element()!.parentElement!;
-    expect(parent.tagName).toBe("DIV");
-
-    // Whatever the component does to its own contents, React has nothing to reconcile.
-    element()!.append(document.createElement("span"));
-    expect(element()!.childElementCount).toBe(1);
+    expect(frame()!.getAttribute("src")).toContain(encodeURIComponent(file.url));
   });
 
-  it("takes the element away again when the file changes", async () => {
-    const { rerender } = show();
-    await waitFor(() => expect(element()).toBeTruthy());
-
-    rerender(
-      <MantineProvider>
-        <FileViewerModal file={{ ...file, url: "/other", name: "other.docx" }} onClose={() => {}} />
-      </MantineProvider>);
-
-    await waitFor(() => expect(document.querySelectorAll("mudex-file-display")).toHaveLength(1));
-    expect(element()!.getAttribute("url")).toBe("/other");
-  });
-
-  it("does not take the studio with it when the viewer throws", async () => {
-    // Rendering the element is what fails here — the boundary is the difference between a message
-    // in a modal and a grey page.
-    const create = document.createElement.bind(document);
-
-    vi.spyOn(document, "createElement").mockImplementation(tag => {
-      if (tag === "mudex-file-display") throw new Error("boom");
-      return create(tag);
-    });
-
+  it("shows the frame once it says it is ready", async () => {
     show();
+    await waitFor(() => expect(frame()).toBeTruthy());
 
-    await waitFor(() =>
-      expect(screen.getByText(/file viewer could not be shown/i)).toBeTruthy());
+    expect(frame()!.style.display).toBe("none");
+    expect(screen.getByText(/fetching the viewer/i)).toBeTruthy();
+
+    say("ready");
+    await waitFor(() => expect(frame()!.style.display).toBe("block"));
   });
 
-  it("says what happened when the viewer cannot be fetched", async () => {
-    loadFileViewer.mockResolvedValue(false);
+  it("says what the frame said when it fails", async () => {
+    show();
+    await waitFor(() => expect(frame()).toBeTruthy());
+
+    say("failed", "the viewer could not be fetched");
+
+    await waitFor(() => expect(screen.getByText(/could not be fetched/)).toBeTruthy());
+  });
+
+  it("ignores anything that is not this frame talking", async () => {
+    show();
+    await waitFor(() => expect(frame()).toBeTruthy());
+
+    // Another tab, another frame, an extension: none of them is the viewer reporting on itself.
+    say("ready", "", null);
+    say("failed", "not from here", null);
+    window.dispatchEvent(new MessageEvent("message", { data: "a string" }));
+
+    expect(screen.getByText(/fetching the viewer/i)).toBeTruthy();
+  });
+
+  it("says so for a studio with no viewer at all", async () => {
+    viewerAvailable.mockResolvedValue(false);
     show();
 
     await waitFor(() =>
       expect(screen.getByText(/file viewer could not be shown/i)).toBeTruthy());
 
-    expect(element()).toBeNull();
-  });
-
-  it("does not leave an empty box when the fetch throws", async () => {
-    loadFileViewer.mockRejectedValue(new Error("offline"));
-    show();
-
-    await waitFor(() =>
-      expect(screen.getByText(/file viewer could not be shown/i)).toBeTruthy());
+    expect(frame()).toBeNull();
   });
 
   it("shows the file's name as the title", async () => {

@@ -1,74 +1,45 @@
-import { health } from "../api";
+import { base, health } from "../api";
 
 /// The rich file viewer: MudEx's `<mudex-file-display>`, which renders the things a browser will
 /// not — a spreadsheet, a Word document, a markdown file, an archive — on top of the images, PDFs
 /// and video the built-in preview already shows.
 ///
-/// It carries a WebAssembly runtime, so it is fetched the first time somebody asks to look at a
-/// file and never as part of the studio. A deployment with no way out to the internet points
-/// `WDS_FILE_VIEWER_URL` at its own copy, or sets it to nothing to switch the viewer off.
+/// It runs on a page of its own, which the studio serves at `/api/viewer/frame`, and this module
+/// only says whether there is one to open. Two reasons it cannot live in this document: the
+/// component puts its stylesheets wherever it is loaded, which repaints the studio, and its
+/// WebAssembly runtime refuses to start in a `srcdoc` frame — a real URL is the price of admission.
 
-let loading: Promise<boolean> | null = null;
-let scriptUrl: string | null | undefined;
+let available: boolean | undefined;
 
-/// Where the viewer comes from, as the server says. Asked once.
-export async function viewerScriptUrl(): Promise<string | null> {
-  if (scriptUrl !== undefined) return scriptUrl;
+/// Whether this studio has a viewer at all. Asked once; a deployment can switch it off.
+export async function viewerAvailable(): Promise<boolean> {
+  if (available !== undefined) return available;
 
   try {
     const state = await health();
-    scriptUrl = state.fileViewer?.script ?? null;
+    available = Boolean(state.fileViewer?.script);
   } catch {
     // A studio that cannot answer is a studio without a viewer, not a broken page.
-    scriptUrl = null;
+    available = false;
   }
 
-  return scriptUrl;
+  return available;
 }
 
-/// Loads it, once per session. Resolves false when there is nothing to load or the load failed —
-/// the caller then says so rather than showing an empty box forever.
-export function loadFileViewer(): Promise<boolean> {
-  loading ??= (async () => {
-    const url = await viewerScriptUrl();
-    if (!url) return false;
+/// The page to put in the frame, for one file.
+export function viewerFrameUrl(
+  file: { url: string; name: string; contentType?: string | null },
+  dark: boolean,
+): string {
+  const query = new URLSearchParams({ url: file.url, name: file.name });
 
-    // Somebody else may have put it there already — a second studio panel, or a reload of this one.
-    if (customElements.get("mudex-file-display")) return true;
+  if (file.contentType) query.set("type", file.contentType);
+  if (dark) query.set("dark", "true");
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const existing = document.querySelector<HTMLScriptElement>(`script[data-mudex="${url}"]`);
-        if (existing) {
-          existing.addEventListener("load", () => resolve());
-          existing.addEventListener("error", () => reject(new Error("could not be loaded")));
-          return;
-        }
-
-        const script = document.createElement("script");
-        script.src = url;
-        script.async = true;
-        script.dataset.mudex = url;
-        script.addEventListener("load", () => resolve());
-        script.addEventListener("error", () => reject(new Error("could not be loaded")));
-        document.head.appendChild(script);
-      });
-
-      // The loader defines the element once its runtime is up; waiting for that is what makes the
-      // difference between an empty box and a viewer.
-      await customElements.whenDefined("mudex-file-display");
-      return true;
-    } catch {
-      // Failed once, and asking again on every click would only make the studio feel slow.
-      return false;
-    }
-  })();
-
-  return loading;
+  return `${base}/viewer/frame?${query}`;
 }
 
-/// Only for tests: forget what was loaded and what the server said.
+/// Only for tests: forget what the server said.
 export function resetFileViewer(): void {
-  loading = null;
-  scriptUrl = undefined;
+  available = undefined;
 }

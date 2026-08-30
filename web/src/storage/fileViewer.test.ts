@@ -1,30 +1,15 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { loadFileViewer, resetFileViewer, viewerScriptUrl } from "./fileViewer";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { resetFileViewer, viewerAvailable, viewerFrameUrl } from "./fileViewer";
 
 const health = vi.fn();
 
-vi.mock("../api", () => ({ health: () => health() }));
+vi.mock("../api", () => ({ base: "/api", health: () => health() }));
 
-/// The loader appends a script and waits for it. Nothing fetches anything in a test, so the event
-/// it waits for is fired by hand — and the element it waits for is defined by hand too.
-const answerScript = (outcome: "load" | "error") => {
-  const append = HTMLHeadElement.prototype.appendChild;
-
-  vi.spyOn(document.head, "appendChild").mockImplementation(node => {
-    if (node instanceof HTMLScriptElement) {
-      queueMicrotask(() => {
-        if (outcome === "load") {
-          if (!customElements.get("mudex-file-display"))
-            customElements.define("mudex-file-display", class extends HTMLElement {});
-        }
-        node.dispatchEvent(new Event(outcome));
-      });
-      return node;
-    }
-
-    return append.call(document.head, node) as typeof node;
-  });
+const file = {
+  url: "/api/storage/c1/download?ref=x&inline=true",
+  name: "quarter.xlsx",
+  contentType: "application/vnd.ms-excel",
 };
 
 beforeEach(() => {
@@ -33,72 +18,62 @@ beforeEach(() => {
   health.mockResolvedValue({ fileViewer: { script: "https://example.test/mudex.js" } });
 });
 
-afterEach(() => vi.restoreAllMocks());
-
-describe("where the viewer comes from", () => {
+describe("whether there is a viewer", () => {
   it("is what the server says", async () => {
-    expect(await viewerScriptUrl()).toBe("https://example.test/mudex.js");
+    expect(await viewerAvailable()).toBe(true);
   });
 
-  it("is asked for once, however many files are opened", async () => {
-    await viewerScriptUrl();
-    await viewerScriptUrl();
+  it("is asked once, however many files are opened", async () => {
+    await viewerAvailable();
+    await viewerAvailable();
 
     expect(health).toHaveBeenCalledTimes(1);
   });
 
-  it("is nothing for a studio told to do without one", async () => {
+  it("is no for a studio told to do without one", async () => {
     health.mockResolvedValue({ fileViewer: null });
-    expect(await viewerScriptUrl()).toBeNull();
+    expect(await viewerAvailable()).toBe(false);
   });
 
-  it("is nothing when the studio cannot answer, rather than a broken page", async () => {
+  it("is no for a server too old to have an answer", async () => {
+    health.mockResolvedValue({ status: "ok" });
+    expect(await viewerAvailable()).toBe(false);
+  });
+
+  it("is no when the studio cannot answer, rather than a broken page", async () => {
     health.mockRejectedValue(new Error("offline"));
-    expect(await viewerScriptUrl()).toBeNull();
+    expect(await viewerAvailable()).toBe(false);
+  });
+
+  it("never loads anything into this page", async () => {
+    // The component's stylesheets would repaint the studio and its element has a style property
+    // of its own that throws when treated as an element's. Both stay in the frame.
+    const append = vi.spyOn(document.head, "appendChild");
+
+    await viewerAvailable();
+
+    expect(append).not.toHaveBeenCalled();
   });
 });
 
-describe("loading it", () => {
-  // Order matters here, and it is the browser's rule rather than the test's: a custom element can
-  // only be defined once per page, and the loader is right to notice that it is already there. So
-  // the failure case runs first, while nothing has defined it yet.
-  it("says no when the script cannot be fetched, and does not keep trying", async () => {
-    answerScript("error");
+describe("the page to frame", () => {
+  it("carries the file, its name and its type", () => {
+    const url = new URL(viewerFrameUrl(file, false), "http://studio");
 
-    expect(await loadFileViewer()).toBe(false);
-
-    // A studio behind a firewall would otherwise reach for the CDN on every click.
-    const appended = document.head.appendChild as unknown as ReturnType<typeof vi.fn>;
-    const before = appended.mock.calls.length;
-
-    expect(await loadFileViewer()).toBe(false);
-    expect(appended.mock.calls.length).toBe(before);
+    expect(url.pathname).toBe("/api/viewer/frame");
+    expect(url.searchParams.get("url")).toBe(file.url);
+    expect(url.searchParams.get("name")).toBe(file.name);
+    expect(url.searchParams.get("type")).toBe(file.contentType);
+    expect(url.searchParams.get("dark")).toBeNull();
   });
 
-  it("says no without asking anything when there is no url", async () => {
-    health.mockResolvedValue({ fileViewer: null });
-    answerScript("load");
-
-    expect(await loadFileViewer()).toBe(false);
-    expect(document.head.appendChild).not.toHaveBeenCalled();
+  it("says when the studio is dark, so the viewer is not a white rectangle in it", () => {
+    const url = new URL(viewerFrameUrl(file, true), "http://studio");
+    expect(url.searchParams.get("dark")).toBe("true");
   });
 
-  it("loads once for the whole session", async () => {
-    answerScript("load");
-
-    const answers = await Promise.all([loadFileViewer(), loadFileViewer(), loadFileViewer()]);
-
-    expect(answers).toEqual([true, true, true]);
-    // One load means one question to the server, however many callers there were.
-    expect(health).toHaveBeenCalledTimes(1);
-  });
-
-  it("takes the element somebody else already put on the page", async () => {
-    // A second studio panel, or this one after a hot reload: defined already, nothing to fetch.
-    expect(customElements.get("mudex-file-display")).toBeTruthy();
-
-    answerScript("load");
-    expect(await loadFileViewer()).toBe(true);
-    expect(document.head.appendChild).not.toHaveBeenCalled();
+  it("leaves out a type nobody knows", () => {
+    const url = new URL(viewerFrameUrl({ url: "/x", name: "a" }, false), "http://studio");
+    expect(url.searchParams.has("type")).toBe(false);
   });
 });

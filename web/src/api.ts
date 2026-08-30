@@ -1,4 +1,4 @@
-const base = "/api";
+export const base = "/api";
 
 export interface Me {
   anonymous: boolean; authenticated: boolean; username: string | null;

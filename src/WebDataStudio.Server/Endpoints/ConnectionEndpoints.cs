@@ -194,6 +194,12 @@ public static class ConnectionEndpoints
         {
             var clock = System.Diagnostics.Stopwatch.StartNew();
 
+            // A dot that spins for twenty seconds has already failed to say what it is for. A
+            // server that has not answered in ten is the answer.
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            deadline.CancelAfter(TimeSpan.FromSeconds(10));
+            ct = deadline.Token;
+
             try
             {
                 var (driver, session) = await factory.OpenAsync(id, ct);
@@ -224,7 +230,9 @@ public static class ConnectionEndpoints
                 {
                     ok = false,
                     milliseconds = (int)clock.ElapsedMilliseconds,
-                    message = e.Message,
+                    message = deadline.IsCancellationRequested && e is OperationCanceledException
+                        ? "no answer within 10 seconds"
+                        : e.Message,
                 });
             }
         });

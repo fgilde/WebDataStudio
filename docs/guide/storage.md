@@ -121,6 +121,12 @@ created — an app host that declared the account and not the container, a name 
 provider answers that with a page of XML. The studio reads it for you: *there is no container called
 'exports' here*.
 
+**A bucket that stops answering says so.** A server that refuses a connection is an error in a
+second; one that is simply gone — a container somebody stopped, an endpoint that has moved —
+accepts nothing and refuses nothing, and the request waits. Every call to a bucket has twenty
+seconds, and then the studio says *listing this bucket did not answer within 20 seconds* instead of
+spinning. The dot in the explorer gives up after ten.
+
 ## Looking at a file
 
 **View** sits next to *Download* and *Save as…* — on an object in a bucket, in its context menu, and

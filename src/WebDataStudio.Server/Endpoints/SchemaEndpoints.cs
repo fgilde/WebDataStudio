@@ -45,6 +45,13 @@ public static class SchemaEndpoints
                 // that sentence rather than the provider's page of XML about it.
                 return Results.NotFound(new { message = e.Message });
             }
+            catch (Storage.StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -68,6 +75,13 @@ public static class SchemaEndpoints
                 // that sentence rather than the provider's page of XML about it.
                 return Results.NotFound(new { message = e.Message });
             }
+            catch (Storage.StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -90,6 +104,13 @@ public static class SchemaEndpoints
                 // A bucket the connection names and the account does not have: the tree says
                 // that sentence rather than the provider's page of XML about it.
                 return Results.NotFound(new { message = e.Message });
+            }
+            catch (Storage.StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
             }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
@@ -125,6 +146,13 @@ public static class SchemaEndpoints
                 // that sentence rather than the provider's page of XML about it.
                 return Results.NotFound(new { message = e.Message });
             }
+            catch (Storage.StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -148,6 +176,13 @@ public static class SchemaEndpoints
                 // A bucket the connection names and the account does not have: the tree says
                 // that sentence rather than the provider's page of XML about it.
                 return Results.NotFound(new { message = e.Message });
+            }
+            catch (Storage.StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
             }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
@@ -181,6 +216,13 @@ public static class SchemaEndpoints
                 // A bucket the connection names and the account does not have: the tree says
                 // that sentence rather than the provider's page of XML about it.
                 return Results.NotFound(new { message = e.Message });
+            }
+            catch (Storage.StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
             }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
@@ -256,6 +298,13 @@ public static class SchemaEndpoints
                 // A bucket the connection names and the account does not have: the tree says
                 // that sentence rather than the provider's page of XML about it.
                 return Results.NotFound(new { message = e.Message });
+            }
+            catch (Storage.StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
             }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
@@ -457,6 +506,13 @@ public static class SchemaEndpoints
                 // that sentence rather than the provider's page of XML about it.
                 return Results.NotFound(new { message = e.Message });
             }
+            catch (Storage.StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -481,6 +537,13 @@ public static class SchemaEndpoints
                 // A bucket the connection names and the account does not have: the tree says
                 // that sentence rather than the provider's page of XML about it.
                 return Results.NotFound(new { message = e.Message });
+            }
+            catch (Storage.StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
             }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }

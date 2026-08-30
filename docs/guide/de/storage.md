@@ -125,6 +125,12 @@ den nie jemand angelegt hat — ein AppHost, der das Konto deklariert hat und ni
 Tippfehler im Namen. Jeder Anbieter antwortet darauf mit einer Seite XML; das Studio liest sie und
 sagt stattdessen: *there is no container called 'exports' here*.
 
+**Ein Bucket, das nicht mehr antwortet, sagt das.** Ein Server, der die Verbindung ablehnt, ist in
+einer Sekunde ein Fehler; einer, der schlicht weg ist — ein gestoppter Container, ein Endpunkt, der
+umgezogen ist —, nimmt nichts an und lehnt nichts ab, und die Anfrage wartet. Jeder Zugriff auf ein
+Bucket hat zwanzig Sekunden; danach sagt das Studio *listing this bucket did not answer within 20
+seconds*, statt sich weiterzudrehen. Der Punkt im Explorer gibt nach zehn auf.
+
 ## Eine Datei ansehen
 
 **View** steht neben *Download* und *Save as…* — bei einem Objekt im Bucket, in dessen Kontextmenü

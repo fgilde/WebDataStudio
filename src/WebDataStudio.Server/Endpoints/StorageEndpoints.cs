@@ -78,6 +78,13 @@ public static class StorageEndpoints
             // A container that was never created: one sentence, rather than the provider's
             // page of XML about it.
             catch (StorageContainerMissingException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -126,6 +133,13 @@ public static class StorageEndpoints
             // A container that was never created: one sentence, rather than the provider's
             // page of XML about it.
             catch (StorageContainerMissingException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -184,6 +198,13 @@ public static class StorageEndpoints
             // A container that was never created: one sentence, rather than the provider's
             // page of XML about it.
             catch (StorageContainerMissingException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -236,6 +257,13 @@ public static class StorageEndpoints
             // A container that was never created: one sentence, rather than the provider's
             // page of XML about it.
             catch (StorageContainerMissingException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });
@@ -273,6 +301,13 @@ public static class StorageEndpoints
             // A container that was never created: one sentence, rather than the provider's
             // page of XML about it.
             catch (StorageContainerMissingException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (StorageUnreachableException e)
+            {
+                // Not this studio's fault and not a bad request: something it depends on
+                // stopped answering, which is what 504 is for.
+                return Results.Json(new { message = e.Message },
+                    statusCode: StatusCodes.Status504GatewayTimeout);
+            }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
         });

@@ -72,6 +72,21 @@ builder.AddRedis("cache").WithWebDataStudio();
 All three land in one studio. Pass `studioName:` for a second one, or build it yourself with
 `AddWebDataStudio` to set a login, read-only mode and row caps from the app host.
 
+An empty development database is a studio with nothing to look at, so the same family has
+[Nextended.Aspire.Hosting.DbTools](https://www.nuget.org/packages/Nextended.Aspire.Hosting.DbTools/)
+for filling one from a database that already exists — schema and rows, from another resource in the
+stack or from a server the app host only has a connection string for:
+
+```csharp
+builder.AddPostgres("pg").AddDatabase("shop")
+       .WithCloneFrom("Host=staging.internal;Database=shop;Username=reader;Password=…")
+       .WithWebDataStudio();
+```
+
+A clone copies the data as it is, real names and addresses included. Where that is not acceptable,
+take a [development subset](explorer.md#a-development-subset) out of the real database instead and
+load the script it writes with `WithSeedScript`.
+
 ## As a desktop application
 
 Download the build for your platform from the

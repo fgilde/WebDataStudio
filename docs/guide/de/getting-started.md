@@ -58,12 +58,20 @@ builder.AddRedis("cache").WithWebDataStudio();
 Alle drei landen in einem Studio. `studioName:` ergibt ein zweites, und wer es selbst mit
 `AddWebDataStudio` baut, setzt Login, Nur-Lese-Modus und Zeilenlimits gleich im App-Host.
 
-## Als Desktop-Anwendung
+Eine leere Entwicklungsdatenbank ist ein Studio ohne Inhalt, deshalb gibt es aus derselben Familie
+[Nextended.Aspire.Hosting.DbTools](https://www.nuget.org/packages/Nextended.Aspire.Hosting.DbTools/):
+Es füllt eine Datenbank aus einer bestehenden — Schema und Zeilen, aus einer anderen Ressource des
+Stacks oder von einem Server, zu dem der App-Host nur eine Verbindungszeichenfolge hat:
 
-Den Build für deine Plattform von der
-[Releases-Seite](https://github.com/fgilde/WebDataStudio/releases) laden, entpacken und starten.
-Er bedient <http://localhost:8080>, öffnet den Browser und legt seine Daten in einem Ordner `data`
-neben der Datei ab.
+```csharp
+builder.AddPostgres("pg").AddDatabase("shop")
+       .WithCloneFrom("Host=staging.internal;Database=shop;Username=reader;Password=…")
+       .WithWebDataStudio();
+```
+
+Ein Klon kopiert die Daten, wie sie sind — echte Namen und Adressen inklusive. Wo das nicht in
+Ordnung ist, lieber im Kontextmenü einer Tabelle **Development subset…** nehmen: eine anonymisierte
+Teilmenge als SQL-Skript, die `WithSeedScript` in den nächsten frischen Stack lädt.
 
 ## Als Desktop-Anwendung
 

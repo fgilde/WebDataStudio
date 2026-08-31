@@ -134,6 +134,42 @@ public class SchemaScopeTests : IAsyncLifetime
         Assert.Equal(["sales"], schemas);
     }
 
+    /// The catalogue is there when somebody asks for it and not before: pg_catalog and
+    /// information_schema hold hundreds of relations nobody in this database wrote.
+    [Fact]
+    public async Task System_schemas_stay_out_of_the_tree_until_the_connection_asks_for_them()
+    {
+        using var factory = Factory(suffix: "-system");
+        using var client = factory.CreateClient();
+        var id = await IdAsync(client);
+
+        var hidden = await SchemasAsync(client, id);
+
+        Assert.DoesNotContain("pg_catalog", hidden);
+        Assert.DoesNotContain("information_schema", hidden);
+
+        (await client.PutAsync($"/api/schema/{id}/system?show=true", null, Ct))
+            .EnsureSuccessStatusCode();
+
+        var shown = await SchemasAsync(client, id);
+
+        Assert.Contains("pg_catalog", shown);
+        Assert.Contains("information_schema", shown);
+        Assert.Contains("public", shown);
+
+        // And the objects in them, which is the point of asking.
+        var tables = JsonDocument.Parse(await client.GetStringAsync(
+                $"/api/schema/{id}?parent={Uri.EscapeDataString("TableFolder:pg_catalog/tables")}", Ct))
+            .RootElement.EnumerateArray().Select(node => node.GetProperty("label").GetString()).ToList();
+
+        Assert.Contains("pg_class", tables);
+
+        (await client.PutAsync($"/api/schema/{id}/system?show=false", null, Ct))
+            .EnsureSuccessStatusCode();
+
+        Assert.DoesNotContain("pg_catalog", await SchemasAsync(client, id));
+    }
+
     [Fact]
     public async Task A_scope_that_names_nothing_is_a_scope_of_everything()
     {
@@ -202,5 +238,19 @@ public class SchemaScopeFilterTests
         scope.Choose("id", ["sales"]);
 
         Assert.Equal(["public"], scope.InForce(new ConnectionSpecName("id", "PG")));
+    }
+
+    [Fact]
+    public void System_objects_are_off_until_a_connection_is_told_otherwise()
+    {
+        var scope = Scope(null, out _);
+
+        Assert.False(scope.SystemObjects("id"));
+
+        scope.ShowSystemObjects("id", true);
+        Assert.True(scope.SystemObjects("id"));
+
+        scope.ShowSystemObjects("id", false);
+        Assert.False(scope.SystemObjects("id"));
     }
 }

@@ -66,16 +66,22 @@ public sealed class SqlServerDriver : AdoDriverBase
     }
 
     public override async Task<IReadOnlyList<SchemaNode>> IntrospectAsync(
-        IDbSession session, SchemaNodeRef? parent, CancellationToken ct)
+        IDbSession session, SchemaNodeRef? parent, CancellationToken ct, bool systemObjects = false)
     {
         if (parent is null)
+        {
+            // Every database has the ten fixed database roles — db_owner, db_datareader and the
+            // rest — as schemas of their own, and they are empty in all but a handful of databases.
+            // Together with sys, INFORMATION_SCHEMA and guest they are what the tree leaves out
+            // until somebody asks for them.
+            var visible = systemObjects
+                ? "1 = 1"
+                : """name NOT IN ('sys','INFORMATION_SCHEMA','guest') AND name NOT LIKE 'db\_%' ESCAPE '\'""";
+
             return await QueryAsync(session, ct,
-                """
-                SELECT name FROM sys.schemas
-                 WHERE name NOT IN ('sys','INFORMATION_SCHEMA','guest') AND name NOT LIKE 'db\_%' ESCAPE '\'
-                 ORDER BY name
-                """,
+                $"SELECT name FROM sys.schemas WHERE {visible} ORDER BY name",
                 name => new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Schema, [name]), name, true));
+        }
 
         if (parent.Kind == SchemaNodeKind.Schema)
         {

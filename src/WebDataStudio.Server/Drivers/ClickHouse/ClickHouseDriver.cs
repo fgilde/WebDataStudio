@@ -60,13 +60,15 @@ public sealed class ClickHouseDriver : AdoDriverBase
     }
 
     public override async Task<IReadOnlyList<SchemaNode>> IntrospectAsync(
-        IDbSession session, SchemaNodeRef? parent, CancellationToken ct)
+        IDbSession session, SchemaNodeRef? parent, CancellationToken ct, bool systemObjects = false)
     {
         if (parent is null)
             return await QueryAsync(session, ct,
-                """
+                $"""
                 SELECT name FROM system.databases
-                 WHERE name NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema')
+                 WHERE {(systemObjects
+                     ? "1"
+                     : "name NOT IN ('system', 'INFORMATION_SCHEMA', 'information_schema')")}
                  ORDER BY name
                 """,
                 name => new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Schema, [name]), name, true));

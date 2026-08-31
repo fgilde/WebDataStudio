@@ -11,4 +11,8 @@ public interface IDriverFixture : IAsyncLifetime
     ConnectionSpec Spec { get; }
     /// The schema the seeded tables live in, or null for engines without schemas.
     string? Schema { get; }
+
+    /// One schema this engine keeps for itself, which the tree must hide until asked. Null for an
+    /// engine that has none — SQLite keeps tables rather than schemas.
+    string? SystemSchema => null;
 }

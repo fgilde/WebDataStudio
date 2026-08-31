@@ -51,6 +51,21 @@ that rather than pretending to be editable. Only schemas and databases are filte
 space or a server-level folder passes through, because a schema scope that emptied the tree on another
 engine would be a bug.
 
+## The schemas the engine keeps for itself
+
+Every engine has schemas nobody in your database wrote: `sys`, `INFORMATION_SCHEMA` and a schema for
+each of the ten fixed database roles — `db_owner`, `db_datareader`, `db_denydatawriter` — on SQL
+Server, `pg_catalog`, `information_schema` and `pg_toast` on PostgreSQL, `mysql`, `sys` and
+`performance_schema` on MySQL, `SYS`, `SYSTEM` and the rest of the maintained users on Oracle,
+`system` on ClickHouse, `admin`, `local` and `config` on MongoDB, the `sqlite_%` tables on SQLite.
+The role schemas in particular are empty in nearly every database, so eleven of them in the tree buy
+nothing.
+
+The tree leaves all of it out. **Properties…** on a connection has **Show system schemas and their
+objects** for the day you need to read a catalogue view: it is per connection, off by default, and
+the objects inside those schemas come with it. A schema scope still applies on top — where somebody
+named the schemas they work in, `sys` is not one of them.
+
 ## What the tree shows
 
 Under a connection PostgreSQL keeps more than its schemas, and the tree lists that next to them:

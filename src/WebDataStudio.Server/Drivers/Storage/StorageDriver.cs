@@ -40,7 +40,7 @@ public sealed class StorageDriver : AdoDriverBase
         await StorageSession.OpenAsync(spec, ct);
 
     public override async Task<IReadOnlyList<SchemaNode>> IntrospectAsync(
-        IDbSession session, SchemaNodeRef? parent, CancellationToken ct)
+        IDbSession session, SchemaNodeRef? parent, CancellationToken ct, bool systemObjects = false)
     {
         var store = StoreOf(session);
 

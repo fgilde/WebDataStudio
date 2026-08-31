@@ -28,7 +28,8 @@ public abstract class AdoDriverBase : IDbDriver
     public abstract SqlDialect Dialect { get; }
 
     public abstract Task<IDbSession> OpenAsync(ConnectionSpec spec, CancellationToken ct);
-    public abstract Task<IReadOnlyList<SchemaNode>> IntrospectAsync(IDbSession session, SchemaNodeRef? parent, CancellationToken ct);
+    public abstract Task<IReadOnlyList<SchemaNode>> IntrospectAsync(IDbSession session, SchemaNodeRef? parent,
+        CancellationToken ct, bool systemObjects = false);
     public abstract Task<ObjectDetail> DescribeAsync(IDbSession session, SchemaNodeRef target, CancellationToken ct);
 
     public virtual string? FromClause(IDbSession session, SchemaNodeRef target) =>

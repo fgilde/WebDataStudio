@@ -984,6 +984,8 @@ export interface SchemaScopeDto {
   /// Where the deployment fixed the scope, that list; then `editable` is false.
   fixedByEnvironment: string[];
   editable: boolean;
+  /// Whether the tree also shows what the engine keeps for itself — sys, pg_catalog, SYS.
+  systemObjects: boolean;
 }
 
 export const schemaScope = (conn: string): Promise<SchemaScopeDto> =>
@@ -991,6 +993,10 @@ export const schemaScope = (conn: string): Promise<SchemaScopeDto> =>
 
 export const chooseSchemas = (conn: string, schemas: string[]): Promise<{ chosen: string[] }> =>
   fetch(`${base}/schema/${conn}/scope`, json("PUT", schemas)).then(r => ok<{ chosen: string[] }>(r));
+
+export const showSystemObjects = (conn: string, show: boolean): Promise<{ systemObjects: boolean }> =>
+  fetch(`${base}/schema/${conn}/system?show=${show}`, { method: "PUT" })
+    .then(r => ok<{ systemObjects: boolean }>(r));
 
 export interface DataHitDto {
   schema: string; table: string; column: string; dataType: string; matches: number;

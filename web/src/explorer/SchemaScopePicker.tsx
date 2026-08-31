@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Group, Loader, MultiSelect, Stack, Text } from "@mantine/core";
-import { chooseSchemas, schemaScope, type SchemaScopeDto } from "../api";
+import { Alert, Button, Group, Loader, MultiSelect, Stack, Switch, Text } from "@mantine/core";
+import { chooseSchemas, schemaScope, showSystemObjects, type SchemaScopeDto } from "../api";
 
 /// Which schemas this connection reads.
 ///
@@ -34,13 +34,29 @@ export function SchemaScopePicker({ connectionId, onChanged }: {
   if (error) return <Alert color="yellow" variant="light">{error}</Alert>;
   if (!scope) return <Loader size="xs" />;
 
+  // What the engine keeps for itself: sys and the empty db_owner-style role schemas on SQL Server,
+  // pg_catalog on PostgreSQL, SYS on Oracle. Reading a catalogue view is a real errand; having
+  // eleven schemas nobody wrote in the tree every day is not, so it is off until asked for.
+  const system = (
+    <Switch size="xs" label="Show system schemas and their objects"
+            checked={scope.systemObjects}
+            onChange={event => {
+              const show = event.currentTarget.checked;
+              setScope({ ...scope, systemObjects: show });
+              showSystemObjects(connectionId, show)
+                .then(() => onChanged?.())
+                .catch(e => setError(e.message));
+            }} />
+  );
+
   if (!scope.editable)
     return (
-      <Stack gap={2}>
+      <Stack gap={4}>
         <Text size="sm" fw={600}>Schemas read</Text>
         <Text size="xs" c="dimmed">
           Fixed by the environment: {scope.fixedByEnvironment.join(", ")}
         </Text>
+        {system}
       </Stack>
     );
 
@@ -65,6 +81,7 @@ export function SchemaScopePicker({ connectionId, onChanged }: {
             All of them
           </Button>}
       </Group>
+      {system}
     </Stack>
   );
 }

@@ -36,17 +36,19 @@ public sealed class PostgreSqlDriver : AdoDriverBase
     }
 
     public override async Task<IReadOnlyList<SchemaNode>> IntrospectAsync(
-        IDbSession session, SchemaNodeRef? parent, CancellationToken ct)
+        IDbSession session, SchemaNodeRef? parent, CancellationToken ct, bool systemObjects = false)
     {
         if (parent is null)
         {
+            var visible = systemObjects
+                ? "true"
+                : """
+                  nspname NOT IN ('pg_catalog','information_schema')
+                    AND nspname NOT LIKE 'pg_toast%' AND nspname NOT LIKE 'pg_temp%'
+                  """;
+
             var schemas = await QueryNodesAsync(session, ct,
-                """
-                SELECT nspname FROM pg_namespace
-                 WHERE nspname NOT IN ('pg_catalog','information_schema')
-                   AND nspname NOT LIKE 'pg_toast%' AND nspname NOT LIKE 'pg_temp%'
-                 ORDER BY nspname
-                """,
+                $"SELECT nspname FROM pg_namespace WHERE {visible} ORDER BY nspname",
                 name => new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Schema, [name]), name, true));
 
             // Below the schemas, the lists a database has one of. They sit at the same level

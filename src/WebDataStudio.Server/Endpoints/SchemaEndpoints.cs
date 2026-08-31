@@ -429,7 +429,9 @@ public static class SchemaEndpoints
                 var (driver, session) = await factory.OpenAsync(conn, ct);
                 await using (session)
                 {
-                    var all = (await driver.IntrospectAsync(session, null, ct))
+                    var systemObjects = scope.SystemObjects(spec.Id);
+
+                    var all = (await driver.IntrospectAsync(session, null, ct, systemObjects))
                         .Where(node => node.Ref.Kind is SchemaNodeKind.Schema or SchemaNodeKind.Database)
                         .Select(node => node.Label)
                         .ToList();
@@ -440,6 +442,7 @@ public static class SchemaEndpoints
                         chosen = scope.Chosen(spec.Id),
                         fixedByEnvironment,
                         editable = fixedByEnvironment.Count == 0,
+                        systemObjects,
                     });
                 }
             }
@@ -463,6 +466,19 @@ public static class SchemaEndpoints
             return Results.Ok(new { chosen = body });
         });
 
+        // Whether this connection also shows what the engine keeps for itself. Separate from the
+        // scope above because it is a different question: the scope narrows what a person wrote,
+        // this one widens the tree to what the engine wrote.
+        app.MapPut("/api/schema/{conn}/system", (string conn, bool show, SchemaScope scope,
+            ConnectionRegistry connections) =>
+        {
+            var spec = connections.Find(conn);
+            if (spec is null) return Results.NotFound(new { message = $"no connection '{conn}'" });
+
+            scope.ShowSystemObjects(spec.Id, show);
+            return Results.Ok(new { systemObjects = show });
+        });
+
         app.MapGet("/api/drivers", (DriverRegistry drivers) =>
             Results.Ok(drivers.All().Select(d => new { d.Info, d.Caps })));
 
@@ -476,11 +492,14 @@ public static class SchemaEndpoints
                 await using (session)
                 {
                     var parentRef = string.IsNullOrEmpty(parent) ? null : SchemaNodeRef.Parse(parent);
-                    var nodes = await driver.IntrospectAsync(session, parentRef, ct);
+                    var spec = connections.Find(conn);
+
+                    var nodes = await driver.IntrospectAsync(session, parentRef, ct,
+                        spec is not null && scope.SystemObjects(spec.Id));
 
                     // A server with five thousand tables should not make every studio pay for all of
                     // them. Where somebody named the schemas they work in, the rest is not listed.
-                    if (parentRef is null && connections.Find(conn) is { } spec)
+                    if (parentRef is null && spec is not null)
                         nodes = scope.Filter(new ConnectionSpecName(spec.Id, spec.Name), nodes);
 
                     // Every driver stops at the object itself. Its columns, indexes, keys and

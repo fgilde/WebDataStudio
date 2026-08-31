@@ -30,6 +30,27 @@ public abstract class DriverContractTests<TFixture> : IClassFixture<TFixture>
         Assert.NotEmpty(await Driver.IntrospectAsync(session, null, Ct));
     }
 
+    /// Every engine keeps schemas of its own — sys, pg_catalog, mysql, SYS — and the tree leaves
+    /// them out until a connection asks for them. What the fixture seeded is there either way.
+    [Fact]
+    public async Task A_system_schema_only_shows_up_when_it_is_asked_for()
+    {
+        if (_fixture.SystemSchema is not { } system) return;
+
+        await using var session = await OpenAsync();
+
+        var hidden = await RootLabelsAsync(session, false);
+        var shown = await RootLabelsAsync(session, true);
+
+        Assert.DoesNotContain(system, hidden);
+        Assert.Contains(system, shown);
+        Assert.All(hidden, label => Assert.Contains(label, shown));
+    }
+
+    private async Task<List<string>> RootLabelsAsync(IDbSession session, bool systemObjects) =>
+        (await Driver.IntrospectAsync(session, null, Ct, systemObjects))
+        .Select(node => node.Label).ToList();
+
     [Fact]
     public async Task Finds_the_seeded_table()
     {

@@ -27,7 +27,7 @@ public sealed class SqliteDriver : AdoDriverBase
     }
 
     public override async Task<IReadOnlyList<SchemaNode>> IntrospectAsync(
-        IDbSession session, SchemaNodeRef? parent, CancellationToken ct)
+        IDbSession session, SchemaNodeRef? parent, CancellationToken ct, bool systemObjects = false)
     {
         // SQLite has one nameless schema: the root shows folders directly.
         if (parent is null)
@@ -48,7 +48,11 @@ public sealed class SqliteDriver : AdoDriverBase
         if (type is null) return [];
 
         await using var cmd = session.Connection.CreateCommand();
-        cmd.CommandText = "SELECT name FROM sqlite_master WHERE type = $type AND name NOT LIKE 'sqlite_%' ORDER BY name";
+        // SQLite has no schemas; what it keeps for itself are the sqlite_% tables — sqlite_sequence,
+        // sqlite_stat1 and the schema itself.
+        cmd.CommandText = "SELECT name FROM sqlite_master WHERE type = $type"
+            + (systemObjects ? "" : " AND name NOT LIKE 'sqlite_%'")
+            + " ORDER BY name";
         cmd.Parameters.Add(new SqliteParameter("$type", type));
 
         var nodes = new List<SchemaNode>();

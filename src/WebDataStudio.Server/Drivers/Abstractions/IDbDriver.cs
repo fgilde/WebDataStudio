@@ -42,7 +42,13 @@ public interface IDbDriver
     Task<IDbSession> OpenAsync(ConnectionSpec spec, CancellationToken ct);
 
     /// One level of the object tree. `parent` is null for the root of the connection.
-    Task<IReadOnlyList<SchemaNode>> IntrospectAsync(IDbSession session, SchemaNodeRef? parent, CancellationToken ct);
+    ///
+    /// `systemObjects` asks for what the engine keeps for itself as well — `sys` and the fixed role
+    /// schemas on SQL Server, `pg_catalog` on PostgreSQL, `SYS` on Oracle, the `sqlite_%` tables.
+    /// Off by default, and every caller but the explorer tree leaves it off: a data dictionary, a
+    /// schema snapshot or a comparison that walked the catalogue would be worse for it.
+    Task<IReadOnlyList<SchemaNode>> IntrospectAsync(IDbSession session, SchemaNodeRef? parent,
+        CancellationToken ct, bool systemObjects = false);
 
     Task<ObjectDetail> DescribeAsync(IDbSession session, SchemaNodeRef target, CancellationToken ct);
 

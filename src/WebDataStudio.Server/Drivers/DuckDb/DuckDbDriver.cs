@@ -36,13 +36,15 @@ public sealed class DuckDbDriver : AdoDriverBase
     }
 
     public override async Task<IReadOnlyList<SchemaNode>> IntrospectAsync(
-        IDbSession session, SchemaNodeRef? parent, CancellationToken ct)
+        IDbSession session, SchemaNodeRef? parent, CancellationToken ct, bool systemObjects = false)
     {
         if (parent is null)
             return await QueryAsync(session, ct,
-                """
+                $"""
                 SELECT schema_name FROM information_schema.schemata
-                 WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'temp', 'system')
+                 WHERE {(systemObjects
+                     ? "true"
+                     : "schema_name NOT IN ('information_schema', 'pg_catalog', 'temp', 'system')")}
                  ORDER BY schema_name
                 """,
                 name => new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Schema, [name]), name, true));

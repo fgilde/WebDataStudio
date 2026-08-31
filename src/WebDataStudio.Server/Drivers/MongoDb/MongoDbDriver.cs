@@ -64,7 +64,7 @@ public sealed class MongoDbDriver : IDbDriver
     }
 
     public async Task<IReadOnlyList<SchemaNode>> IntrospectAsync(IDbSession session, SchemaNodeRef? parent,
-        CancellationToken ct)
+        CancellationToken ct, bool systemObjects = false)
     {
         var mongo = Cast(session);
 
@@ -72,7 +72,7 @@ public sealed class MongoDbDriver : IDbDriver
         {
             var names = await (await mongo.Client.ListDatabaseNamesAsync(ct)).ToListAsync(ct);
             return names
-                .Where(n => n is not ("admin" or "local" or "config"))
+                .Where(n => systemObjects || n is not ("admin" or "local" or "config"))
                 .Select(n => new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Schema, [n]), n, true))
                 .ToList();
         }

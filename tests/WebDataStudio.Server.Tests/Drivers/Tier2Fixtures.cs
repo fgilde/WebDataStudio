@@ -19,6 +19,7 @@ public sealed class DuckDbFixture : IDriverFixture
     public ConnectionSpec Spec => new("t", "test", "duckdb", $"Data Source={_path}",
         false, null, null, ConnectionSource.Stored);
     public string? Schema => "main";
+    public string? SystemSchema => "information_schema";
 
     public async ValueTask InitializeAsync()
     {
@@ -53,6 +54,7 @@ public sealed class ClickHouseFixture : IDriverFixture
     public ConnectionSpec Spec => new("t", "test", "clickhouse", _container.GetConnectionString(),
         false, null, null, ConnectionSource.Stored);
     public string? Schema => "default";
+    public string? SystemSchema => "system";
 
     public async ValueTask InitializeAsync()
     {
@@ -91,6 +93,7 @@ public sealed class OracleFixture : IDriverFixture
     public ConnectionSpec Spec => new("t", "test", "oracle", _container.GetConnectionString(),
         false, null, null, ConnectionSource.Stored);
     public string? Schema => "TEST";
+    public string? SystemSchema => "SYS";
 
     public async ValueTask InitializeAsync()
     {

@@ -15,6 +15,7 @@ public sealed class PostgreSqlFixture : IDriverFixture
     public ConnectionSpec Spec => new("t", "test", "postgresql", _container.GetConnectionString(),
         false, null, null, ConnectionSource.Stored);
     public string? Schema => "public";
+    public string? SystemSchema => "pg_catalog";
 
     public async ValueTask InitializeAsync()
     {

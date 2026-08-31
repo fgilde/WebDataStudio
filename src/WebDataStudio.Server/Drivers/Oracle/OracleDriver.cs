@@ -79,13 +79,15 @@ public sealed class OracleDriver : AdoDriverBase
     }
 
     public override async Task<IReadOnlyList<SchemaNode>> IntrospectAsync(
-        IDbSession session, SchemaNodeRef? parent, CancellationToken ct)
+        IDbSession session, SchemaNodeRef? parent, CancellationToken ct, bool systemObjects = false)
     {
+        // An Oracle schema is a user, and an install ships dozens of them — SYS, SYSTEM, XDB and
+        // the rest. The server flags them itself, which is a better list than any hard-coded one.
         if (parent is null)
             return await QueryAsync(session, ct,
-                """
+                $"""
                 SELECT username FROM all_users
-                 WHERE oracle_maintained = 'N'
+                 WHERE {(systemObjects ? "1 = 1" : "oracle_maintained = 'N'")}
                  ORDER BY username
                 """,
                 name => new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Schema, [name]), name, true));

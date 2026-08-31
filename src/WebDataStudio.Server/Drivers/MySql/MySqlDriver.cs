@@ -32,17 +32,19 @@ public sealed class MySqlDriver : AdoDriverBase
     }
 
     public override async Task<IReadOnlyList<SchemaNode>> IntrospectAsync(
-        IDbSession session, SchemaNodeRef? parent, CancellationToken ct)
+        IDbSession session, SchemaNodeRef? parent, CancellationToken ct, bool systemObjects = false)
     {
         // In MySQL a schema IS a database, so the root lists databases as schema nodes.
         if (parent is null)
+        {
+            var visible = systemObjects
+                ? "true"
+                : "schema_name NOT IN ('mysql','information_schema','performance_schema','sys')";
+
             return await QueryAsync(session, ct,
-                """
-                SELECT schema_name FROM information_schema.schemata
-                 WHERE schema_name NOT IN ('mysql','information_schema','performance_schema','sys')
-                 ORDER BY schema_name
-                """,
+                $"SELECT schema_name FROM information_schema.schemata WHERE {visible} ORDER BY schema_name",
                 name => new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Schema, [name]), name, true));
+        }
 
         if (parent.Kind == SchemaNodeKind.Schema)
         {

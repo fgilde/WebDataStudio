@@ -101,7 +101,7 @@ public sealed class RedisDriver : IDbDriver
     }
 
     public async Task<IReadOnlyList<SchemaNode>> IntrospectAsync(IDbSession session, SchemaNodeRef? parent,
-        CancellationToken ct)
+        CancellationToken ct, bool systemObjects = false)
     {
         var redis = Cast(session);
 

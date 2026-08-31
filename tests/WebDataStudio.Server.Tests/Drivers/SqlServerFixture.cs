@@ -14,6 +14,7 @@ public sealed class SqlServerFixture : IDriverFixture
     public ConnectionSpec Spec => new("t", "test", "sqlserver", _container.GetConnectionString(),
         false, null, null, ConnectionSource.Stored);
     public string? Schema => "dbo";
+    public string? SystemSchema => "sys";
 
     public async ValueTask InitializeAsync()
     {
@@ -34,4 +35,35 @@ public sealed class SqlServerFixture : IDriverFixture
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();
 }
 
-public class SqlServerContractTests(SqlServerFixture fixture) : DriverContractTests<SqlServerFixture>(fixture);
+public class SqlServerContractTests(SqlServerFixture fixture) : DriverContractTests<SqlServerFixture>(fixture)
+{
+    /// What Rider shows and the tree does not: sys, INFORMATION_SCHEMA, guest, and a schema for
+    /// each of the ten fixed database roles. The role schemas exist in every SQL Server database
+    /// and are empty in nearly all of them, so hiding them is the whole point — and showing them
+    /// when somebody asks is the other half of it.
+    [Fact]
+    public async Task System_and_fixed_role_schemas_are_hidden_until_asked_for()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec,
+            TestContext.Current.CancellationToken);
+
+        async Task<List<string>> SchemasAsync(bool systemObjects) =>
+            (await fixture.Driver.IntrospectAsync(session, null,
+                TestContext.Current.CancellationToken, systemObjects))
+            .Select(node => node.Label).ToList();
+
+        string[] system =
+        [
+            "sys", "INFORMATION_SCHEMA", "guest",
+            "db_owner", "db_accessadmin", "db_securityadmin", "db_ddladmin", "db_backupoperator",
+            "db_datareader", "db_datawriter", "db_denydatareader", "db_denydatawriter",
+        ];
+
+        var hidden = await SchemasAsync(false);
+        Assert.Equal(["dbo"], hidden);
+
+        var shown = await SchemasAsync(true);
+        foreach (var schema in system) Assert.Contains(schema, shown);
+        Assert.Contains("dbo", shown);
+    }
+}

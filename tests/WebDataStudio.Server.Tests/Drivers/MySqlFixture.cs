@@ -15,6 +15,7 @@ public sealed class MySqlFixture : IDriverFixture
     public ConnectionSpec Spec => new("t", "test", "mysql", _container.GetConnectionString(),
         false, null, null, ConnectionSource.Stored);
     public string? Schema => "shop";
+    public string? SystemSchema => "performance_schema";
 
     public async ValueTask InitializeAsync()
     {

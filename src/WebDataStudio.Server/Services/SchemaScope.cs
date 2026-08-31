@@ -30,6 +30,16 @@ public sealed class SchemaScope(IConfiguration config, WorkspaceStore workspace)
     public void Choose(string connectionId, IReadOnlyList<string> schemas) =>
         workspace.SaveItem($"schemas:{connectionId}", JsonSerializer.Serialize(schemas));
 
+    /// Whether this connection also shows what the engine keeps for itself — `sys` and the fixed
+    /// role schemas on SQL Server, `pg_catalog` on PostgreSQL, `SYS` on Oracle. Off by default,
+    /// because a tree that opens on eleven schemas nobody wrote is a worse tree; on, for the day
+    /// somebody needs to read a catalogue view. Workspace state like the scope itself.
+    public bool SystemObjects(string connectionId) =>
+        workspace.LoadItem($"schemas:system:{connectionId}") == "true";
+
+    public void ShowSystemObjects(string connectionId, bool show) =>
+        workspace.SaveItem($"schemas:system:{connectionId}", show ? "true" : "false");
+
     /// The scope in force: the environment's if it says anything, otherwise the studio's choice.
     public IReadOnlyList<string> InForce(ConnectionSpecName connection)
     {

@@ -17,10 +17,12 @@ globalThis.ResizeObserver ??= class {
 
 const schemaScope = vi.fn();
 const chooseSchemas = vi.fn();
+const showSystemObjects = vi.fn();
 
 vi.mock("../api", () => ({
   schemaScope: (...args: unknown[]) => schemaScope(...args),
   chooseSchemas: (...args: unknown[]) => chooseSchemas(...args),
+  showSystemObjects: (...args: unknown[]) => showSystemObjects(...args),
 }));
 
 const { SchemaScopePicker } = await import("./SchemaScopePicker");
@@ -34,11 +36,13 @@ describe("SchemaScopePicker", () => {
     cleanup();
     schemaScope.mockReset();
     chooseSchemas.mockReset();
+    showSystemObjects.mockReset();
   });
 
   it("offers every schema and says that nothing chosen means all of them", async () => {
     schemaScope.mockResolvedValue({
-      available: ["public", "sales", "archive"], chosen: [], fixedByEnvironment: [], editable: true,
+      available: ["public", "sales", "archive"], chosen: [], fixedByEnvironment: [],
+      editable: true, systemObjects: false,
     });
 
     draw();
@@ -49,7 +53,8 @@ describe("SchemaScopePicker", () => {
 
   it("saves what was chosen and tells the shell to re-read the tree", async () => {
     schemaScope.mockResolvedValue({
-      available: ["public", "sales"], chosen: ["sales"], fixedByEnvironment: [], editable: true,
+      available: ["public", "sales"], chosen: ["sales"], fixedByEnvironment: [],
+      editable: true, systemObjects: false,
     });
     chooseSchemas.mockResolvedValue({ chosen: ["sales"] });
     const onChanged = vi.fn();
@@ -65,12 +70,31 @@ describe("SchemaScopePicker", () => {
 
   it("says so rather than pretending to be editable where the environment fixed the scope", async () => {
     schemaScope.mockResolvedValue({
-      available: ["public", "sales"], chosen: [], fixedByEnvironment: ["public"], editable: false,
+      available: ["public", "sales"], chosen: [], fixedByEnvironment: ["public"],
+      editable: false, systemObjects: false,
     });
 
     draw();
 
     await waitFor(() => expect(screen.getByText(/Fixed by the environment: public/)).toBeTruthy());
     expect(screen.queryByRole("button", { name: "Apply" })).toBeNull();
+  });
+
+  it("asks for the system schemas and tells the shell to re-read the tree", async () => {
+    schemaScope.mockResolvedValue({
+      available: ["public"], chosen: [], fixedByEnvironment: [], editable: true,
+      systemObjects: false,
+    });
+    showSystemObjects.mockResolvedValue({ systemObjects: true });
+    const onChanged = vi.fn();
+
+    draw(onChanged);
+
+    const label = "Show system schemas and their objects";
+    await waitFor(() => expect(screen.getByLabelText(label)).toBeTruthy());
+    fireEvent.click(screen.getByLabelText(label));
+
+    await waitFor(() => expect(showSystemObjects).toHaveBeenCalledWith("c1", true));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 });

@@ -36,6 +36,7 @@ the app opens straight into the studio.
 | **Umbrel** | *App Store → ⋯ → Community app stores* with `https://github.com/fgilde/WebDataStudio` |
 | **Unraid** | Community Applications, or copy [`templates/webdatastudio.xml`](templates/webdatastudio.xml) into `/boot/config/plugins/dockerMan/templates-user/` |
 | **Cosmos** | Market → ServApps |
+| **Proxmox VE** | `bash -c "$(curl -fsSL https://raw.githubusercontent.com/fgilde/WebDataStudio/master/deploy/proxmox/install.sh)"` on the host: an unprivileged Debian container with Docker, the studio, and a generated password |
 
 Those packages set `WDS_USER` and `WDS_PASSWORD`, so the studio they install has a login screen.
 

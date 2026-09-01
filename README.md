@@ -28,6 +28,17 @@ docker run -d -p 8080:8080 -v wds-data:/data \
 Open <http://localhost:8080>. Without `WDS_USER` and `WDS_PASSWORD` there is **no login screen** —
 the app opens straight into the studio.
 
+### From a home-server app store
+
+| Store | How |
+|---|---|
+| **CasaOS** | *App Store → Add source* with `https://github.com/fgilde/WebDataStudio/releases/download/store/casaos-appstore.zip` |
+| **Umbrel** | *App Store → ⋯ → Community app stores* with `https://github.com/fgilde/WebDataStudio` |
+| **Unraid** | Community Applications, or copy [`templates/webdatastudio.xml`](templates/webdatastudio.xml) into `/boot/config/plugins/dockerMan/templates-user/` |
+| **Cosmos** | Market → ServApps |
+
+Those packages set `WDS_USER` and `WDS_PASSWORD`, so the studio they install has a login screen.
+
 ### In .NET Aspire
 
 ```csharp

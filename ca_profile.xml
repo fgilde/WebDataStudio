@@ -1,0 +1,18 @@
+<CommunityApplications>
+  <Profile>
+    **WebDataStudio** — a database studio that runs in your browser.
+
+    PostgreSQL, MySQL/MariaDB, SQL Server, SQLite, Oracle, DuckDB, ClickHouse, MongoDB and Redis in
+    one container: schema explorer, SQL editor with completion and history, a visual query builder,
+    result charts, ER diagrams drawn from the foreign keys, schema editing, a column-by-column
+    comparison between two connections, saved and scheduled queries with file export, and an MCP
+    endpoint for AI agents.
+
+    Connections are added in the studio or handed to it as WDS_CONN_&lt;NAME&gt; variables. Set the
+    admin user and password: without both, the studio has no login screen at all.
+
+    Support: https://github.com/fgilde/WebDataStudio/issues
+  </Profile>
+  <Icon>https://raw.githubusercontent.com/fgilde/WebDataStudio/master/docs/assets/icon.png</Icon>
+  <WebPage>https://fgilde.github.io/WebDataStudio/</WebPage>
+</CommunityApplications>

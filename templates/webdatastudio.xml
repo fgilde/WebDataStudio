@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<!--
+  Unraid Community Applications template.
+
+  Copy it into /boot/config/plugins/dockerMan/templates-user/ to install by hand, or point Community
+  Applications at this repository. The password field is not optional on purpose: with no user and no
+  password WebDataStudio serves without a login screen, and a template that made that easy would put
+  an open database client on somebody's LAN.
+-->
+<Container version="2">
+  <Name>WebDataStudio</Name>
+  <Repository>ghcr.io/fgilde/webdatastudio:latest</Repository>
+  <Registry>https://github.com/fgilde/WebDataStudio/pkgs/container/webdatastudio</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/fgilde/WebDataStudio/issues</Support>
+  <Project>https://github.com/fgilde/WebDataStudio</Project>
+  <Overview>
+    A database studio that runs in your browser: PostgreSQL, MySQL/MariaDB, SQL Server, SQLite, Oracle,
+    DuckDB, ClickHouse, MongoDB and Redis in one container.
+
+    Schema explorer, SQL editor with completion and history, a visual query builder, result charts, ER
+    diagrams drawn from the foreign keys, schema editing, a column-by-column comparison between two
+    connections, saved and scheduled queries with file export, and an MCP endpoint for AI agents.
+
+    Connections are added in the studio or handed in as WDS_CONN_&lt;NAME&gt; variables. Set the admin user
+    and password below - without both, the studio has no login screen at all. Read-only connections are
+    enforced in the driver, not only in the interface.
+  </Overview>
+  <Category>Tools:Utilities Productivity: Cloud:</Category>
+  <WebUI>http://[IP]:[PORT:8080]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/fgilde/WebDataStudio/master/templates/webdatastudio.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/fgilde/WebDataStudio/master/docs/assets/icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <ReadMe>https://raw.githubusercontent.com/fgilde/WebDataStudio/master/README.md</ReadMe>
+  <License>MIT</License>
+  <ExtraSearchTerms>database sql client postgres mysql mssql sqlite oracle duckdb clickhouse mongodb redis</ExtraSearchTerms>
+  <Config Name="WebUI" Target="8080" Default="8095" Mode="tcp" Description="Port of the web interface." Type="Port" Display="always" Required="true" Mask="false">8095</Config>
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/webdatastudio" Mode="rw" Description="Saved connections, query history, layouts and the studio's own database." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/webdatastudio</Config>
+  <Config Name="Admin user" Target="WDS_USER" Default="admin" Mode="" Description="Admin user name. Together with the password below this turns on the login screen." Type="Variable" Display="always" Required="true" Mask="false">admin</Config>
+  <Config Name="Admin password" Target="WDS_PASSWORD" Default="" Mode="" Description="Admin password. Leave it empty only if an open studio on this network is what you want." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Title" Target="WDS_TITLE" Default="WebDataStudio" Mode="" Description="Name shown in the header and the browser tab." Type="Variable" Display="advanced" Required="false" Mask="false">WebDataStudio</Config>
+  <Config Name="Read only" Target="WDS_READONLY" Default="" Mode="" Description="Set to true to make every connection read-only, enforced in the driver." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Time zone" Target="TZ" Default="Europe/Berlin" Mode="" Description="Time zone." Type="Variable" Display="advanced" Required="false" Mask="false">Europe/Berlin</Config>
+</Container>

@@ -1,0 +1,23 @@
+# Umbrel puts every app behind its own proxy, which is what gives it a tile and a hostname. The
+# proxy is the only thing that publishes a port; the studio itself is reachable inside the app
+# network and nowhere else.
+version: "3.7"
+
+services:
+  app_proxy:
+    environment:
+      APP_HOST: fgilde-webdatastudio_server_1
+      APP_PORT: 8080
+
+  server:
+    image: ghcr.io/fgilde/webdatastudio:latest
+    restart: on-failure
+    stop_grace_period: 1m
+    environment:
+      # Both halves are required: with neither, the studio serves without a login screen.
+      WDS_USER: admin
+      WDS_PASSWORD: ${APP_PASSWORD}
+      WDS_TITLE: WebDataStudio
+    volumes:
+      # Saved connections, query history, layouts and the studio's own database.
+      - ${APP_DATA_DIR}/data:/data

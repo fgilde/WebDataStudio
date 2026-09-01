@@ -12,7 +12,7 @@ services:
     environment:
       TZ: $TZ
       WDS_USER: admin
-      WDS_PASSWORD: $DEFAULT_PWD
+      WDS_PASSWORD: casaos
     volumes:
       - type: bind
         source: /DATA/AppData/$AppID/data
@@ -92,8 +92,10 @@ x-casaos:
   tips:
     before_install:
       en_US: |
-        Set WDS_USER and WDS_PASSWORD before you expose this: without both, the studio has no
-        login screen at all. The data directory keeps saved connections, history and layouts.
+        Change WDS_PASSWORD in the fields below - it is set to "casaos" so that the app has a login
+        screen at all, and everybody knows that one. WDS_USER is "admin". With neither of the two set,
+        the studio serves with no login screen. The data directory keeps saved connections, query
+        history and layouts.
   icon: https://raw.githubusercontent.com/fgilde/WebDataStudio/master/store/casaos/Apps/WebDataStudio/icon.png
   thumbnail: https://raw.githubusercontent.com/fgilde/WebDataStudio/master/store/casaos/Apps/WebDataStudio/thumbnail.png
   screenshot_link:

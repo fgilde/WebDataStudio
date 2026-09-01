@@ -12,6 +12,8 @@
   <a href="https://github.com/fgilde/WebDataStudio/pkgs/container/webdatastudio">Container image</a>
 </p>
 
+[![QuickRun](https://quickrun.org/badge.svg)](https://quickrun.org/run?repo=fgilde/WebDataStudio)
+
 ---
 
 ## Run it

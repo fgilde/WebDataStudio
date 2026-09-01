@@ -118,12 +118,23 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
+      # Before the artifacts: a checkout cleans the workspace, and downloading first would mean
+      # downloading into a directory that is about to be emptied.
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
 
+      # What CHANGELOG.md says about this tag becomes the body; the generated commit list is appended
+      # to it by the action. A tag with no section writes nothing and the generated notes stand alone,
+      # so a release is never held up by a missing entry.
+      - name: Notes from the changelog
+        run: node scripts/release-notes.mjs "${GITHUB_REF_NAME}" > notes.md
+
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
+          body_path: notes.md
           generate_release_notes: true

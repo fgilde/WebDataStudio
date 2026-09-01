@@ -28,3 +28,4 @@ jobs:
 
       # A renamed page must not silently break the sidebar of the documentation site.
       - run: node scripts/check-links.mjs docs
+      - run: node --test "scripts/**/*.test.mjs"

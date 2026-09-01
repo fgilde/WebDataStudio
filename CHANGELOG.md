@@ -4,6 +4,10 @@ What changed between releases, in the order it matters to somebody using the stu
 commit order. Releases before 1.3.0 are on the
 [releases page](https://github.com/fgilde/WebDataStudio/releases).
 
+A section here is the body of that release: the release workflow reads the one the tag names
+(`scripts/release-notes.mjs`) and the generated commit list follows it. So a new version is written
+down here *before* it is tagged — a tag with no section still publishes, with the commit list alone.
+
 ## 1.3.0
 
 The image, the desktop builds and the Aspire integration all come from this tag.

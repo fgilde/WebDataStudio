@@ -63,9 +63,20 @@ public sealed class StorageDriver : AdoDriverBase
                 ? target.Container
                 : target.Provider.ToString();
 
+            // One segment, whatever the container is called. A ref is `Kind:a/b/c` and it is split
+            // on the slash, so a bucket name — which cannot hold one — is safe and a folder's path is
+            // not: `/data/drop` came back as three segments, the first empty, and everything under it
+            // was then listed under the prefix "data/drop", which is nothing. That is why a folder
+            // connection showed its container and no files in the image, while the same connection
+            // worked on Windows, where a local path is spelled with backslashes.
+            //
+            // Nothing reads this segment — the store knows its own root, and every level below takes
+            // `Path.Skip(1)` as the prefix — so the folder's name is what goes in it.
+            var segment = target.Provider == StorageProvider.Local ? name : target.Container;
+
             return
             [
-                new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Container, [target.Container]), label,
+                new SchemaNode(new SchemaNodeRef(SchemaNodeKind.Container, [segment]), label,
                     true, Detail: detail),
             ];
         }

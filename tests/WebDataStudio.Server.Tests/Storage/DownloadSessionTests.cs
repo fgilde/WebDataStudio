@@ -40,7 +40,11 @@ public class DownloadSessionTests : IDisposable
             b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["DB_PATH"] = Path.Combine(_dir, "wds.db"),
-                ["WDS_CONN_DROP"] = $"file:///{_files.Replace('\\', '/')}",
+                // new Uri(path).AbsoluteUri rather than "file:///" and a path: on Linux the path
+                // already starts with a slash, so the hand-written form produced
+                // file:////tmp/..., where the fourth slash makes "tmp" a host and the folder
+                // unreachable — the connection then had nothing in it.
+                ["WDS_CONN_DROP"] = new Uri(_files).AbsoluteUri,
                 ["WDS_MAX_SESSIONS"] = "2",
             })));
 
@@ -80,6 +84,27 @@ public class DownloadSessionTests : IDisposable
 
         Assert.NotEmpty(refs);
         return refs;
+    }
+
+    /// A ref is `Kind:a/b/c`, split on the slash. So every segment has to be one segment — and a
+    /// folder connection's container is a path, which on Linux is full of slashes. It showed its
+    /// folder and no files in the image, and passed here, because a Windows path is spelled with
+    /// backslashes. The invariant is what the test holds on to, not the platform.
+    [Fact]
+    public async Task The_container_a_folder_connection_shows_is_one_segment()
+    {
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var conn = await IdAsync(client);
+
+        var containers = await client.GetFromJsonAsync<List<System.Text.Json.JsonElement>>(
+            $"/api/schema/{conn}", Ct);
+
+        var containerRef = Assert.Single(containers!).GetProperty("ref").GetString()!;
+        var path = containerRef.Split(':', 2)[1];
+
+        Assert.DoesNotContain('/', path);
+        Assert.DoesNotContain(Path.DirectorySeparatorChar, path);
     }
 
     [Fact]

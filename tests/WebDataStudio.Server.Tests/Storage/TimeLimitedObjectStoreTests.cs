@@ -144,7 +144,7 @@ public class TimeLimitedObjectStoreTests
         // It answers or it does not; there is no network to stall on, and a large local listing
         // should not be cut off at twenty seconds.
         Assert.IsType<LocalObjectStore>(
-            ObjectStores.For(StorageUrl.Parse($"file:///{Path.GetTempPath().Replace('\\', '/')}")));
+            ObjectStores.For(StorageUrl.Parse(new Uri(Path.GetTempPath()).AbsoluteUri)));
     }
 
     [Fact]

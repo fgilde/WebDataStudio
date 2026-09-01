@@ -50,8 +50,37 @@ public class DownloadSessionTests : IDisposable
         return list![0].GetProperty("id").GetString()!;
     }
 
-    private static string Ref(string dir, string name) =>
-        Uri.EscapeDataString($"StorageObject:{dir}/{name}");
+    /// The refs the tree hands out, rather than refs built here out of a path.
+    ///
+    /// A file connection's tree names its container itself, and an absolute path is not what goes in
+    /// a ref — a test that assembled one from `_files` happened to pass on Windows and answered 404
+    /// on Linux, which is a test bug rather than a bug. Asking the server is also what a browser
+    /// does, so this exercises the path that actually runs.
+    private static async Task<List<string>> FileRefsAsync(HttpClient client, string conn)
+    {
+        var containers = await client.GetFromJsonAsync<List<System.Text.Json.JsonElement>>(
+            $"/api/schema/{conn}", Ct);
+
+        var refs = new List<string>();
+
+        foreach (var container in containers ?? [])
+        {
+            var parent = container.GetProperty("ref").GetString()!;
+
+            var children = await client.GetFromJsonAsync<List<System.Text.Json.JsonElement>>(
+                $"/api/schema/{conn}?parent={Uri.EscapeDataString(parent)}", Ct);
+
+            foreach (var child in children ?? [])
+            {
+                if (child.GetProperty("ref").GetString() is { } childRef
+                    && childRef.StartsWith("StorageObject:", StringComparison.Ordinal))
+                    refs.Add(childRef);
+            }
+        }
+
+        Assert.NotEmpty(refs);
+        return refs;
+    }
 
     [Fact]
     public async Task Downloading_more_files_than_there_are_sessions_leaves_the_studio_working()
@@ -60,11 +89,13 @@ public class DownloadSessionTests : IDisposable
         var client = factory.CreateClient();
         var conn = await IdAsync(client);
 
-        // Six files through two sessions. Every one of them has to give its session back.
-        foreach (var name in new[] { "people.csv", "notes.md", "orders.ndjson", "people.csv", "notes.md", "orders.ndjson" })
+        var files = await FileRefsAsync(client, conn);
+
+        // Every file twice, through two sessions. Every one of them has to give its session back.
+        foreach (var objectRef in files.Concat(files))
         {
             var response = await client.GetAsync(
-                $"/api/storage/{conn}/download?ref={Ref(_files, name)}&inline=true", Ct);
+                $"/api/storage/{conn}/download?ref={Uri.EscapeDataString(objectRef)}&inline=true", Ct);
 
             response.EnsureSuccessStatusCode();
 
@@ -86,10 +117,12 @@ public class DownloadSessionTests : IDisposable
 
         // A viewer that asks for a file and goes away — a closed tab, a component that changed its
         // mind. ASP.NET disposes the stream either way, and that is what returns the session.
+        var first = (await FileRefsAsync(client, conn))[0];
+
         for (var i = 0; i < 4; i++)
         {
             using var response = await client.GetAsync(
-                $"/api/storage/{conn}/download?ref={Ref(_files, "people.csv")}&inline=true",
+                $"/api/storage/{conn}/download?ref={Uri.EscapeDataString(first)}&inline=true",
                 HttpCompletionOption.ResponseHeadersRead, Ct);
 
             response.EnsureSuccessStatusCode();

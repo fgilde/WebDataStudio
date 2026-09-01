@@ -28,7 +28,10 @@ public static class NotifyEndpoints
         api.MapGet("/{conn}/listen", async (string conn, string channels, HttpContext ctx,
             SessionFactory factory, CancellationToken ct) =>
         {
-            var (driver, session) = await factory.OpenAsync(conn, ct);
+            // Its own connection, not one of the pool's: this one is parked in WaitAsync for as long
+            // as the browser keeps the stream, and Npgsql leaves it in a state the pool cannot hand
+            // on to anybody else. See SessionFactory.OpenExclusiveAsync.
+            var (driver, session) = await factory.OpenExclusiveAsync(conn, ct);
             await using (session)
             {
                 if (session.Connection is not NpgsqlConnection connection)
@@ -73,6 +76,13 @@ public static class NotifyEndpoints
 
                 connection.Notification += OnNotice;
 
+                // A stop of this listener's own, linked to the request's. The waiter has to be
+                // brought back before the connection is closed — a connector still inside WaitAsync
+                // throws NpgsqlOperationInProgressException when it is disposed — and the stream can
+                // also end without the request being cancelled at all.
+                using var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                Task waiting = Task.CompletedTask;
+
                 try
                 {
                     foreach (var name in names)
@@ -85,9 +95,23 @@ public static class NotifyEndpoints
                     // Two halves: one waits on the socket so Npgsql can raise the event, the other
                     // writes what the event queued. WaitAsync is the only way to hear a
                     // notification that arrives while nothing else is running on the connection.
-                    var waiting = Task.Run(async () =>
+                    waiting = Task.Run(async () =>
                     {
-                        while (!ct.IsCancellationRequested) await connection.WaitAsync(ct);
+                        try
+                        {
+                            while (!stop.IsCancellationRequested) await connection.WaitAsync(stop.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // The stream ended. Swallowed here rather than left for the task to
+                            // carry: nobody awaits this one, and an unobserved exception at shutdown
+                            // is a crash with a stack trace about something that went to plan.
+                        }
+                        catch (NpgsqlException)
+                        {
+                            // The connection went away while it was waiting, which is the same thing
+                            // from the other side.
+                        }
                     }, ct);
 
                     // A comment, flushed straight away: until something is written the response
@@ -119,7 +143,6 @@ public static class NotifyEndpoints
                         }
                     }
 
-                    await waiting;
                 }
                 catch (OperationCanceledException)
                 {
@@ -127,6 +150,14 @@ public static class NotifyEndpoints
                 }
                 finally
                 {
+                    // In this order: stop waiting, wait for the waiter to be out, then let go of the
+                    // event. Closing the connection is what comes after this block, and it needs the
+                    // connector idle.
+                    await stop.CancelAsync();
+
+                    try { await waiting; }
+                    catch (Exception) { /* it ended, which is all this needed */ }
+
                     connection.Notification -= OnNotice;
                 }
             }

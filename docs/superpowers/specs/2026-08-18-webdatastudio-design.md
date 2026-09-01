@@ -491,6 +491,7 @@ it works for every engine whose capability set claims support for it.
 | F27.5 | A result kept as a file, listed, reopened, and scripted back as INSERTs |
 | F27.6 | Geography in a result drawn as a shape rather than read as coordinates |
 | F27.7 | "there is no row over there" as a condition in the query builder |
+| F27.8 | Which rows a page holds, said in rows: the range, both ends, a typed page number, the page size, and a count where the total is only an estimate |
 | F28.1 | Object storage as a connection: S3-compatible, Azure Blob, Google Cloud Storage, a folder |
 | F28.2 | Containers, prefixes and objects in the tree, paged rather than walked |
 | F28.3 | An object's details and a preview: text, JSON, CSV, an image, a Parquet schema |

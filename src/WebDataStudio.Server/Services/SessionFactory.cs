@@ -48,6 +48,28 @@ public sealed class SessionFactory(
         return (driver, await pool.RentAsync(connectionId, token => OpenRawAsync(spec, driver, token), ct));
     }
 
+    /// A session of its own, outside the pool, for the two things a pooled one cannot do: stay open
+    /// for as long as somebody watches a stream, and end up in a state the pool cannot hand on.
+    ///
+    /// PostgreSQL's LISTEN is both. It parks its connection in `WaitAsync` — where Npgsql leaves the
+    /// connector in `Waiting` — and holds it for as long as the browser keeps the stream. Returned to
+    /// the pool, that connection makes the next renter, and the shutdown, throw
+    /// `NpgsqlOperationInProgressException`; held for an hour, it is one of the four sessions a
+    /// studio has. So a listener owns its connection and closes it with the request.
+    public async Task<(IDbDriver Driver, IDbSession Session)> OpenExclusiveAsync(
+        string connectionId, CancellationToken ct)
+    {
+        var spec = registry.Find(connectionId) ?? throw new UnknownConnectionException(connectionId);
+        var driver = drivers.Get(spec.Engine);
+
+        if (EntraConnectionString.WantsAPerson(spec.ConnectionString))
+            spec = entra.TokenFor(connectionId) is { Length: > 0 } token
+                ? spec with { AccessToken = token }
+                : throw new EntraSignInRequiredException(connectionId);
+
+        return (driver, await OpenRawAsync(spec, driver, ct));
+    }
+
     private async Task<IDbSession> OpenRawAsync(ConnectionSpec spec, IDbDriver driver, CancellationToken ct)
     {
         if (spec.Tunnel is not { } tunnel) return await driver.OpenAsync(spec, ct);

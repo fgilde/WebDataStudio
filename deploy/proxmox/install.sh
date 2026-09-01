@@ -1,125 +1,125 @@
 #!/usr/bin/env bash
-# WebDataStudio on Proxmox VE: an unprivileged Debian container with Docker and the studio in it.
+# WebDataStudio on a Debian machine: the self-contained build from the latest release, a service
+# user, a systemd unit and a generated password.
 #
-# Run it on the PVE host as root:
-#   bash -c "$(curl -fsSL https://raw.githubusercontent.com/fgilde/WebDataStudio/master/deploy/proxmox/install.sh)"
+# Runs on its own as well as from webdatastudio.sh, which is what makes it testable by hand -- on a
+# plain Debian VM, in an LXC container, on a Raspberry Pi:
 #
-# Self-contained on purpose. The community helper scripts source a shared build.func from another
-# repository at run time, which is convenient right up to the day that file moves. This one needs
-# pct, which every PVE host has.
+#   curl -fsSL https://raw.githubusercontent.com/fgilde/WebDataStudio/master/deploy/proxmox/install.sh | bash
 #
-# Overridable: CTID, HOSTNAME_, DISK_GB, RAM_MB, CORES, BRIDGE, STORAGE, TEMPLATE_STORAGE, PORT, WDS_USER
+# No Docker: the release ships a single self-contained binary, and Docker inside an unprivileged LXC
+# container starts nothing on a current Proxmox -- runc writes net.ipv4.ip_unprivileged_port_start and
+# /proc/sys is read-only there.
+#
+# Idempotent: run it again and it fetches the current release, keeps the password, the data directory
+# and the port it already wrote, and restarts the service.
 set -euo pipefail
 
-CTID="${CTID:-}"
-HOSTNAME_="${HOSTNAME_:-webdatastudio}"
-DISK_GB="${DISK_GB:-8}"
-RAM_MB="${RAM_MB:-2048}"
-CORES="${CORES:-2}"
-BRIDGE="${BRIDGE:-vmbr0}"
-STORAGE="${STORAGE:-local-lvm}"
-TEMPLATE_STORAGE="${TEMPLATE_STORAGE:-local}"
-PORT="${PORT:-8095}"
-WDS_USER="${WDS_USER:-admin}"
+PORT="${WDS_PORT:-8095}"
+DATA_DIR="${WDS_DATA_DIR:-/var/lib/webdatastudio}"
+INSTALL_DIR="/opt/webdatastudio"
+ENV_FILE="/etc/webdatastudio.env"
+REPO="fgilde/WebDataStudio"
+ADMIN_USER="${WDS_USER:-admin}"
 
-die() { echo "webdatastudio: $*" >&2; exit 1; }
 note() { echo "==> $*"; }
+die() { echo "webdatastudio: $*" >&2; exit 1; }
 
-command -v pct >/dev/null || die "this runs on a Proxmox VE host: pct was not found"
 [ "$(id -u)" -eq 0 ] || die "run as root"
 
-[ -n "$CTID" ] || { CTID="$(pvesh get /cluster/nextid)"; note "no CTID given, taking the next free one: $CTID"; }
+case "$(uname -m)" in
+  x86_64) ASSET="webdatastudio-linux-x64.tar.gz" ;;
+  aarch64 | arm64) ASSET="webdatastudio-linux-arm64.tar.gz" ;;
+  *) die "no release build for $(uname -m)" ;;
+esac
 
-TEMPLATE="$(pveam available --section system 2>/dev/null | awk '/debian-13-standard/{print $2}' | sort | tail -1)"
-[ -n "$TEMPLATE" ] || TEMPLATE="$(pveam available --section system 2>/dev/null | awk '/debian-12-standard/{print $2}' | sort | tail -1)"
-[ -n "$TEMPLATE" ] || die "no Debian template offered by pveam"
-if ! pveam list "$TEMPLATE_STORAGE" 2>/dev/null | grep -q "$TEMPLATE"; then
-  note "downloading the template $TEMPLATE"
-  pveam update >/dev/null 2>&1 || true
-  pveam download "$TEMPLATE_STORAGE" "$TEMPLATE"
+export DEBIAN_FRONTEND=noninteractive
+note "packages"
+apt-get update -qq
+apt-get install -y -qq --no-install-recommends curl ca-certificates tar openssl >/dev/null
+# .NET wants ICU for anything culture-aware, and Debian keeps renaming the package with each release.
+apt-get install -y -qq --no-install-recommends libicu76 >/dev/null 2>&1 ||
+  apt-get install -y -qq --no-install-recommends libicu72 >/dev/null 2>&1 ||
+  apt-get install -y -qq --no-install-recommends libicu-dev >/dev/null
+
+note "downloading the latest release"
+URL="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" |
+  grep -o "https://[^\"]*${ASSET}" | head -1)"
+[ -n "$URL" ] || die "the latest release carries no ${ASSET}"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+curl -fsSL "$URL" -o "$TMP/app.tar.gz"
+mkdir -p "$INSTALL_DIR"
+tar xzf "$TMP/app.tar.gz" -C "$INSTALL_DIR"
+BINARY="$(find "$INSTALL_DIR" -maxdepth 2 -type f -name 'WebDataStudio.Server' | head -1)"
+[ -n "$BINARY" ] || die "the archive holds no WebDataStudio.Server binary"
+chmod +x "$BINARY"
+
+id -u webdatastudio >/dev/null 2>&1 || useradd --system --home "$DATA_DIR" --shell /usr/sbin/nologin webdatastudio
+mkdir -p "$DATA_DIR"
+chown -R webdatastudio:webdatastudio "$DATA_DIR" "$INSTALL_DIR"
+
+# The password is generated once and kept here, so a second run does not lock out whoever wrote the
+# first one down. With no user and no password the studio has no login screen at all, which is the one
+# thing an installer must not leave behind.
+if [ ! -f "$ENV_FILE" ]; then
+  note "generating the login"
+  cat > "$ENV_FILE" <<EOF
+ASPNETCORE_URLS=http://0.0.0.0:${PORT}
+DB_PATH=${DATA_DIR}/webdatastudio.db
+WDS_USER=${ADMIN_USER}
+WDS_PASSWORD=$(openssl rand -hex 18)
+WDS_OPEN_BROWSER=false
+WDS_BACKUP_DIR=${DATA_DIR}/backups
+EOF
+  chown root:webdatastudio "$ENV_FILE"
+  chmod 640 "$ENV_FILE"
 fi
 
-note "creating the container $CTID"
-# nesting is what lets Docker run inside an unprivileged container; keyctl is what containerd wants.
-pct create "$CTID" "${TEMPLATE_STORAGE}:vztmpl/${TEMPLATE}" \
-  --hostname "$HOSTNAME_" \
-  --cores "$CORES" --memory "$RAM_MB" --swap 512 \
-  --rootfs "${STORAGE}:${DISK_GB}" \
-  --net0 "name=eth0,bridge=${BRIDGE},ip=dhcp" \
-  --features nesting=1,keyctl=1 \
-  --unprivileged 1 --onboot 1 >/dev/null
-pct start "$CTID"
+note "writing the service"
+cat > /etc/systemd/system/webdatastudio.service <<EOF
+[Unit]
+Description=WebDataStudio
+After=network-online.target
+Wants=network-online.target
 
-note "waiting for the network"
-IP=""
-for _ in $(seq 1 30); do
-  IP="$(pct exec "$CTID" -- bash -c "hostname -I 2>/dev/null | awk '{print \$1}'" 2>/dev/null || true)"
-  [ -n "$IP" ] && break
+[Service]
+Type=simple
+User=webdatastudio
+Group=webdatastudio
+EnvironmentFile=${ENV_FILE}
+WorkingDirectory=${DATA_DIR}
+ExecStart=${BINARY}
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=${DATA_DIR}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable webdatastudio >/dev/null 2>&1 || true
+systemctl restart webdatastudio
+
+note "waiting for the studio to answer"
+for _ in $(seq 1 40); do
+  if curl -fsS -o /dev/null "http://127.0.0.1:${PORT}/"; then
+    IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+    echo ""
+    note "done"
+    echo "    URL:      http://${IP:-127.0.0.1}:${PORT}"
+    echo "    Login:    $(grep '^WDS_USER=' "$ENV_FILE" | cut -d= -f2-) / $(grep '^WDS_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)"
+    echo "    Service:  systemctl status webdatastudio"
+    echo "    Update:   run this script again"
+    exit 0
+  fi
   sleep 2
 done
-[ -n "$IP" ] || die "the container did not get an address"
 
-note "installing Docker"
-pct exec "$CTID" -- bash -lc '
-  set -e
-  export DEBIAN_FRONTEND=noninteractive
-  . /etc/os-release
-  apt-get update -qq
-  apt-get install -y -qq ca-certificates curl openssl >/dev/null
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-  chmod a+r /etc/apt/keyrings/docker.asc
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list
-  apt-get update -qq
-  apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null
-  systemctl enable --now docker >/dev/null 2>&1 || true
-'
-
-note "writing the compose file"
-TMP="$(mktemp)"
-cat > "$TMP" <<'YAML'
-services:
-  webdatastudio:
-    image: ghcr.io/fgilde/webdatastudio:latest
-    restart: unless-stopped
-    ports:
-      - "${PORT}:8080"
-    environment:
-      WDS_USER: "${WDS_USER}"
-      WDS_PASSWORD: "${WDS_PASSWORD}"
-    volumes:
-      - wds-data:/data
-volumes:
-  wds-data:
-YAML
-pct exec "$CTID" -- mkdir -p /opt/webdatastudio
-pct push "$CTID" "$TMP" /opt/webdatastudio/docker-compose.yml
-rm -f "$TMP"
-
-# The password is generated inside the container and kept in its .env, so running this script again
-# does not lock out anyone who wrote the first one down. Without a password the studio has no login
-# screen at all, which is why it is generated rather than left to a later decision.
-note "starting WebDataStudio"
-pct exec "$CTID" -- bash -lc '
-  set -e
-  cd /opt/webdatastudio
-  if [ ! -f .env ]; then
-    {
-      echo "PORT='"$PORT"'"
-      echo "WDS_USER='"$WDS_USER"'"
-      echo "WDS_PASSWORD=$(openssl rand -hex 18)"
-    } > .env
-    chmod 600 .env
-  fi
-  docker compose pull -q
-  docker compose up -d
-'
-
-PASSWORD="$(pct exec "$CTID" -- bash -lc "grep '^WDS_PASSWORD=' /opt/webdatastudio/.env | cut -d= -f2-")"
-
-echo ""
-note "done"
-echo "    URL:      http://${IP}:${PORT}"
-echo "    Login:    ${WDS_USER} / ${PASSWORD}"
-echo "    Update:   pct exec ${CTID} -- bash -lc 'cd /opt/webdatastudio && docker compose pull && docker compose up -d'"
-echo "    Password: pct exec ${CTID} -- bash -lc 'cat /opt/webdatastudio/.env'"
+journalctl -u webdatastudio --no-pager -n 30 || true
+die "the service did not answer on port ${PORT}"

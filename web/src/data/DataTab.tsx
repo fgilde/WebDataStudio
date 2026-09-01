@@ -656,7 +656,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
       <Pager
         page={pageIndex}
         pageSize={pageSize}
-        rowsOnPage={shown.length}
+        rowsOnPage={shown.rows.length}
         total={exactTotal ?? page.totalEstimate}
         totalIsEstimate={exactTotal === null && (page.totalIsEstimate ?? false)}
         filtered={exactTotal === null && (page.filtered ?? false)}

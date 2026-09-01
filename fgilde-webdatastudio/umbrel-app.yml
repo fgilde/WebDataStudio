@@ -47,7 +47,7 @@ dependencies: []
 repo: https://github.com/fgilde/WebDataStudio
 support: https://github.com/fgilde/WebDataStudio/issues
 
-port: 8095
+port: 8118
 gallery:
   - 1.png
   - 2.png

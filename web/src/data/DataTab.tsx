@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Pagination, Select, Text, Tooltip,
+  ActionIcon, Alert, Badge, Button, Group, Loader, Menu, Select, Text, Tooltip,
 } from "@mantine/core";
 import {
   IconArrowBackUp, IconArrowRight, IconClipboardPlus, IconCopy, IconCopyPlus, IconDeviceFloppy, IconDownload, IconEye, IconEyeOff,
@@ -10,9 +10,10 @@ import {
 } from "@tabler/icons-react";
 import { copyAsCsv, copyAsJson, copyAsMarkdown, copyAsSqlInList } from "../export/copyAs";
 import {
-  browseData, getMaskPolicy, getUndoState, historyAvailable, lookupValues, saveMaskPolicy,
+  browseData, countRows, getMaskPolicy, getUndoState, historyAvailable, lookupValues, saveMaskPolicy,
   type DataPageDto, type ForeignKeyDto, type UndoStateDto,
 } from "../api";
+import { Pager } from "../grid/Pager";
 
 import { CellValue } from "../grid/CellValue";
 import { MenuFilterInput } from "../grid/MenuFilterInput";
@@ -26,7 +27,7 @@ import { ChangePreviewModal } from "../grid/editing/ChangePreviewModal";
 import { GenerateDialog } from "./GenerateDialog";
 import { BulkUpdateModal } from "../grid/editing/BulkUpdateModal";
 import { useChangeSet, type RowChange } from "../grid/editing/useChangeSet";
-import { preferences, usePreferences } from "../shell/preferences";
+import { preferences, savePreferences, usePreferences } from "../shell/preferences";
 import { RowHistoryModal } from "./RowHistoryModal";
 import { carriesZone, describeZone } from "../grid/formatTime";
 
@@ -82,6 +83,9 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   const { pageSize } = usePreferences();
   const [page, setPage] = useState<DataPageDto | null>(null);
   const [pageIndex, setPageIndex] = useState(1);
+  // What a count said, for as long as this page is the one it counted.
+  const [exactTotal, setExactTotal] = useState<number | null>(null);
+  const [counting, setCounting] = useState(false);
   // Keyed by name, like every other piece of column state in this tab — the row editor, the key
   // badge and the foreign-key lookup all address columns by name.
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -203,6 +207,10 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
     return () => { cancelled = true; };
   }, [connectionId, objectRef, pageIndex, pageSize, nonce, sort, filter, reveal, lookups]);
 
+  // A counted total describes one filter on one table. Anything that changes what is being read
+  // makes it a number about something else.
+  useEffect(() => setExactTotal(null), [connectionId, objectRef, filter, nonce]);
+
   // Re-read after every apply: what can be undone changes with the data, not with the render.
   useEffect(() => {
     let cancelled = false;
@@ -262,7 +270,6 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   const isBoolean = (type: string) => /bool|bit/i.test(type);
 
   const insertedRows = Array.from({ length: changeSet.insertedRows }, (_, i) => -(i + 1));
-  const totalPages = page.totalEstimate ? Math.max(1, Math.ceil(page.totalEstimate / pageSize)) : 1;
 
   const selectedCells = selected
     .map(s => ({ rowIndex: s.row, column: columns[s.col], value: changeSet.editedValue(s.row, columns[s.col]) }))
@@ -646,11 +653,31 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <Group justify="center" py={4}>
-          <Pagination size="xs" total={totalPages} value={pageIndex} onChange={setPageIndex} />
-        </Group>
-      )}
+      <Pager
+        page={pageIndex}
+        pageSize={pageSize}
+        rowsOnPage={shown.length}
+        total={exactTotal ?? page.totalEstimate}
+        totalIsEstimate={exactTotal === null && (page.totalIsEstimate ?? false)}
+        filtered={exactTotal === null && (page.filtered ?? false)}
+        onPage={setPageIndex}
+        onPageSize={size => {
+          // The first row on screen stays on screen: changing the size on page 14 of 200-row pages
+          // and landing on page 14 of 25-row pages would be a different part of the table.
+          const firstRow = (pageIndex - 1) * pageSize;
+          setPageIndex(Math.floor(firstRow / size) + 1);
+          void savePreferences({ pageSize: size });
+        }}
+        counting={counting}
+        onCount={async () => {
+          setCounting(true);
+          try {
+            const answer = await countRows(connectionId, objectRef,
+              { filterColumn: filter?.column, filter: filter?.value });
+            setExactTotal(answer.total);
+          } catch { /* the number stays what it was; the grid is not the place for this error */ }
+          finally { setCounting(false); }
+        }} />
 
       {jsonColumn && (
         <JsonColumnDialog connectionId={connectionId} objectRef={objectRef} column={jsonColumn}

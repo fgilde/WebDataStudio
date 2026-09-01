@@ -217,6 +217,11 @@ export interface DataPageDto {
   keyColumns: string[];
   reason: string | null;
   totalEstimate: number | null;
+  /// Whether that number is the catalogue's guess rather than a count of this result. True for the
+  /// SQL engines, where it is also blind to the filter — countRows answers exactly, on request.
+  totalIsEstimate?: boolean;
+  /// Whether a filter narrowed this page, which is when the estimate stops describing it at all.
+  filtered?: boolean;
   offset: number;
   limit: number;
   /// Column names that came from the table a foreign key points at. Read-only: an edit here would
@@ -244,6 +249,18 @@ export const browseData = (conn: string, ref: string,
   // Repeated rather than joined: each one is its own value, and a column name may hold a comma.
   for (const lookup of params.lookups ?? []) query.append("lookup", lookup);
   return fetch(`${base}/data/${conn}?${refQuery(ref, query)}`).then(r => ok<DataPageDto>(r));
+};
+
+/// How many rows there really are, filter included. A scan on a large table, so it is asked for
+/// rather than shown by itself.
+export const countRows = (conn: string, ref: string,
+  params: { filterColumn?: string; filter?: string } = {}): Promise<{ total: number | null }> => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") query.set(key, String(value));
+  }
+  return fetch(`${base}/data/${conn}/count?${refQuery(ref, query)}`)
+    .then(r => ok<{ total: number | null }>(r));
 };
 
 export interface StudioUserDto {

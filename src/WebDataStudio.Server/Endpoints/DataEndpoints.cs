@@ -209,6 +209,8 @@ public static class DataEndpoints
                             keyColumns = Array.Empty<string>(),
                             reason = session.Spec.ReadOnly ? "this connection is read-only" : built.Reason,
                             totalEstimate = built.Total,
+                            // The engine counted this one itself, for this query.
+                            totalIsEstimate = false,
                             lookups = Array.Empty<string>(),
                             offset = skip,
                             limit = take,
@@ -317,7 +319,13 @@ public static class DataEndpoints
                         editable = identity.Editable && !session.Spec.ReadOnly,
                         keyColumns = identity.KeyColumns,
                         reason = session.Spec.ReadOnly ? "this connection is read-only" : identity.Reason,
+                        // What the catalogue says the table holds: cheap, and on PostgreSQL, SQL
+                        // Server and MySQL an estimate rather than a count. It also knows nothing
+                        // about a filter, so with one in force it is not this result's size at all —
+                        // which is what /count is for.
                         totalEstimate = detail.RowCount,
+                        totalIsEstimate = true,
+                        filtered = filter is { Length: > 0 } && filterColumn is { Length: > 0 },
                         // Which of the columns came from another table. They are read-only: an
                         // edit here would be an update to a row this grid is not addressing.
                         lookups = lookups.Select(l => l.Name),
@@ -399,6 +407,75 @@ public static class DataEndpoints
         // The values a column actually holds, most common first — the checkbox list that saves
         // guessing what to type into the filter. A masked column is refused rather than counted:
         // the distinct values of a column of secrets are the secrets.
+        // How many rows there really are — for the pager, which cannot honestly say "1-200 of
+        // 12,345" out of a number the catalogue guessed and a filter it never saw. Asked for
+        // deliberately, because on a large table this is a scan.
+        app.MapGet("/api/data/{conn}/count", async (string conn,
+            [FromQuery(Name = "ref")] string objectRef, string? filterColumn, string? filter,
+            SessionFactory factory, CancellationToken ct) =>
+        {
+            try
+            {
+                var (driver, session) = await factory.OpenAsync(conn, ct);
+                await using (session)
+                {
+                    if (!driver.Caps.Sql)
+                        return Results.BadRequest(new
+                        {
+                            message = $"{driver.Info.Label} cannot count rows on request; the number "
+                                      + "it browses with is the one it has",
+                        });
+
+                    var target = SchemaEndpoints.ParseObjectRef(objectRef);
+                    var detail = await driver.DescribeAsync(session, target, ct);
+
+                    var columnNames = detail.Columns
+                        .Select(c => c.Name)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                    var parameters = new Dictionary<string, object?>();
+                    var where = "";
+
+                    // The same filter the page was built with, or the count would answer a different
+                    // question than the one on screen.
+                    if (filterColumn is { Length: > 0 } && columnNames.Contains(filterColumn)
+                        && filter is { Length: > 0 })
+                    {
+                        var column = detail.Columns
+                            .First(c => c.Name.Equals(filterColumn, StringComparison.OrdinalIgnoreCase));
+
+                        var condition = FilterExpression.Build(driver.Dialect,
+                            driver.Dialect.QuoteIdentifier(column.Name),
+                            FilterExpression.KindOf(column.DataType), filter, "c");
+
+                        if (!condition.IsEmpty)
+                        {
+                            where = $" WHERE {condition.Sql}";
+                            foreach (var (key, value) in condition.Parameters) parameters[key] = value;
+                        }
+                    }
+
+                    var sql = $"SELECT count(*) FROM {driver.FromClause(session, target)}{where}";
+                    long? total = null;
+
+                    await foreach (var chunk in driver.ExecuteAsync(session,
+                        new ScriptRequest(sql, 1, timeout, Parameters: FilterExpression.AsText(parameters)), ct))
+                    {
+                        if (chunk is ResultChunk.Error error)
+                            return Results.Json(new { message = error.Text }, statusCode: 502);
+
+                        if (chunk is ResultChunk.Rows rows && rows.Items.Count > 0)
+                            total = Convert.ToInt64(rows.Items[0].ElementAtOrDefault(0) ?? 0L);
+                    }
+
+                    return Results.Ok(new { total });
+                }
+            }
+            catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+            catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
         app.MapGet("/api/data/{conn}/distinct", async (string conn,
             [FromQuery(Name = "ref")] string objectRef, string column, string? search, int? limit,
             SessionFactory factory, MaskPolicyStore policies, CancellationToken ct) =>

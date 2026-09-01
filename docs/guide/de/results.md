@@ -146,7 +146,25 @@ Eine mit Doppelklick geöffnete Tabelle hat dieselben Aktionen **Copy** und **Ex
 Abfrage-Ergebnis: Kopieren nimmt die Seite auf dem Schirm, Export streamt die ganze Tabelle. Die
 Spaltenköpfe haben ein Menü zum Sortieren und Filtern, und beides läuft auf dem Server — eine Seite
 hält standardmäßig 200 von womöglich Millionen Zeilen, im Browser wäre also die falsche Menge
-sortiert. Wie viele es sind, ist eine [Einstellung](shortcuts.md).
+sortiert. Wie viele es sind, ist eine [Einstellung](shortcuts.md) — und direkt unter dem Grid
+änderbar.
+
+### Der Pager
+
+Unter dem Daten-Tab steht, **welche Zeilen** auf dem Schirm sind — `1–200 von 12.345` — nicht nur,
+welche Seitenzahl hervorgehoben ist. Daneben:
+
+- **Erste, vorige, nächste, letzte Seite**, das Ende einer Tabelle ist also ein Klick weit weg;
+- ein **Seitenfeld**, sobald es mehr als fünf Seiten sind: `1400` tippen, Enter;
+- **Zeilen pro Seite**, von 25 bis 5000. Das ist die Einstellung, gilt also auch für die nächste
+  Tabelle, und die Zeile, die du gerade ansiehst, bleibt sichtbar: von 200 auf 25 auf Seite 14 landet
+  auf Seite 105, nicht auf Seite 14 von etwas anderem.
+
+Zwei Dinge zur Gesamtzahl. Bei PostgreSQL, SQL Server und MySQL kommt sie aus dem Katalog und ist
+damit eine Schätzung — angezeigt als `von ≈12.345`. Und ein Filter verkleinert das Ergebnis, ohne dass
+der Katalog davon etwas weiß; dann steht dort `von ?` statt einer Zahl über eine andere Menge. Die
+Schaltfläche **∑** daneben zählt echt, Filter inklusive — bei einer großen Tabelle ist das ein Scan,
+deshalb ein Knopf und nichts, was das Studio von allein tut.
 
 ### Eine Engine ohne SQL
 

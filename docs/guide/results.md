@@ -28,6 +28,23 @@ A switch above the grid picks how to read the same result:
 - Double-click a cell to open the value viewer: text, JSON, XML, hex, images and BLOB download.
 - `NULL` is drawn differently from an empty string, because the difference matters.
 
+## Paging a table
+
+The bar under a data tab says which rows are on screen — `1–200 of 12,345` — rather than only which
+page number is highlighted. Next to it:
+
+- **first, previous, next, last**, so the end of a table is one click away;
+- a **page box** once there are more than five pages: type `1400`, press Enter;
+- **rows per page**, from 25 to 5000. It is the preference, so it holds for the next table too, and
+  the row you were looking at stays on screen: changing 200 to 25 on page 14 lands on page 105, not
+  on page 14 of something else.
+
+Two things about the total. On PostgreSQL, SQL Server and MySQL it comes from the catalogue, which is
+an estimate — shown as `of ≈12,345`. And a filter narrows the result without changing what the
+catalogue knows, so the total then reads `of ?` rather than a number about a different set of rows.
+The **∑** button next to it counts for real, filter included; on a large table that is a scan, which
+is why it is a button rather than something the studio does by itself.
+
 ## The filter language
 
 ![The column menu: the filter box and the values the column holds](../assets/screenshots/filter-dark.png)

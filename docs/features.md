@@ -189,6 +189,7 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F27.5 | Results kept as NDJSON files on the studio's disk, listed, reopened as a grid, and scripted back as INSERTs | done | all | Archive panel, result area, explorer |
 | F27.6 | GeoJSON, WKT or a latitude/longitude pair drawn to scale | partial: no basemap — a container has no tile server, and the studio will not reach out to one on its own | all | Result area, map view |
 | F27.7 | `EXISTS` and `NOT EXISTS` over a table that is not in the query | done | all | Query builder |
+| F27.8 | A pager that says which rows are on screen — `1–200 of 12,345` — with first, last and a typed page number, the page size beside it, and an exact count on request where the total is the catalogue's estimate or a filter narrows the result | done | all | Data tab |
 | F28.1 | Object storage as a connection: S3-compatible, Azure Blob, Google Cloud Storage, a folder | done | storage | Connections, `WDS_CONN_*`, Add a bucket |
 | F28.2 | Containers, prefixes and objects in the tree, paged rather than walked | done | storage | Explorer |
 | F28.3 | An object's details and a preview: text, JSON, CSV, an image, a Parquet schema | done | storage | Structure panel |

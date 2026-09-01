@@ -9,7 +9,8 @@
 <p align="center">
   <a href="https://fgilde.github.io/WebDataStudio/">Documentation</a> ·
   <a href="https://fgilde.github.io/WebDataStudio/#/de/">Dokumentation (Deutsch)</a> ·
-  <a href="https://github.com/fgilde/WebDataStudio/pkgs/container/webdatastudio">Container image</a>
+  <a href="https://github.com/fgilde/WebDataStudio/pkgs/container/webdatastudio">Container image</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
 </p>
 
 [![QuickRun](https://quickrun.org/badge.svg)](https://quickrun.org/run?repo=fgilde/WebDataStudio)

@@ -76,6 +76,10 @@ EOF
   chmod 640 "$ENV_FILE"
 fi
 
+# ASP.NET Core takes its content root from the working directory, and the studio's wwwroot sits next
+# to the binary - point the unit anywhere else and every page is a 404 while the process looks healthy.
+APP_DIR="$(dirname "$BINARY")"
+
 note "writing the service"
 cat > /etc/systemd/system/webdatastudio.service <<EOF
 [Unit]
@@ -88,7 +92,7 @@ Type=simple
 User=webdatastudio
 Group=webdatastudio
 EnvironmentFile=${ENV_FILE}
-WorkingDirectory=${DATA_DIR}
+WorkingDirectory=${APP_DIR}
 ExecStart=${BINARY}
 Restart=on-failure
 RestartSec=5

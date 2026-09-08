@@ -8,6 +8,25 @@ A section here is the body of that release: the release workflow reads the one t
 (`scripts/release-notes.mjs`) and the generated commit list follows it. So a new version is written
 down here *before* it is tagged — a tag with no section still publishes, with the commit list alone.
 
+## 1.6.1
+
+### Fixed
+
+- **A password may hold a `#`.** `postgresql://user:pw#@host:5432/shop` is not a URL — the `#` starts
+  the fragment — so it never parsed, and `WDS_CONN_*` then dropped the connection with nothing in
+  the log: the studio simply came up without it. The user information between `://` and the last
+  `@` is now percent-encoded before parsing, so a password is written as it is. An already-encoded
+  `%23` is left alone rather than encoded twice, and the host is read from after the *last* `@`, so
+  a password may hold one of those too. A value whose scheme the studio cannot read is a warning on
+  the way up now, with the password cut out of the line.
+- **A URL pasted into the connection form works.** It never did, hash or no hash: the translation
+  into the provider-native string existed only for `WDS_CONN_*`, so the driver got the URL and
+  answered "Format of the initialization string does not conform to specification" — while the
+  form's own description offered exactly that shape. Adding, editing and testing a connection all
+  translate now, and the field says both shapes and that a `#` is fine in either.
+
+  Reported in [#1](https://github.com/fgilde/WebDataStudio/issues/1).
+
 ## 1.6.0
 
 An OData service is a database too.

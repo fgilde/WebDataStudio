@@ -2,7 +2,7 @@ manifestVersion: 1
 id: fgilde-webdatastudio
 category: developer
 name: WebDataStudio
-version: "1.5.0"
+version: "1.6.0"
 tagline: A database studio that runs in your browser
 description: >-
   WebDataStudio is a database client that lives on your server instead of on one laptop:

@@ -8,6 +8,53 @@ A section here is the body of that release: the release workflow reads the one t
 (`scripts/release-notes.mjs`) and the generated commit list follows it. So a new version is written
 down here *before* it is tagged — a tag with no section still publishes, with the commit list alone.
 
+## 1.6.0
+
+An OData service is a database too.
+
+### Connections
+
+- **Query an OData service as a connection.** Paste the URL of a service root and the engine picks
+  itself. The explorer lists the entity sets from the service's `$metadata`, the data tab pages,
+  sorts and filters them through `$top`, `$skip`, `$orderby` and `$filter` — so the service does the
+  work rather than the studio — and the query tab takes a resource path with query options,
+  `Products?$filter=UnitPrice gt 20&$orderby=ProductName&$top=50`. V2 to V4, read-only: no POST, no
+  PATCH, no DELETE.
+
+  The connection string is the service root URL. `user:pw@` travels as Basic authentication and
+  `bearer:<token>@` as a Bearer token, both as headers rather than in the URL; each further line is
+  a request header, which is how a service behind an API key or a session cookie is reached. The
+  studio's own server makes the request, so a browser's cookies never reach the service.
+
+  Thanks to **@daniel-kuon**, who wrote the driver, the builder and their tests.
+- **A visual builder over an OData request.** The wand button in the query tab and in the data tab
+  opens the same form over the request: the fields to select, the relations to expand, a row per
+  condition, a row per sort — all of it offered from the service's own metadata, with quoting that
+  follows the property's type. The query tab's text stays the one source of truth: the form is read
+  out of it and written back to it. A `$filter` the form cannot take apart is kept exactly as typed,
+  and an option it has no field for travels through untouched.
+- **The hosts an OData service may live on** are the same list every other connection target is
+  checked against, `WDS_CONNECT_HOSTS`. Worth knowing before opening a studio to other people: an
+  OData connection makes the *server* fetch a URL somebody typed.
+
+### Fixed
+
+- **A column menu opens at its column again.** Mantine centres a dropdown under its target, and the
+  target is the header cell — as wide as the column. On a 450px column the click landed at x=470 and
+  the menu at x=545; both column menus, the query tab's and the data tab's, align to the start of
+  the cell now. Measured in a browser, because jsdom has no layout.
+- The engine capability table said nothing rather than "no" for OData in twenty-two of its
+  twenty-eight rows, and the German mirror had neither the column nor the prose. Both pages answer
+  for every row now, and the German one no longer claims that object storage has no execution plan.
+
+### The site
+
+- **Run it now** is QuickRun's own button — its logo, our colours — with a Download button beside it
+  for a browser that cannot reach quickrun.org. And the page reads more like the thing it is about:
+  graph paper behind the hero with a statement over the headline, section headings that open with
+  `--`, a prompt on the shell block, and every engine card carrying the scheme its connection string
+  starts with.
+
 ## 1.5.0
 
 ### A studio anybody brings their own data to

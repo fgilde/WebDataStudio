@@ -210,7 +210,10 @@ export function ResultGrid({ result, onSelectionChange, changed }: {
                   overflow: "hidden",
                   borderBottom: "1px solid var(--mantine-color-default-border)",
                 }}>
-                  <Menu withinPortal closeOnItemClick={false}>
+                  {/* The target is the header cell, which is as wide as the column. Centred — Mantine's
+                      default — a narrow label in a wide column opens its menu far to the right of
+                      where it was clicked, so the dropdown is aligned to the cell's start. */}
+                  <Menu withinPortal closeOnItemClick={false} position="bottom-start">
                     <Menu.Target>
                       <Group gap={2} style={{ cursor: "pointer" }} wrap="nowrap">
                         <Text size="xs" fw={600}>{c.name}</Text>

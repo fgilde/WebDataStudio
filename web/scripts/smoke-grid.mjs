@@ -42,6 +42,24 @@ const header = name => page.locator("thead th").filter({ hasText: name }).first(
 const menuInput = page.locator(".mantine-Menu-dropdown input");
 const menuItem = text => page.locator(".mantine-Menu-dropdown").getByText(text, { exact: true });
 
+// Where the menu opens. Mantine centres a dropdown under its target, and the target is the header
+// cell — as wide as the column. Centred, a narrow label in a wide column opened its menu far to the
+// right of the click, which no unit test can see: jsdom has no layout.
+await header("city").click();
+await page.waitForTimeout(500);
+
+{
+  const cell = await header("city").boundingBox();
+  const dropdown = await page.locator(".mantine-Menu-dropdown").first().boundingBox();
+  const off = Math.round(dropdown.x - cell.x);
+
+  check(`the column menu opens at the column, not beside it (${off}px from the cell's left edge)`,
+    Math.abs(off) <= 12);
+}
+
+await page.keyboard.press("Escape");
+await page.waitForTimeout(300);
+
 // The filter inside the column menu.
 await header("city").click();
 await page.waitForTimeout(500);

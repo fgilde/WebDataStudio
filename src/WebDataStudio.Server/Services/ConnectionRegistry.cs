@@ -38,7 +38,9 @@ public sealed class ConnectionRegistry
         _hosts = hosts;
         _log = log;
         _environment = EnvironmentConnections.Parse(
-            config.AsEnumerable().ToDictionary(kv => kv.Key, kv => kv.Value));
+            config.AsEnumerable().ToDictionary(kv => kv.Key, kv => kv.Value),
+            // A connection somebody wrote down and did not get is worth a line on the way up.
+            why => log?.LogWarning("connection from the environment not offered: {Why}", why));
         _forceReadOnly = string.Equals(config["WDS_READONLY"], "true", StringComparison.OrdinalIgnoreCase);
     }
 

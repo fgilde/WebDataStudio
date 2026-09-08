@@ -41,6 +41,8 @@ public static class ConnectionEndpoints
         {
             if (!access.MayAdd) return AddingIsClosed();
             if (Validate(body) is { } error) return error;
+
+            body = Translated(body);
             if (Unreachable(hosts, body) is { } refused) return refused;
 
             var draft = new ConnectionSpec("", body.Name.Trim(), body.Engine, body.ConnectionString,
@@ -81,6 +83,8 @@ public static class ConnectionEndpoints
             if (registry.Find(id) is not { } existing) return Results.NotFound();
             if (existing.Source == ConnectionSource.Environment) return EnvironmentIsReadOnly();
             if (Validate(body) is { } error) return error;
+
+            body = Translated(body);
             if (Unreachable(hosts, body) is { } refused) return refused;
 
             // A connection this browser owns is edited where it lives: in memory, under its key.
@@ -325,6 +329,8 @@ public static class ConnectionEndpoints
             // it belongs behind the same switch as the form rather than beside it.
             if (!access.MayAdd) return AddingIsClosed();
             if (Validate(body) is { } error) return error;
+
+            body = Translated(body);
             if (Unreachable(hosts, body) is { } refused) return refused;
 
             TunnelSpec? opened = null;
@@ -422,6 +428,18 @@ public static class ConnectionEndpoints
 
         return null;
     }
+
+    /// The body as the drivers want it. A URL — `postgres://user:pw@host:5432/db`, which is the
+    /// shape the form itself offers — is translated into the provider-native string here, because
+    /// Npgsql and its siblings answer "Format of the initialization string does not conform to
+    /// specification" when handed a URL. A password with a `#` in it survives the trip; the URL
+    /// reader encodes what has to be encoded (issue #1).
+    private static ConnectionRequest Translated(ConnectionRequest body) =>
+        ConnectionUrl.Read(body.ConnectionString) is { } url
+            // The engine the scheme names wins over a stale pick in the form: somebody who pasted a
+            // postgres URL means postgres, whatever the box said before the paste.
+            ? body with { Engine = url.Engine, ConnectionString = url.ConnectionString }
+            : body;
 
     /// A target outside WDS_CONNECT_HOSTS, refused at the door: a studio that would open it is a
     /// way into whatever network it runs in.

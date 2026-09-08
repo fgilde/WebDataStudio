@@ -57,6 +57,22 @@ Erkannte Schemata: `postgres`, `postgresql`, `mysql`, `mariadb`, `sqlserver`, `m
 `oracle`, `duckdb`, `clickhouse`, `mongodb`, `redis`. Eine `http`- oder `https`-URL ist die
 Service-Root eines OData-Dienstes.
 
+Ein Passwort ist, was jemand gewählt hat, und `#`, `?`, `/`, `@` und ein Leerzeichen bedeuten in
+einer URL etwas und in einem Passwort nichts. Schreib es, wie es ist —
+`postgres://app:pw#1@db:5432/shop` —, das Studio kodiert vor dem Parsen, was kodiert werden muss;
+ein schon als `pw%231` geschriebenes Passwort wird nicht doppelt kodiert. Der Host ist, was nach dem
+**letzten** `@` kommt, ein Passwort darf also eines enthalten.
+
+Beide Formen funktionieren, hier und im Verbindungsformular:
+
+```bash
+WDS_CONN_SHOP=postgres://app:pw#1@db:5432/shop
+WDS_CONN_SHOP="Host=db;Port=5432;Database=shop;Username=app;Password=pw#1"
+```
+
+Ein Wert mit einem Schema, das das Studio nicht kennt, oder einer, den es gar nicht lesen kann,
+steht jetzt beim Start als Zeile im Log, statt als Verbindung stillschweigend zu fehlen.
+
 **Mehrere Pfade in einer Einstellung.** `WDS_SAVED_QUERIES_DIR`, `WDS_EXPORT_TEMPLATES_DIR`,
 `WDS_QUALITY_FILE`, `WDS_SEED_SQL`, `WDS_CONNECTIONS_FILE`, `WDS_MASK_FILE`,
 `WDS_DASHBOARD_FILE`, `WDS_SNIPPETS_FILE` und `WDS_PREFERENCES_FILE` nehmen je einen Pfad oder

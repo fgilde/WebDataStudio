@@ -6,6 +6,11 @@ Open **Connections** in the header, press **Add**, and either fill in the form o
 connection string — pasting detects the engine and fills the rest. **Test** opens the connection
 once and reports what the server said, without saving anything.
 
+Both shapes are taken: the provider-native string,
+`Host=db;Port=5432;Database=shop;Username=app;Password=pw`, and the URL,
+`postgres://app:pw@db:5432/shop` — which the studio translates into the first before any driver sees
+it. A password with a `#`, a `?` or a space in it needs no encoding by hand in either.
+
 ## A database file
 
 Not every database is a server. A SQLite file, a DuckDB file or a folder of Parquet and CSV files is

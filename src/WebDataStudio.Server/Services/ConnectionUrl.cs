@@ -47,6 +47,67 @@ public static class ConnectionUrl
     public static string? EngineFromScheme(string scheme) =>
         Engines.TryGetValue(scheme, out var engine) ? engine : null;
 
+    /// The engine and the connection string a value in URL form means, or null when it is not a URL
+    /// this studio recognises — a provider-native connection string, say, which needs no translating.
+    ///
+    /// One place for both ways in, because both used to get it wrong in their own way: a
+    /// `WDS_CONN_*` variable dropped a URL it could not parse without a word, and the form stored it
+    /// as typed and let the driver answer "Format of the initialization string does not conform to
+    /// specification".
+    public static (string Engine, string ConnectionString)? Read(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+
+        var text = value.Trim();
+        var scheme = text.IndexOf("://", StringComparison.Ordinal);
+        if (scheme <= 0) return null;
+
+        if (EngineFromScheme(text[..scheme]) is not { } engine) return null;
+
+        // A password is whatever somebody chose, and `#`, `?`, `/` and a space all mean something
+        // to a URL and nothing to a password. Encoded before parsing rather than demanded of the
+        // person typing it: `postgresql://user:pw#@host/db` is what they have in their password
+        // manager.
+        if (!Uri.TryCreate(Escaped(text, scheme + 3), UriKind.Absolute, out var url)) return null;
+
+        return (engine, ToAdoConnectionString(engine, url));
+    }
+
+    /// Percent-encodes what has to be encoded inside a URL's user information — everything between
+    /// `://` and the last `@` — and leaves the rest of the URL, and anything already encoded, alone.
+    ///
+    /// The host is what follows the *last* `@`, so a password may hold one too.
+    private static string Escaped(string url, int authority)
+    {
+        var at = url.LastIndexOf('@');
+        if (at < authority) return url;
+
+        var userInfo = url[authority..at];
+        var encoded = new System.Text.StringBuilder(userInfo.Length);
+
+        for (var i = 0; i < userInfo.Length; i++)
+        {
+            var c = userInfo[i];
+
+            // `:` separates the user from the password and stays; an already-escaped `%XX` stays as
+            // it is, so somebody who encoded their password by hand does not get it encoded twice.
+            if (c == '%' && i + 2 < userInfo.Length
+                && Uri.IsHexDigit(userInfo[i + 1]) && Uri.IsHexDigit(userInfo[i + 2]))
+            {
+                encoded.Append(userInfo, i, 3);
+                i += 2;
+                continue;
+            }
+
+            if (c == ':' || char.IsAsciiLetterOrDigit(c) || c is '-' or '.' or '_' or '~')
+                encoded.Append(c);
+            else
+                encoded.Append(Uri.HexEscape(c));
+        }
+
+        return url[..authority] + encoded + url[at..];
+    }
+
     public static int DefaultPort(string engine) =>
         DefaultPorts.TryGetValue(engine, out var port) ? port : 0;
 

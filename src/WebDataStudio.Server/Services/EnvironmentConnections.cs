@@ -20,7 +20,13 @@ public static class EnvironmentConnections
     private sealed record Entry(string Name, string? Engine, string ConnectionString,
         bool ReadOnly, string? Color, string? Group);
 
-    public static IReadOnlyList<ConnectionSpec> Parse(IDictionary<string, string?> env)
+    /// <param name="env">The whole environment; only the WDS_CONN_* entries are looked at.</param>
+    /// <param name="refused">
+    /// Said once per value that was named but could not be read. A deployment should hear about a
+    /// connection it configured and did not get.
+    /// </param>
+    public static IReadOnlyList<ConnectionSpec> Parse(IDictionary<string, string?> env,
+        Action<string>? refused = null)
     {
         var specs = new List<ConnectionSpec>();
 
@@ -84,17 +90,27 @@ public static class EnvironmentConnections
             string engine;
             string connectionString;
 
-            if (Uri.TryCreate(value, UriKind.Absolute, out var url)
-                && ConnectionUrl.EngineFromScheme(url.Scheme) is { } fromScheme)
+            if (ConnectionUrl.Read(value) is { } url)
             {
-                engine = declared ?? fromScheme;
-                connectionString = engine == fromScheme
-                    ? ConnectionUrl.ToAdoConnectionString(engine, url)
-                    : value;
+                engine = declared ?? url.Engine;
+                // A declared engine that disagrees with the scheme means the value is not what the
+                // scheme says it is, so it travels as it was written.
+                connectionString = engine == url.Engine ? url.ConnectionString : value;
             }
             else
             {
-                if ((declared ?? EngineGuess.FromConnectionString(value)) is not { } guessed) continue;
+                if ((declared ?? EngineGuess.FromConnectionString(value)) is not { } guessed)
+                {
+                    // Silence is what made issue #1 hard to see: a URL the studio could not parse
+                    // meant the connection simply was not there, with nothing said anywhere.
+                    if (value.Contains("://", StringComparison.Ordinal))
+                        refused?.Invoke($"{name}: '{WithoutSecret(value)}' is not a connection this "
+                                        + "studio can read — the scheme is not one it knows, or the "
+                                        + $"value needs {SinglePrefix}{variable}_ENGINE beside it");
+
+                    continue;
+                }
+
                 engine = guessed;
                 connectionString = value;
             }
@@ -110,6 +126,18 @@ public static class EnvironmentConnections
     }
 
     /// Deterministic id so bookmarks, tabs and saved layouts survive a container restart.
+    /// A value for a log line with whatever sits between `://` and the last `@` taken out: that is
+    /// where the password is.
+    private static string WithoutSecret(string value)
+    {
+        var scheme = value.IndexOf("://", StringComparison.Ordinal);
+        var at = value.LastIndexOf('@');
+
+        return scheme > 0 && at > scheme + 3
+            ? value[..(scheme + 3)] + "…@" + value[(at + 1)..]
+            : value;
+    }
+
     private static string StableId(string name) =>
         "env-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(name)))[..12].ToLowerInvariant();
 }

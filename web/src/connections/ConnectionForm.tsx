@@ -108,7 +108,8 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
           }} />}
       <Textarea label="Connection string" autosize minRows={2} value={value.connectionString}
         onChange={e => setConnectionString(e.currentTarget.value)}
-        description="A provider connection string or a URL such as postgres://user:pw@host:5432/db" />
+        description={"Either shape: Host=db;Port=5432;Database=shop;Username=u;Password=pw — or a "
+          + "URL, postgres://u:pw@db:5432/shop. A password with # or ? in it is fine in both."} />
       <Switch label="Read-only" checked={value.readOnly}
         onChange={e => { const readOnly = e.currentTarget.checked; setValue(v => ({ ...v, readOnly })); }} />
 

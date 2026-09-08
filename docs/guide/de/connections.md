@@ -7,6 +7,12 @@ Verbindungszeichenfolge einfügen — beim Einfügen wird die Engine erkannt und
 **Test** öffnet die Verbindung einmal und meldet, was der Server gesagt hat, ohne etwas zu
 speichern.
 
+Beide Formen werden genommen: die providereigene Zeichenfolge,
+`Host=db;Port=5432;Database=shop;Username=app;Password=pw`, und die URL,
+`postgres://app:pw@db:5432/shop` — die das Studio in die erste übersetzt, bevor irgendein Treiber
+sie sieht. Ein Passwort mit `#`, `?` oder Leerzeichen muss in keiner der beiden von Hand kodiert
+werden.
+
 ## Eine Datenbankdatei
 
 Nicht jede Datenbank ist ein Server. Eine SQLite-Datei, eine DuckDB-Datei oder ein Ordner mit

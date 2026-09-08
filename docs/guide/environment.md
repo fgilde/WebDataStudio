@@ -114,6 +114,21 @@ WDS_CONN_NORTHWIND=https://services.odata.org/V4/Northwind/Northwind.svc/
 Recognised schemes: `postgres`, `postgresql`, `mysql`, `mariadb`, `sqlserver`, `mssql`, `sqlite`,
 `oracle`, `duckdb`, `clickhouse`, `mongodb`, `redis`. An `http` or `https` URL is an OData service root.
 
+A password is whatever somebody chose, and `#`, `?`, `/`, `@` and a space all mean something to a URL
+and nothing to a password. Write it as it is — `postgres://app:pw#1@db:5432/shop` — and the studio
+encodes what has to be encoded before it parses; a password already written as `pw%231` is left
+alone rather than encoded twice. The host is what follows the *last* `@`, so a password may hold one.
+
+Either shape works, here and in the connection form:
+
+```bash
+WDS_CONN_SHOP=postgres://app:pw#1@db:5432/shop
+WDS_CONN_SHOP="Host=db;Port=5432;Database=shop;Username=app;Password=pw#1"
+```
+
+A value with a scheme the studio does not know, or one it cannot read at all, is now a line in the
+log on the way up rather than a connection that quietly is not there.
+
 ## Connections as provider connection strings
 
 The same variable also takes the connection string a provider produces, which is what an

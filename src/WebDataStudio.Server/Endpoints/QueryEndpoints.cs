@@ -14,7 +14,11 @@ public static class QueryEndpoints
         string? TransactionId = null,
         /// Keep going after a statement fails, and report what failed at the end. Off by default:
         /// stopping at the first error is what a migration wants.
-        bool? ContinueOnError = null);
+        bool? ContinueOnError = null,
+        /// The dashboard a widget belongs to, when this is a widget's statement: its time range and
+        /// the variable values somebody chose. Absent for a query tab, and then nothing is expanded
+        /// — `$__timeFilter` in a tab is text a person typed.
+        DashboardContext? Dashboard = null);
 
     public record BeginRequest(string ConnectionId);
 
@@ -97,8 +101,37 @@ public static class QueryEndpoints
             ctx.Response.Headers["X-Run-Id"] = runId;
             ctx.Response.ContentType = "application/x-ndjson";
 
-            var request = new ScriptRequest(body.Sql, body.MaxRows ?? defaultMaxRows,
-                body.TimeoutSeconds ?? defaultTimeout, body.Schema, body.Parameters,
+            // A widget's statement reads its dashboard through macros, and this is where they
+            // become SQL: a range as bound values, a variable as a bound value or — for a list —
+            // one quoted literal per entry. See DashboardSql, which is the whole boundary.
+            string sql;
+            var parameters = body.Parameters;
+
+            try
+            {
+                var expanded = DashboardSql.Expand(body.Sql, driver.Dialect, body.Dashboard);
+                sql = expanded.Sql;
+
+                if (expanded.Parameters.Count > 0)
+                    parameters = new Dictionary<string, string?>(body.Parameters ?? [])
+                        .Concat(expanded.Parameters)
+                        .GroupBy(pair => pair.Key)
+                        .ToDictionary(group => group.Key, group => group.Last().Value);
+            }
+            catch (DashboardValueException e)
+            {
+                await ctx.Response.WriteAsync(
+                    JsonSerializer.Serialize(new
+                    {
+                        type = "error", statement = 0, text = e.Message,
+                        code = (string?)null, line = (int?)null, column = (int?)null,
+                    }, Json) + '\n', ctx.RequestAborted);
+
+                return Results.Empty;
+            }
+
+            var request = new ScriptRequest(sql, body.MaxRows ?? defaultMaxRows,
+                body.TimeoutSeconds ?? defaultTimeout, body.Schema, parameters,
                 // A held transaction is already open, so the per-script one would nest.
                 body.Transactional == true && held is null,
                 body.ContinueOnError ?? false);

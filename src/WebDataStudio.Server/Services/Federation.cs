@@ -8,10 +8,15 @@ using WebDataStudio.Server.Drivers.Abstractions;
 namespace WebDataStudio.Server.Services;
 
 /// One query against one connection, staged under `Alias`.
-public sealed record FederationSource(string ConnectionId, string Sql, string Alias);
+public sealed record FederationSource(string ConnectionId, string Sql, string Alias,
+    /// Values to bind, where this source's statement came from a dashboard widget: the range and
+    /// the chosen variables. See DashboardSql — a value binds rather than being written in.
+    IReadOnlyDictionary<string, string?>? Parameters = null);
 
 public sealed record FederationRequest(
-    IReadOnlyList<FederationSource> Sources, string Sql, int? MaxRowsPerSource);
+    IReadOnlyList<FederationSource> Sources, string Sql, int? MaxRowsPerSource,
+    /// Values to bind in the joining SQL, where it came from a dashboard widget.
+    IReadOnlyDictionary<string, string?>? Parameters = null);
 
 /// Something the caller can fix: a bad alias, too much data, SQL DuckDB will not take.
 public sealed class FederationException(string message) : Exception(message);
@@ -47,6 +52,14 @@ public sealed partial class Federation(SessionFactory factory, MaskPolicyStore p
 
         await using var command = duck.CreateCommand();
         command.CommandText = request.Sql;
+
+        foreach (var (key, value) in request.Parameters ?? new Dictionary<string, string?>())
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = key;
+            parameter.Value = (object?)value ?? DBNull.Value;
+            command.Parameters.Add(parameter);
+        }
 
         DbDataReader reader;
         try
@@ -141,7 +154,8 @@ public sealed partial class Federation(SessionFactory factory, MaskPolicyStore p
         var (driver, session) = await factory.OpenAsync(source.ConnectionId, ct);
         await using (session)
         {
-            await foreach (var chunk in driver.ExecuteAsync(session, new ScriptRequest(source.Sql, 1, 60), ct))
+            await foreach (var chunk in driver.ExecuteAsync(session,
+                new ScriptRequest(source.Sql, 1, 60, Parameters: source.Parameters), ct))
                 switch (chunk)
                 {
                     case ResultChunk.Columns columns:
@@ -169,7 +183,8 @@ public sealed partial class Federation(SessionFactory factory, MaskPolicyStore p
             var batch = new List<object?[]>();
 
             // The cap plus one: reading one row past it is how the refusal knows it is right.
-            var request = new ScriptRequest(source.Sql, maxRows + 1, 300);
+            var request = new ScriptRequest(source.Sql, maxRows + 1, 300,
+                Parameters: source.Parameters);
 
             await foreach (var chunk in Masking.Stream(driver.ExecuteAsync(session, request, ct), policy, ct))
             {

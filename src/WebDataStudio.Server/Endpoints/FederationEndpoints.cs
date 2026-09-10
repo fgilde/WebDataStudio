@@ -1,4 +1,5 @@
 using System.Text.Json;
+using WebDataStudio.Server.Drivers;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Services;
 
@@ -7,7 +8,11 @@ namespace WebDataStudio.Server.Endpoints;
 public static class FederationEndpoints
 {
     public record SourceDto(string ConnectionId, string Sql, string Alias);
-    public record FederateRequest(List<SourceDto> Sources, string Sql, int? MaxRowsPerSource);
+    public record FederateRequest(List<SourceDto> Sources, string Sql, int? MaxRowsPerSource,
+        /// The dashboard a widget belongs to, when this is a widget's statement. Each source is
+        /// expanded with its own engine's dialect and the joining SQL with DuckDB's — the same
+        /// boundary, applied per statement rather than once.
+        DashboardContext? Dashboard = null);
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -17,11 +22,11 @@ public static class FederationEndpoints
         // source. A wrong alias or a broken source query shows up here rather than after a minute
         // of copying.
         app.MapPost("/api/federate/preview", async (FederateRequest body, Federation federation,
-            CancellationToken ct) =>
+            ConnectionRegistry connections, DriverRegistry drivers, CancellationToken ct) =>
         {
             try
             {
-                var plan = await federation.PreviewAsync(Model(body), ct);
+                var plan = await federation.PreviewAsync(Model(body, connections, drivers), ct);
                 return Results.Ok(new
                 {
                     sources = plan.Select(entry => new { alias = entry.Alias, ddl = entry.Ddl }),
@@ -35,14 +40,14 @@ public static class FederationEndpoints
         // The same NDJSON stream a query produces, so the existing result grid renders it without
         // knowing that several databases were involved.
         app.MapPost("/api/federate/run", async (FederateRequest body, HttpContext ctx,
-            Federation federation) =>
+            Federation federation, ConnectionRegistry connections, DriverRegistry drivers) =>
         {
             var ct = ctx.RequestAborted;
             ctx.Response.ContentType = "application/x-ndjson";
 
             try
             {
-                await foreach (var chunk in federation.RunAsync(Model(body), ct))
+                await foreach (var chunk in federation.RunAsync(Model(body, connections, drivers), ct))
                     await WriteAsync(ctx, Wire(chunk), ct);
             }
             catch (FederationException e)
@@ -71,9 +76,33 @@ public static class FederationEndpoints
         code = (string?)null, line = (int?)null, column = (int?)null,
     };
 
-    private static FederationRequest Model(FederateRequest body) => new(
-        [.. (body.Sources ?? []).Select(s => new FederationSource(s.ConnectionId, s.Sql, s.Alias))],
-        body.Sql ?? "", body.MaxRowsPerSource);
+    private static FederationRequest Model(FederateRequest body, ConnectionRegistry connections,
+        DriverRegistry drivers)
+    {
+        var sources = new List<FederationSource>();
+
+        foreach (var source in body.Sources ?? [])
+        {
+            var expanded = DashboardSql.Expand(source.Sql, Dialect(source.ConnectionId, connections, drivers),
+                body.Dashboard);
+
+            sources.Add(new FederationSource(source.ConnectionId, expanded.Sql, source.Alias,
+                expanded.Parameters.Count > 0 ? expanded.Parameters : null));
+        }
+
+        // The joining SQL runs in DuckDB, so that is the dialect its own macros are written for.
+        var joining = DashboardSql.Expand(body.Sql ?? "",
+            drivers.Get("duckdb").Dialect, body.Dashboard);
+
+        return new FederationRequest(sources, joining.Sql, body.MaxRowsPerSource,
+            joining.Parameters.Count > 0 ? joining.Parameters : null);
+    }
+
+    private static SqlDialect Dialect(string connectionId, ConnectionRegistry connections,
+        DriverRegistry drivers) =>
+        connections.Find(connectionId)?.Engine is { Length: > 0 } engine
+            ? drivers.Get(engine).Dialect
+            : drivers.Get("duckdb").Dialect;
 
     private static object Wire(ResultChunk chunk) => chunk switch
     {

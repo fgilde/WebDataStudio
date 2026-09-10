@@ -11,23 +11,6 @@ public sealed record HistoryEntry(long Id, string ConnectionId, string Sql,
 
 /// A note somebody left on an object: what a column really means, why a table is the way it is,
 /// what the last migration broke.
-/// One box on a dashboard: a statement, and what to draw with what comes back.
-public sealed record DashboardTile(
-    string Title, string ConnectionId, string Sql,
-    /// `number` shows the first cell of the first row, `table` the rows, `chart` a bar per row.
-    string View,
-    /// How many columns of the grid it takes, 1 to 4.
-    int Width);
-
-/// A page of boxes, each one a statement somebody wants on a screen rather than in a tab.
-public sealed record Dashboard(
-    string Id, string Name, IReadOnlyList<DashboardTile> Tiles,
-    /// How often the boxes run themselves. 0 means only when somebody asks.
-    int RefreshSeconds, DateTimeOffset UpdatedAt,
-    /// True for one the deployment ships: the studio shows it and cannot change or delete it, the
-    /// same deal a mounted quality rule gets.
-    bool FromFile = false);
-
 public sealed record ObjectNote(
     long Id, string ConnectionId, string ObjectRef, string Author, string Body, DateTimeOffset At);
 
@@ -142,7 +125,14 @@ public sealed class WorkspaceStore
 
         // A file created before snapshots existed has the table without that column, and SQLite has
         // no ADD COLUMN IF NOT EXISTS — so it is asked first.
-        if (prepared.Available) AddColumnIfMissing("history", "snapshot", "TEXT NULL");
+        if (prepared.Available)
+        {
+            AddColumnIfMissing("history", "snapshot", "TEXT NULL");
+            // A dashboard is a document now — a canvas, a time range, variables. The `tiles` column
+            // stays and keeps being written, so an image rolled back onto the same file still shows
+            // the boxes rather than an empty page.
+            AddColumnIfMissing("dashboards", "document", "TEXT NOT NULL DEFAULT ''");
+        }
     }
 
     private void AddColumnIfMissing(string table, string column, string definition)
@@ -546,41 +536,81 @@ public sealed class WorkspaceStore
         using var db = Open();
         using var cmd = db.CreateCommand();
         cmd.CommandText =
-            "SELECT id, name, tiles, refresh_seconds, updated_at FROM dashboards ORDER BY name COLLATE NOCASE";
+            "SELECT id, name, tiles, refresh_seconds, updated_at, document FROM dashboards "
+            + "ORDER BY name COLLATE NOCASE";
 
         using var reader = cmd.ExecuteReader();
         var list = new List<Dashboard>();
 
         while (reader.Read())
-            list.Add(new Dashboard(
-                reader.GetString(0), reader.GetString(1),
-                JsonSerializer.Deserialize<List<DashboardTile>>(reader.GetString(2)) ?? [],
-                reader.GetInt32(3), DateTimeOffset.Parse(reader.GetString(4))));
+        {
+            var id = reader.GetString(0);
+            var name = reader.GetString(1);
+            var refresh = reader.GetInt32(3);
+            var at = DateTimeOffset.Parse(reader.GetString(4));
+            var document = reader.IsDBNull(5) ? "" : reader.GetString(5);
+
+            // The document is the dashboard; the tile list is what a page written before the canvas
+            // existed left behind. Reading both here is the whole migration — nothing else in the
+            // studio has to know there were two shapes.
+            Dashboard? kept = null;
+
+            if (document.Length > 0)
+            {
+                try
+                {
+                    kept = JsonSerializer.Deserialize<Dashboard>(document, Dashboards.Json);
+                }
+                catch (JsonException)
+                {
+                    // A document this cannot read is a dashboard somebody would rather see as its
+                    // tiles than not at all.
+                }
+            }
+
+            kept ??= new Dashboard(id, name,
+                Dashboards.FromTiles(
+                    JsonSerializer.Deserialize<List<DashboardTile>>(reader.GetString(2)) ?? []),
+                refresh, at);
+
+            list.Add(Dashboards.Normalise(kept with { Id = id, Name = name, RefreshSeconds = refresh, UpdatedAt = at }));
+        }
 
         return list;
     }
 
     public Dashboard SaveDashboard(Dashboard dashboard)
     {
-        var stored = dashboard with
+        var stored = Dashboards.Normalise(dashboard with
         {
             Id = string.IsNullOrEmpty(dashboard.Id) ? Guid.NewGuid().ToString("n") : dashboard.Id,
             UpdatedAt = DateTimeOffset.UtcNow,
-        };
+        });
+
+        var document = JsonSerializer.Serialize(stored, Dashboards.Json);
+
+        // A megabyte of dashboard is not a dashboard; it is a paste accident, and keeping it would
+        // make the whole list slow to read.
+        if (document.Length > 512 * 1024)
+            throw new InvalidOperationException(
+                "this dashboard is larger than half a megabyte, which is more than a page of "
+                + "widgets can honestly be");
 
         using var db = Open();
         using var cmd = db.CreateCommand();
         cmd.CommandText =
-            "INSERT INTO dashboards (id, name, tiles, refresh_seconds, updated_at) "
-            + "VALUES ($id, $name, $tiles, $refresh, $at) "
+            "INSERT INTO dashboards (id, name, tiles, refresh_seconds, updated_at, document) "
+            + "VALUES ($id, $name, $tiles, $refresh, $at, $document) "
             + "ON CONFLICT(id) DO UPDATE SET name = excluded.name, tiles = excluded.tiles, "
-            + "refresh_seconds = excluded.refresh_seconds, updated_at = excluded.updated_at";
+            + "refresh_seconds = excluded.refresh_seconds, updated_at = excluded.updated_at, "
+            + "document = excluded.document";
 
         cmd.Parameters.AddWithValue("$id", stored.Id);
         cmd.Parameters.AddWithValue("$name", stored.Name);
-        cmd.Parameters.AddWithValue("$tiles", JsonSerializer.Serialize(stored.Tiles));
+        cmd.Parameters.AddWithValue("$tiles", JsonSerializer.Serialize(Dashboards.ToTiles(stored)));
         cmd.Parameters.AddWithValue("$refresh", stored.RefreshSeconds);
         cmd.Parameters.AddWithValue("$at", stored.UpdatedAt.ToString("O"));
+        cmd.Parameters.AddWithValue("$document", document);
         cmd.ExecuteNonQuery();
 
         return stored;

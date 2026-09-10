@@ -6,7 +6,10 @@ namespace WebDataStudio.Server.Services;
 /// One studio account. `Connections` empty means "all of them"; a non-empty set is a whitelist of
 /// connection names or ids.
 public sealed record StudioUser(
-    string Name, string Secret, string Role, IReadOnlySet<string> Connections)
+    string Name, string Secret, string Role, IReadOnlySet<string> Connections,
+    /// Where the account came from. The environment's own are shown and never changed from the UI,
+    /// the same deal an environment connection gets.
+    UserSource Source = UserSource.Environment)
 {
     public bool IsAdmin => Role == UserRoles.Admin;
 
@@ -49,12 +52,15 @@ public sealed class UserStore
     /// A hash of nothing anybody knows, verified against when no account matched.
     private static readonly Lazy<string> Decoy = new(() => Hash(Guid.NewGuid().ToString()));
 
-    private readonly List<StudioUser> _users;
+    private readonly List<StudioUser> _environment;
+    private readonly StudioUserStore? _stored;
 
-    public UserStore(IReadOnlyList<StudioUser> users, bool external = false)
+    public UserStore(IReadOnlyList<StudioUser> users, bool external = false,
+        StudioUserStore? stored = null)
     {
-        _users = [.. users];
+        _environment = [.. users];
         External = external;
+        _stored = stored;
     }
 
     /// An identity provider decides who may sign in, rather than a list in the environment.
@@ -62,11 +68,18 @@ public sealed class UserStore
 
     /// Nowhere to sign in from: the studio runs open and never shows a login screen. A provider
     /// counts, or configuring one would leave a studio wide open with a login button on it.
-    public bool Anonymous => _users.Count == 0 && !External;
+    public bool Anonymous => All.Count == 0 && !External;
 
-    public IReadOnlyList<StudioUser> All => _users;
+    /// Every account that may sign in: what the deployment wrote down, then what an admin made.
+    /// Asked rather than cached, because the second half changes while the studio runs.
+    public IReadOnlyList<StudioUser> All =>
+        _stored is null ? _environment : [.. _environment, .. _stored.List()];
 
-    public static UserStore FromConfiguration(IConfiguration config)
+    /// Only the deployment's own, for the places that have to tell them apart.
+    public IReadOnlyList<StudioUser> FromEnvironment => _environment;
+
+    public static UserStore FromConfiguration(IConfiguration config,
+        StudioUserStore? stored = null)
     {
         var users = Parse(config["WDS_USERS"]);
 
@@ -79,7 +92,7 @@ public sealed class UserStore
                     new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
         }
 
-        return new UserStore(users, OidcOptions.FromConfiguration(config).Enabled);
+        return new UserStore(users, OidcOptions.FromConfiguration(config).Enabled, stored);
     }
 
     public static List<StudioUser> Parse(string? value)
@@ -112,7 +125,7 @@ public sealed class UserStore
     {
         StudioUser? found = null;
 
-        foreach (var user in _users)
+        foreach (var user in All)
         {
             var nameOk = FixedTimeEquals(user.Name, username);
             var secretOk = VerifySecret(user.Secret, password);

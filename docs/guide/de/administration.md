@@ -161,7 +161,38 @@ blockiert. Eine Sitzung lässt sich beenden, nach einer Rückfrage, die ihr aktu
 Datenbanken auflisten, anlegen und löschen — bei den Engines, die mehr als eine haben. Das Löschen
 verlangt, dass du den Namen tippst.
 
-## Konten und Rollen
+## Wer sich am Studio anmelden darf
+
+Zwei Sorten Konten leben im Tab **Studio users**: die, die die Bereitstellung in `WDS_USERS`
+aufgeschrieben hat, und die, die eine Administratorin hier anlegt. Beide melden sich gleich an und
+bedeuten danach dasselbe — Rolle, erlaubte Verbindungen, Maskierung, die Zeile im Audit-Trail.
+
+`WDS_USERS` passt zu einem Stack, der ausgeliefert wird, und passt nicht zu einem Studio, das ein
+Jahr läuft: irgendwann fängt jemand an einem Dienstag an. Deshalb legt der Tab auch Konten an; sie
+liegen in der eigenen Datenbank des Studios, neben den Verbindungen.
+
+Was dabei gilt:
+
+- **Ein Passwort wird nur als Hash geschrieben.** Der Browser schickt, was jemand getippt hat; auf
+  der Platte landet PBKDF2. Zurück reist kein Hash, auch nicht zu einer Administratorin.
+- **Was die Umgebung besitzt, ist hier nur lesbar.** Ein Konto aus `WDS_USERS` steht mit
+  entsprechender Kennzeichnung in der Liste und hat weder Stift noch Papierkorb — die Ablehnung
+  nennt die Variable. Genau das ist auch der Weg zurück: ein Konto, das ein Rollout besitzt, kann
+  niemand von innen entfernen.
+- **Die letzte Administratorin lässt sich nicht löschen und nicht herabstufen.** Ein Studio, das
+  niemand administrieren kann, kommt nur über einen Container-Rollout zurück; also lehnt das Panel
+  vorher ab. Ein Admin-Konto aus `WDS_USERS` zählt mit — eine Bereitstellung, die eines hat, darf
+  die hier angelegten Konten also alle wieder loswerden.
+- **Nur Administratorinnen sehen das überhaupt.** `/api/admin/*` ist admin-only; wer direkt fragt,
+  bekommt dasselbe Nein, das der fehlende Knopf andeutet.
+- Ein Studio, das sein Datenverzeichnis nicht schreiben kann, führt keine eigenen Konten. Der Tab
+  sagt das mit der Kennzeichnung *read-only store* und bietet kein **Add account** an, statt eines
+  Knopfes, der scheitert.
+
+Das Feld **Hash a password for WDS_USERS** bleibt: es rechnet einen Hash im Format
+`pbkdf2$Iterationen$Salt$Hash` aus — praktisch, wenn ein Konto doch in die Umgebung soll.
+
+## Konten und Rollen (der Datenbank)
 
 Der Tab **Accounts** listet, was der Server kennt: Konten, Rollen und den Unterschied. In PostgreSQL
 gibt es nur eine Sorte Ding, und der Unterschied ist, ob es sich anmelden darf; die anderen Engines

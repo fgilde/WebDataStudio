@@ -152,6 +152,7 @@ Status is one of `done`, `partial: <what is missing>` or `not-supported: <engine
 | F20.2 | Undo for an applied data change, the inverse shown as a script before it runs | done | all | Data tab |
 | F20.3 | Several studio accounts with roles (admin, editor, viewer) and their own connections | done | all | Login, administration, studio users tab |
 | F20.4 | The mask policy can come from the deployment: extra columns, exempt columns, or the heuristic off entirely | done | all | Environment, data tab |
+| F20.5 | Accounts an admin makes, changes and removes while the studio runs, kept as PBKDF2 hashes beside the connections; `WDS_USERS` accounts stay read-only and the last admin cannot be removed or demoted | done | all | Administration, studio users tab |
 | F21.1 | Federated query across connections, staged in DuckDB, with a row cap per source and the staging shown first | done | all | Federated panel |
 | F21.2 | Watch a query on an interval, changed cells highlighted, one run at a time | done | all | Query tab |
 | F21.3 | Generated test rows with a strategy per column, foreign keys pointing at existing rows, seeded | done | all | Data tab, generate dialog |

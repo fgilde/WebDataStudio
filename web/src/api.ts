@@ -324,11 +324,35 @@ export const countRows = (conn: string, ref: string,
 
 export interface StudioUserDto {
   name: string; role: string; connections: string[]; hashed: boolean;
+  /// "Environment" is an account the deployment wrote down: shown here, changed in a rollout.
+  source: "Environment" | "Stored";
 }
-export interface StudioUsersDto { anonymous: boolean; source: string; users: StudioUserDto[] }
+export interface StudioUsersDto {
+  anonymous: boolean; source: string;
+  /// Whether this studio can keep accounts of its own. False on a read-only data directory, and
+  /// then the panel offers no editing rather than buttons that fail.
+  writable: boolean;
+  users: StudioUserDto[];
+}
+
+/// Omitting the password on an edit keeps the one they have: an admin fixing a role should not need
+/// to know somebody's password.
+export interface AccountInput {
+  name: string; password?: string; role: string; connections: string[];
+}
 
 export const listStudioUsers = (): Promise<StudioUsersDto> =>
   fetch(`${base}/admin/studio-users`).then(r => ok<StudioUsersDto>(r));
+
+export const createStudioUser = (body: AccountInput): Promise<{ name: string; role: string }> =>
+  fetch(`${base}/admin/studio-users`, json("POST", body))
+    .then(r => ok<{ name: string; role: string }>(r));
+export const updateStudioUser = (name: string, body: AccountInput): Promise<void> =>
+  fetch(`${base}/admin/studio-users/${encodeURIComponent(name)}`, json("PUT", body))
+    .then(r => ok<void>(r));
+export const deleteStudioUser = (name: string): Promise<void> =>
+  fetch(`${base}/admin/studio-users/${encodeURIComponent(name)}`, { method: "DELETE" })
+    .then(r => ok<void>(r));
 
 /// Turns a password into what WDS_USERS wants. Admin-only on the server.
 export const hashStudioPassword = (password: string): Promise<{ hash: string }> =>

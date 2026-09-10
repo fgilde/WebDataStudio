@@ -46,7 +46,6 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 // builder (WebApplicationFactory in tests, and anything layered on later) only land in the composed
 // IConfiguration after Build().
 builder.Services.AddSingleton(sp => AuthOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
-builder.Services.AddSingleton(sp => UserStore.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<CurrentUser>();
 
@@ -145,6 +144,13 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton(sp => new ConnectionStore(
     sp.GetRequiredService<IConfiguration>()["DB_PATH"] ?? defaultDbPath,
     sp.GetRequiredService<SecretProtector>()));
+builder.Services.AddSingleton(sp => new StudioUserStore(
+    sp.GetRequiredService<IConfiguration>()["DB_PATH"] ?? defaultDbPath));
+// Accounts come from two places: what the deployment wrote down, and what an admin made. The store
+// is asked on every access rather than cached, because the second half changes while the studio
+// runs.
+builder.Services.AddSingleton(sp => UserStore.FromConfiguration(
+    sp.GetRequiredService<IConfiguration>(), sp.GetRequiredService<StudioUserStore>()));
 builder.Services.AddSingleton<FileRoots>();
 builder.Services.AddSingleton<SessionConnections>();
 // Ends the sessions nobody came back to, and deletes what they brought with them.

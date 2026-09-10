@@ -7,7 +7,7 @@
 | `WDS_CONN_<NAME>_ENGINE` | which engine that connection string belongs to |
 | `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | flags for the connection of the same name |
 | `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app; the account is an admin |
-| `WDS_USERS` | several accounts: `name:role:secret[:conn,conn]` entries separated by `;` — see [Safety](safety.md) |
+| `WDS_USERS` | several accounts: `name:role:secret[:conn,conn]` entries separated by `;`. Read-only in the studio; an admin makes further accounts in the panel — see [Safety](safety.md#accounts-an-admin-makes) |
 | `WDS_TITLE` | a name for this studio, shown in the header, on the login screen and in the browser tab |
 | `WDS_THEME` | the theme the studio comes up in, by id (`ocean`, `aspire`, `nord`, …). A person who picks another one keeps their choice; an id the studio does not have is ignored |
 | `WDS_TRANSACTION_IDLE_SECONDS` | how long a transaction a query tab holds open may sit untouched before the server rolls it back (default 900). A closed browser ends the same way |

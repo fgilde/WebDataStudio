@@ -16,6 +16,10 @@ public static class AdminEndpoints
         string? Action = null, bool? Role = null, bool? CanLogin = null, string? Member = null);
     public record UserApplyRequest(string Hash);
     public record HashRequest(string Password);
+
+    /// One account as the panel sends it. `Password` empty on an edit means "keep the one they
+    /// have": an admin fixing a role should not need to know somebody's password.
+    public record AccountRequest(string Name, string? Password, string Role, string[]? Connections);
     public record DatabaseRequest(string Name);
     public record JobActionRequest(string Id, string Action);
     public record BackupRequest(
@@ -27,21 +31,85 @@ public static class AdminEndpoints
         // --- sessions --------------------------------------------------------
         // What the server is doing right now, and who is waiting for whom. One call, because the
         // overview tab asks for both every few seconds.
-        // The studio's own accounts, not the database's. Secrets never leave the server, and the
-        // list is read-only: accounts are deployment configuration, so a rollout is the only way to
-        // change them and nobody can grant themselves a role through the UI.
-        app.MapGet("/api/admin/studio-users", (UserStore users, IConfiguration config) => Results.Ok(new
+        // The studio's own accounts, not the database's. Secrets never leave the server — not
+        // even hashed: a hash in a browser's memory is a hash somebody can take away.
+        app.MapGet("/api/admin/studio-users", (UserStore users, StudioUserStore store,
+            IConfiguration config) => Results.Ok(new
         {
             anonymous = users.Anonymous,
             source = string.IsNullOrWhiteSpace(config["WDS_USERS"]) ? "WDS_USER/WDS_PASSWORD" : "WDS_USERS",
+            // Whether this studio can keep accounts at all. A read-only data directory says no, and
+            // the panel then offers no pencil rather than a button that fails.
+            writable = store.Available,
             users = users.All.Select(u => new
             {
                 name = u.Name,
                 role = u.Role,
                 connections = u.Connections.OrderBy(c => c, StringComparer.OrdinalIgnoreCase),
                 hashed = u.Secret.StartsWith("pbkdf2$", StringComparison.Ordinal),
+                source = u.Source.ToString(),
             }),
         }));
+
+        // --- accounts an admin makes -----------------------------------------
+        // Everything under /api/admin is admin-only already (see Program.cs), so these four say
+        // nothing about roles and everything about the two ways to lock a studio out of itself.
+
+        app.MapPost("/api/admin/studio-users", (AccountRequest body, UserStore users,
+            StudioUserStore store) =>
+        {
+            if (string.IsNullOrWhiteSpace(body.Name))
+                return Results.BadRequest(new { message = "a name is needed" });
+
+            if (string.IsNullOrEmpty(body.Password))
+                return Results.BadRequest(new { message = "a password is needed" });
+
+            if (users.FromEnvironment.Any(u => u.Name.Equals(body.Name.Trim(),
+                    StringComparison.OrdinalIgnoreCase)))
+                return Results.Conflict(new
+                {
+                    message = $"'{body.Name.Trim()}' is an account this deployment wrote down in "
+                              + "WDS_USERS; change it there or pick another name",
+                });
+
+            try
+            {
+                var made = store.Add(body.Name, body.Password, body.Role, body.Connections ?? []);
+                return Results.Ok(new { name = made.Name, role = made.Role });
+            }
+            catch (InvalidOperationException e)
+            {
+                return Results.Conflict(new { message = e.Message });
+            }
+        });
+
+        app.MapPut("/api/admin/studio-users/{name}", (string name, AccountRequest body,
+            UserStore users, StudioUserStore store) =>
+        {
+            if (Owned(users, name) is { } owned) return owned;
+            if (store.Find(name) is null) return Results.NotFound();
+
+            // The last admin may not talk themselves out of the role: a studio nobody can
+            // administer needs a rollout to come back.
+            if (LastAdmin(users, name) && !UserRoles.Normalise(body.Role).Equals(UserRoles.Admin))
+                return TheLastAdmin("demoted");
+
+            store.Update(name, body.Role, body.Connections ?? [], body.Password);
+
+            return Results.NoContent();
+        });
+
+        app.MapDelete("/api/admin/studio-users/{name}", (string name, UserStore users,
+            StudioUserStore store) =>
+        {
+            if (Owned(users, name) is { } owned) return owned;
+            if (store.Find(name) is null) return Results.NotFound();
+            if (LastAdmin(users, name)) return TheLastAdmin("removed");
+
+            store.Delete(name);
+
+            return Results.NoContent();
+        });
 
         // Turning a password into what WDS_USERS wants. Hashing is not a secret operation - the
         // hash it returns is what goes into a deployment - but it stays behind the admin role so it
@@ -633,4 +701,29 @@ public static class AdminEndpoints
         catch (InvalidOperationException e) { return Results.BadRequest(new { message = e.Message }); }
         catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
     }
+
+    /// An account the deployment owns: shown here, changed in the environment. The same deal an
+    /// environment connection gets, and the refusal names the variable that owns it.
+    private static IResult? Owned(UserStore users, string name) =>
+        users.FromEnvironment.Any(u => u.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            ? Results.Json(new
+            {
+                message = $"'{name}' is an account this deployment wrote down; change it in "
+                          + "WDS_USERS and roll the container out",
+            }, statusCode: StatusCodes.Status403Forbidden)
+            : null;
+
+    /// Whether this account is the only admin left. An admin from the environment counts: with one
+    /// of those around, the way back in does not need a rollout.
+    private static bool LastAdmin(UserStore users, string name) =>
+        users.All.Count(u => u.IsAdmin) == 1
+        && users.All.Any(u => u.IsAdmin && u.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+    private static IResult TheLastAdmin(string what) =>
+        Results.Conflict(new
+        {
+            message = $"this is the last admin this studio has, so it cannot be {what} — a studio "
+                      + "nobody can administer needs a container rollout to come back",
+        });
+
 }

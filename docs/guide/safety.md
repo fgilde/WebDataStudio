@@ -96,9 +96,30 @@ WDS_USERS='ada:admin:pbkdf2$210000$c2FsdA==$aGFzaA==;grace:viewer:pbkdf2$...:PRO
 The header shows a person icon once accounts exist: who is signed in, their role and what it may
 do, and **Sign out**. On a studio without accounts there is nothing to be and no menu.
 
-Accounts are deployment configuration, not stored state. They come from the environment, so a
-container rollout is the only way to change them and nobody can grant themselves a role through the
-UI. The *Studio users* tab lists who exists; it does not edit.
+### Accounts an admin makes
+
+`WDS_USERS` is right for a stack that ships and wrong for a studio that runs for a year: somebody
+joins on a Tuesday. So the *Studio users* tab in the administration panel makes accounts too, kept
+in the studio's own database beside the connections. Both kinds sign in the same way and mean the
+same thing downstream — role, connections, masking, the line in the audit trail.
+
+What keeps the old promise intact:
+
+- **A password is only ever written as a hash.** What the browser sends is what somebody typed; what
+  lands on disk is PBKDF2. No hash travels back, not even to an admin.
+- **What the environment owns stays read-only here.** An account from `WDS_USERS` is listed with a
+  badge saying so and has no pencil and no bin — the refusal names the variable. That is also what
+  makes it the way back in: an account a rollout owns cannot be removed by anybody signed in.
+- **The last admin cannot be removed or demoted.** A studio nobody can administer needs a container
+  rollout to come back, so the panel refuses instead. An admin in `WDS_USERS` counts as one, which
+  is why a deployment that has one can always drop the accounts made here.
+- **Only an admin sees any of this.** `/api/admin/*` is admin-only, so an editor asking directly
+  gets the same no the hidden button implies.
+- A studio whose data directory cannot be written keeps no accounts of its own; the tab says so with
+  a *read-only store* badge and offers no **Add account**, rather than a button that fails.
+
+An account made here can be deleted, and then it cannot sign in — an open session is not a second
+account. Nothing else about the studio changes.
 
 Generating a hash — the *Studio users* tab has a field for it, or by hand against a running studio
 signed in as an admin:

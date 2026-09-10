@@ -39,7 +39,7 @@ export function useWidgetData(widget: Widget, dashboard: Dashboard,
   // the server is already streaming and a cancel is a second round trip for nothing.
   const generation = useRef(0);
 
-  const key = JSON.stringify([widget.source, dashboard.timeRange, chosen, nonce]);
+  const key = JSON.stringify([widget.type, widget.source, dashboard.timeRange, chosen, nonce]);
 
   const run = useCallback(() => {
     const mine = ++generation.current;
@@ -48,6 +48,13 @@ export function useWidgetData(widget: Widget, dashboard: Dashboard,
 
     const federated = source.kind === "Federated";
     const sources = source.sources ?? [];
+
+    // A band and a prose widget draw no rows, and a statement nobody looks at is a statement
+    // nobody should have run — including on every refresh.
+    if (widget.type === "Row" || widget.type === "Text") {
+      setData(empty);
+      return;
+    }
 
     if (federated ? sources.length === 0 : !(source.connectionId && source.sql?.trim())) {
       setData({ ...empty, error: null });

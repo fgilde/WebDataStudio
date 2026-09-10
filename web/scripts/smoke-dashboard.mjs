@@ -119,6 +119,70 @@ try {
   check("the time range can be changed", true);
 } catch (e) { await fail("range", e); }
 
+// --- switching to another dashboard --------------------------------------------------------------
+// GridStack only adopts the elements that exist when it starts, so the widgets of the *next*
+// dashboard were once elements it had never seen: unmanaged, unpositioned, all piled into the
+// corner at the same size. This is that bug, as a check.
+try {
+  await page.request.post(`${baseUrl}/api/dashboards`, {
+    data: {
+      name: `${name} second`,
+      widgets: [
+        {
+          id: "s1", type: "Stat", title: "Second dashboard",
+          position: { x: 0, y: 0, w: 8, h: 5 },
+          source: { kind: "Sql", connectionId: connection.id, sql: "SELECT count(*) AS n FROM customers" },
+          mapping: {}, options: { legend: true, thresholds: [] },
+        },
+        {
+          id: "s2", type: "Table", title: "Its rows",
+          position: { x: 8, y: 0, w: 16, h: 5 },
+          source: { kind: "Sql", connectionId: connection.id, sql: "SELECT * FROM customers LIMIT 5" },
+          mapping: {}, options: { legend: true, thresholds: [] },
+        },
+      ],
+    },
+  });
+
+  const boxes = () => page.locator(".grid-stack-item").evaluateAll(items => items.map(one => {
+    const { x, width, height } = one.getBoundingClientRect();
+    return { x: Math.round(x), width: Math.round(width), height: Math.round(height) };
+  }));
+
+  // Saved through the API, so this browser has not seen it yet — which is what the refresh button
+  // is for.
+  await page.getByRole("button", { name: "Refresh", exact: true }).click();
+  await page.waitForTimeout(1200);
+
+  const open = async (label) => {
+    await page.getByRole("combobox", { name: "Dashboard" }).click();
+    await page.getByRole("option", { name: label, exact: true }).click();
+    await page.waitForTimeout(1500);
+  };
+
+  await open(`${name} second`);
+
+  const second = await boxes();
+  if (second.length !== 2) throw new Error(`the second dashboard drew ${second.length} widgets`);
+  // Side by side and each wider than the corner they used to collapse into.
+  if (second[0].x === second[1].x)
+    throw new Error("both widgets start at the same column");
+  if (second.some(one => one.width < 100 || one.height < 100))
+    throw new Error(`a widget came out at ${JSON.stringify(second)}`);
+
+  check("switching to another dashboard positions its widgets", true);
+
+  // And back: the first dashboard's own widgets are managed again rather than left behind.
+  await open(name);
+
+  const first = await boxes();
+  if (first.length !== 2) throw new Error(`the first dashboard drew ${first.length} widgets`);
+  if (first.some(one => one.width < 100 || one.height < 100))
+    throw new Error(`a widget came back at ${JSON.stringify(first)}`);
+
+  check("and switching back positions them again", true);
+} catch (e) { await fail("switch", e); }
+
 // --- a Grafana dashboard, pasted --------------------------------------------------------------------
 const grafana = JSON.stringify({
   title: `${name} from grafana`,

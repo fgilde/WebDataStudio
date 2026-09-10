@@ -3,8 +3,9 @@
 ![Dashboards](../../assets/screenshots/dashboards-dark.png)
 
 Ein Dashboard ist hier eine Leinwand: vierundzwanzig Spalten, Widgets, die sich ziehen und in der
-Größe ändern lassen, eine Zeitspanne für die Seite und Variablen, die ihre Statements lesen.
-**Tools → Dashboard.**
+Größe ändern lassen, eine Zeitspanne für die Seite und Variablen, die ihre Statements lesen. Das
+**Raster-Symbol** in der Kopfleiste öffnet sie; sie stehen außerdem unter **Tools → Dashboard** und
+in der Befehlspalette.
 
 Nichts darauf ist ein zweiter Weg an die Daten. Das Statement eines Widgets läuft über denselben
 Endpunkt wie ein Abfrage-Tab — oder über die Federation des Studios, wenn es mehrere Verbindungen

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { ActionIcon, Badge, Divider, Menu, Text, Tooltip } from "@mantine/core";
-import { IconLogout, IconUser } from "@tabler/icons-react";
+import { IconLogout, IconUser, IconUsersGroup } from "@tabler/icons-react";
 import { logout, me, type Me } from "../api";
+import { emit } from "../shell/bus";
 
 const roleColour = (role?: string | null) =>
   role === "admin" ? "red" : role === "editor" ? "blue" : "gray";
@@ -45,13 +46,20 @@ export function UserMenu() {
         </Menu.Item>
 
         <Divider />
-        {/* Accounts come from the environment: a rollout is the only way to change them, which is
-            why this says where to look instead of offering an editor that could not work. */}
-        <Menu.Label>Accounts live in WDS_USERS</Menu.Label>
-        <Menu.Item component="a" href="https://fgilde.github.io/WebDataStudio/guide/#/safety"
-          target="_blank" rel="noreferrer">
-          <Text size="xs">How to add users and roles</Text>
-        </Menu.Item>
+        {/* An admin can make accounts now, so this is the way to that panel rather than a link to
+            the documentation for a variable. */}
+        {role === "admin" ? (
+          <Menu.Item leftSection={<IconUsersGroup size={14} />}
+            onClick={() => emit("command", "tool.accounts")}>
+            <Text size="sm">Manage accounts</Text>
+            <Text size="xs" c="dimmed">Who may sign in, and as what</Text>
+          </Menu.Item>
+        ) : (
+          <Menu.Item component="a" href="https://fgilde.github.io/WebDataStudio/guide/#/safety"
+            target="_blank" rel="noreferrer">
+            <Text size="xs">How accounts and roles work</Text>
+          </Menu.Item>
+        )}
 
         <Divider />
         <Menu.Item color="red" leftSection={<IconLogout size={14} />}

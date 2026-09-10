@@ -99,8 +99,11 @@ do, and **Sign out**. On a studio without accounts there is nothing to be and no
 ### Accounts an admin makes
 
 `WDS_USERS` is right for a stack that ships and wrong for a studio that runs for a year: somebody
-joins on a Tuesday. So the *Studio users* tab in the administration panel makes accounts too, kept
-in the studio's own database beside the connections. Both kinds sign in the same way and mean the
+joins on a Tuesday. So accounts are made here too, kept in the studio's own database beside the
+connections.
+
+**Where:** the person icon in the header → **Manage accounts**, or *Administration → Studio users*.
+It needs no connection selected — these are the studio's accounts, not a database's. Both kinds sign in the same way and mean the
 same thing downstream — role, connections, masking, the line in the audit trail.
 
 What keeps the old promise intact:
@@ -120,6 +123,12 @@ What keeps the old promise intact:
 
 An account made here can be deleted, and then it cannot sign in — an open session is not a second
 account. Nothing else about the studio changes.
+
+**On a studio with no accounts, the first one turns the login on for everybody.** Such a studio has
+no roles to check, so whoever reaches it can make that account — which is exactly how it is meant to
+be bootstrapped, and exactly why the bootstrapping belongs on a studio only people you trust can
+reach. On a studio that should be open to a network, either set `WDS_USERS` before exposing it or
+leave it without accounts on purpose.
 
 Generating a hash — the *Studio users* tab has a field for it, or by hand against a running studio
 signed in as an admin:

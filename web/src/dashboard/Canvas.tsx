@@ -65,22 +65,41 @@ export function Canvas({ dashboard, editing, rowHeight, onLayout, children }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, rowHeight]);
 
-  // A widget added or removed is a node added or removed; a position changed in state is one the
-  // canvas is told about, so an import or an undo moves the boxes.
+  // React owns the children, so GridStack has to be told about them.
+  //
+  // `init` adopts the elements that exist at that moment and nothing after: a widget added from the
+  // palette, and every widget of the next dashboard the picker opens, are elements it has never
+  // seen — unmanaged, so it positions none of them and they all pile up in the corner. So every
+  // change reconciles both ways: adopt what is new, forget what has left the DOM, and move what
+  // stayed.
   useEffect(() => {
     const instance = grid.current;
     if (!instance) return;
 
     instance.batchUpdate(true);
 
+    const known = new Map(instance.engine.nodes
+      .filter(node => node.el)
+      .map(node => [node.el!, node]));
+
+    for (const node of [...known.keys()])
+      if (!node.isConnected) {
+        // The DOM node is React's to remove; this only takes it out of the engine.
+        instance.removeWidget(node, false);
+        known.delete(node);
+      }
+
     for (const widget of dashboard.widgets) {
       const element = host.current?.querySelector<HTMLElement>(`[gs-id="${widget.id}"]`);
       if (!element) continue;
 
-      instance.update(element, {
+      const position = {
         x: widget.position.x, y: widget.position.y,
         w: widget.position.w, h: widget.position.h,
-      });
+      };
+
+      if (known.has(element)) instance.update(element, position);
+      else instance.makeWidget(element, position);
     }
 
     instance.batchUpdate(false);

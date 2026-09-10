@@ -260,9 +260,14 @@ export function DashboardPanel({ onOpenInEditor }: {
         ))}
 
         <Group gap={2} ml="auto" wrap="nowrap">
-          <Tooltip label="Run every widget again">
+          <Tooltip label="Run every widget again, and read the list anew">
             <ActionIcon size="sm" variant="subtle" aria-label="Refresh"
-              onClick={() => setNonce(n => n + 1)}>
+              onClick={() => {
+                setNonce(n => n + 1);
+                // Also the list: a dashboard somebody else saved is one this browser has not seen,
+                // and a refresh button that refreshes only half of what is on screen is a lie.
+                if (!draft) setReload(n => n + 1);
+              }}>
               <IconRefresh size={15} />
             </ActionIcon>
           </Tooltip>

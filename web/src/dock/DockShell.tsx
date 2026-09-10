@@ -1239,9 +1239,13 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
   // One panel per tool and connection: clicking the button again focuses the panel that is
   // already open instead of stacking duplicates.
   const openTool = useCallback((component: string, title: string, connectionId: string,
-    tab?: string) => {
-    if (!connectionId) return;
-    const id = `${component}:${connectionId}`;
+    tab?: string, needsConnection = true) => {
+    // A dashboard and the studio's own accounts belong to the studio, not to a connection: they
+    // opened only after somebody had clicked a database, which is a way to make a panel look
+    // broken.
+    if (!connectionId && needsConnection) return;
+
+    const id = connectionId ? `${component}:${connectionId}` : component;
     // Already open: focus it, and switch it to the tab that was asked for — "Scheduled jobs" has to
     // land on the jobs tab whether or not the admin panel was open already.
     const existing = api.current?.getPanel(id);
@@ -1333,7 +1337,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
       if (tool.dock === "panel") { focusPanel(tool.component); return; }
 
-      openTool(tool.component, tool.title, activeConnection, tool.tab);
+      openTool(tool.component, tool.title, activeConnection, tool.tab, tool.requiresConnection);
     },
     saveCurrentQuery: () => focusPanel("saved"),
     activeConnection,

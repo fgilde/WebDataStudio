@@ -3,7 +3,8 @@
 ![Dashboards](../assets/screenshots/dashboards-dark.png)
 
 A dashboard here is a canvas: twenty-four columns, widgets you drag and resize, one time range for
-the page, and variables its statements read. **Tools → Dashboard.**
+the page, and variables its statements read. The **grid icon** in the header opens them; they are
+also in **Tools → Dashboard** and in the command palette.
 
 Nothing on it is a second way into the data. A widget's statement runs through the endpoint a query
 tab runs through — or through the studio's own [federation](federation.md) when it spans several

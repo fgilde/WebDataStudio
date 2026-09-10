@@ -442,27 +442,43 @@ export function AdminPanel({ connectionId, database = "", onOpenInEditor, tab }:
 
   useEffect(() => { if (tab) setActive(tab); }, [tab]);
 
-  if (!connectionId) return <Text size="xs" c="dimmed" p="xs">Select a connection first.</Text>;
+  // Everything here is about one database — except the studio's own accounts, which are about the
+  // studio. Those open without a connection rather than asking for one they do not use.
+  const studioOnly = !connectionId;
+
+  if (studioOnly && active !== "studio-users")
+    return <Text size="xs" c="dimmed" p="xs">Select a connection first.</Text>;
 
   return (
     <Tabs value={active} onChange={setActive} keepMounted={false}>
       <Tabs.List>
-        <Tabs.Tab value="overview">Overview</Tabs.Tab>
-        <Tabs.Tab value="maintenance">Maintenance</Tabs.Tab>
-        <Tabs.Tab value="sessions">Sessions</Tabs.Tab>
-        <Tabs.Tab value="jobs">Jobs</Tabs.Tab>
-        <Tabs.Tab value="capture">Capture</Tabs.Tab>
-        <Tabs.Tab value="quality">Data quality</Tabs.Tab>
-        <Tabs.Tab value="databases">Databases</Tabs.Tab>
-        <Tabs.Tab value="users">Accounts</Tabs.Tab>
+        {/* On a studio with no connection chosen, the accounts are the only thing this panel can
+            answer, so they are the only tab. */}
+        {studioOnly ? null : (
+          <>
+            <Tabs.Tab value="overview">Overview</Tabs.Tab>
+            <Tabs.Tab value="maintenance">Maintenance</Tabs.Tab>
+            <Tabs.Tab value="sessions">Sessions</Tabs.Tab>
+            <Tabs.Tab value="jobs">Jobs</Tabs.Tab>
+            <Tabs.Tab value="capture">Capture</Tabs.Tab>
+            <Tabs.Tab value="quality">Data quality</Tabs.Tab>
+            <Tabs.Tab value="databases">Databases</Tabs.Tab>
+            <Tabs.Tab value="users">Accounts</Tabs.Tab>
+          </>
+        )}
+        {/* The studio's own accounts, which is the one thing here that is not about a database. */}
         <Tabs.Tab value="studio-users">Studio users</Tabs.Tab>
-        <Tabs.Tab value="audit">Audit</Tabs.Tab>
-        <Tabs.Tab value="backup">Backup</Tabs.Tab>
-        <Tabs.Tab value="metrics">Metrics</Tabs.Tab>
-        <Tabs.Tab value="slow">Slow queries</Tabs.Tab>
-        <Tabs.Tab value="schema">Schema drift</Tabs.Tab>
-        <Tabs.Tab value="replication">Replication</Tabs.Tab>
-        <Tabs.Tab value="logs">Log</Tabs.Tab>
+        {studioOnly ? null : (
+          <>
+            <Tabs.Tab value="audit">Audit</Tabs.Tab>
+            <Tabs.Tab value="backup">Backup</Tabs.Tab>
+            <Tabs.Tab value="metrics">Metrics</Tabs.Tab>
+            <Tabs.Tab value="slow">Slow queries</Tabs.Tab>
+            <Tabs.Tab value="schema">Schema drift</Tabs.Tab>
+            <Tabs.Tab value="replication">Replication</Tabs.Tab>
+            <Tabs.Tab value="logs">Log</Tabs.Tab>
+          </>
+        )}
       </Tabs.List>
 
       <Tabs.Panel value="maintenance"><Maintenance connectionId={connectionId} /></Tabs.Panel>

@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { ActionIcon, AppShell, Divider, Group, Text, Tooltip } from "@mantine/core";
 import {
-  IconCommand, IconDatabaseCog, IconInfoCircle, IconLayoutBoard, IconPalette, IconTable,
+  IconCommand, IconDatabaseCog, IconInfoCircle, IconLayoutBoard, IconLayoutGrid, IconPalette,
+  IconTable,
 } from "@tabler/icons-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeDrawer } from "../ThemeDrawer";
@@ -45,6 +46,16 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
                 <IconDatabaseCog size={17} />
               </ActionIcon>
             </Tooltip>
+            {/* Up here rather than four items into a menu: a dashboard is a thing people come to
+                the studio for, not a tool they reach for once. */}
+            {pathname === "/" ? (
+              <Tooltip label="Dashboards">
+                <ActionIcon variant="subtle" aria-label="Dashboards"
+                  onClick={() => emit("command", "tool.dashboard")}>
+                  <IconLayoutGrid size={17} />
+                </ActionIcon>
+              </Tooltip>
+            ) : null}
           </Group>
           {/* The studio's own name, when it has one. Absolutely centred on the bar rather than
               placed between the two groups, whose widths differ. */}

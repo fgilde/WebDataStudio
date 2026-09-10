@@ -163,8 +163,12 @@ verlangt, dass du den Namen tippst.
 
 ## Wer sich am Studio anmelden darf
 
-Zwei Sorten Konten leben im Tab **Studio users**: die, die die Bereitstellung in `WDS_USERS`
-aufgeschrieben hat, und die, die eine Administratorin hier anlegt. Beide melden sich gleich an und
+**Wo:** das Personen-Symbol in der Kopfleiste → **Manage accounts**, oder
+*Administration → Studio users*. Eine ausgewählte Verbindung braucht es dafür nicht — das sind die
+Konten des Studios, nicht die einer Datenbank.
+
+Zwei Sorten Konten leben dort: die, die die Bereitstellung in `WDS_USERS` aufgeschrieben hat, und
+die, die eine Administratorin hier anlegt. Beide melden sich gleich an und
 bedeuten danach dasselbe — Rolle, erlaubte Verbindungen, Maskierung, die Zeile im Audit-Trail.
 
 `WDS_USERS` passt zu einem Stack, der ausgeliefert wird, und passt nicht zu einem Studio, das ein
@@ -188,6 +192,11 @@ Was dabei gilt:
 - Ein Studio, das sein Datenverzeichnis nicht schreiben kann, führt keine eigenen Konten. Der Tab
   sagt das mit der Kennzeichnung *read-only store* und bietet kein **Add account** an, statt eines
   Knopfes, der scheitert.
+
+**Auf einem Studio ohne Konten schaltet das erste Konto den Login für alle ein.** So ein Studio hat
+keine Rollen zu prüfen, also darf jeder, der es erreicht, dieses Konto anlegen — genau so ist der
+Start gedacht, und genau deshalb gehört er auf ein Studio, das nur Leute erreichen, denen du traust.
+Soll ein Studio offen im Netz stehen, setze vorher `WDS_USERS` oder lass es bewusst ohne Konten.
 
 Das Feld **Hash a password for WDS_USERS** bleibt: es rechnet einen Hash im Format
 `pbkdf2$Iterationen$Salt$Hash` aus — praktisch, wenn ein Konto doch in die Umgebung soll.

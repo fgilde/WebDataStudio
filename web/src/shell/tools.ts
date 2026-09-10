@@ -64,7 +64,14 @@ export const TOOLS: ToolDefinition[] = [
   },
   {
     id: "tool.dashboard", component: "dashboard", dock: "tool", title: "Dashboard",
-    label: "Dashboard", requiresConnection: false,
+    label: "Dashboards — a canvas of widgets", requiresConnection: false,
+  },
+  {
+    // The studio's own accounts, not a database's: they belong to the studio, so they need no
+    // connection and are their own entry rather than the ninth tab of the administration panel.
+    id: "tool.accounts", component: "admin", dock: "tool", title: "Accounts",
+    label: "Who may sign in to this studio", requiresConnection: false, adminOnly: true,
+    tab: "studio-users",
   },
   {
     id: "tool.redis", component: "redis", dock: "tool", title: "Redis",

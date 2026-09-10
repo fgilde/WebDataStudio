@@ -8,6 +8,91 @@ A section here is the body of that release: the release workflow reads the one t
 (`scripts/release-notes.mjs`) and the generated commit list follows it. So a new version is written
 down here *before* it is tagged — a tag with no section still publishes, with the commit list alone.
 
+## 1.7.0
+
+Dashboards worth putting on a wall.
+
+### Dashboards
+
+- **A dashboard is a canvas.** Twenty-four columns, drag a widget by its title bar, resize it by its
+  corner, reorder the page — with view and edit as two modes and view as the default. Every dashboard
+  that existed still opens: a page written as tiles lays itself out and is a document from then on.
+- **Fifteen widget types**, each asking only for what its own form needs: stat, gauge, bar, stacked
+  bar, pie, treemap, line, area, stacked area, sparkline, table, list, heatmap, map and sankey, plus
+  Markdown prose and a collapsible band. The settings drawer keeps three questions apart — where the
+  rows come from, which column plays which role, and how it looks — and left empty the roles are
+  read from the result itself, so `SELECT status, count(*)` needs no mapping at all.
+- **One widget over several databases at once.** Each source gets its own statement and an alias;
+  the widget's own statement runs over those aliases through the studio's own federation, with a row
+  cap per source. PostgreSQL knows what was ordered and SQL Server knows what was delivered — the
+  picture is the question neither can answer by itself.
+- **One time range per dashboard**, relative (`now-24h`, `now/d`) or absolute, reaching a statement
+  through `$__timeFilter(column)`, `$__from`, `$__to`, `$__fromIso`, `$__toIso` and `$__interval` —
+  expanded on the server for that engine's own dialect. In view mode the range is your own choice
+  while you look; in edit mode it is saved as where the page starts.
+- **Variables** from a statement, a written list or a constant, single or multi, with an optional
+  "All". A single value is **bound as a parameter** and never becomes part of the statement text; a
+  list has to be inlined — no driver binds an `IN` list — so each entry is quoted per dialect, and a
+  value carrying a line break is refused with the variable's name in the message. A dashboard is a
+  document people paste to each other; it does not get to be a way to run somebody else's SQL.
+- **Grafana dashboards, in and out.** Paste one — theirs, ours, the older tile shape, or an export
+  from their API — and nothing has to say which it is: the studio decides per file. Panels, grid
+  positions (both are twenty-four columns, so it is a copy), statements, field config, variables and
+  the time range come across; what cannot come along is a sentence in the report rather than a
+  silently empty widget, and the panel as Grafana wrote it stays on the widget so an export puts
+  back the fields this studio never read. **Export as Grafana JSON** writes their schema with
+  `schemaVersion` pinned.
+- **What a deployment ships:** `WDS_DASHBOARD_FILE` takes a file, several files or a folder, in any
+  of the three shapes, mixed. A team with thirteen exported Grafana dashboards points it at the
+  folder and is done. From an app host, `WithDashboards` now takes the widget model and
+  `WithGrafanaDashboards("./dashboards")` mounts the folder.
+- **The colour rules are rules, not taste.** One validated categorical order in a light and a dark
+  set across every theme, assigned by place and never cycled — a ninth series folds into "Other"
+  rather than getting a hue nobody validated. A legend from two series, direct labels up to four, one
+  hue light-to-dark for a magnitude, the four threshold states reserved and printed as words next to
+  their numbers, and the rows behind any chart one menu item away. There is no second axis to find:
+  two measures at different scales are two widgets.
+- A widget that cannot draw says why **in its own frame** — a gauge with no range refuses rather
+  than inventing a scale — and one broken statement never blanks a page.
+
+### Accounts
+
+- **An admin can make, change and remove accounts while the studio runs.** They live in the studio's
+  own database beside the connections, and a password is only ever written as a PBKDF2 hash — no
+  hash travels back, not even to an admin. The person icon in the header → **Manage accounts** is
+  the way there, and it needs no connection selected.
+- What `WDS_USERS` owns stays read-only here, with a badge saying so and a refusal that names the
+  variable — which is also what makes it the way back in. **The last admin cannot be removed or
+  demoted**, because a studio nobody can administer needs a container rollout to come back. A studio
+  whose data directory is read-only keeps no accounts of its own and says so instead of offering a
+  button that fails.
+
+### The studio's own look
+
+- **`WDS_ICON`** puts a deployment's own icon in the header, on the login screen and in the browser
+  tab — a URL, or a file mounted into the container, which the studio then serves itself at
+  `/api/brand/icon` before the login screen so the login screen can show it. A path that is not
+  there is a typo in a deployment, not a reason to refuse to start: the browser falls back to the
+  shipped icon. In Aspire: `WithIcon("brand/mark.svg")`.
+- **An about drawer** behind the **i** in the header, in place of the two links that used to sit
+  there: the version, the commit, when the image was built, and buttons for the documentation, the
+  repository and the website. The header is for what people do all day; "where does this come from"
+  is asked once.
+- Dashboards have their own icon in the header rather than living four items into a menu.
+
+### Fixed
+
+- **Switching dashboards left the widgets in a heap.** GridStack adopts the elements that exist when
+  it starts and nothing after, so the widgets of the next dashboard the picker opened were elements
+  it had never seen: unmanaged, unpositioned, all in the corner at the same size. The canvas now
+  reconciles both ways on every change — adopt what is new, forget what has left, move what stayed —
+  which also fixes a widget added from the palette and a dashboard that arrived by import.
+- The refresh button on a dashboard re-reads the list as well: refreshing half of what is on screen
+  was a lie, and a dashboard somebody else saved stayed invisible until a reload.
+- A tool that needs no connection — a dashboard, the studio's own accounts — could not be opened
+  before a database had been clicked.
+- A section band and a prose widget no longer run the statement they never draw, on every refresh.
+
 ## 1.6.1
 
 ### Fixed

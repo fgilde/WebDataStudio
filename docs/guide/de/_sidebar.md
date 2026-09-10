@@ -7,6 +7,7 @@
 - [Abfrage-Editor](/de/editor.md)
 - [Query-Builder](/de/query-builder.md)
 - [Ergebnisse und Export](/de/results.md)
+- [Dashboards](/de/dashboards.md)
 - [Daten bearbeiten](/de/editing.md)
 - [Schema bearbeiten](/de/schema.md)
 - [Analyse](/de/analysis.md)

@@ -563,6 +563,14 @@ it works for every engine whose capability set claims support for it.
 | F30.49 | The hosts the studio may connect to at all, whatever the connection string says |
 | F30.50 | The empty state of a studio somebody brings their own data to |
 | F30.51 | A deployment's own icon, in the header, on the login screen and in the browser tab |
+| F31.1 | A dashboard as a canvas: twenty-four columns, drag, resize, reorder, edit and view as two modes |
+| F31.2 | Fifteen widget types, each with the source, the column roles and the options its form needs |
+| F31.3 | A widget over several connections at once, through the studio's own federation |
+| F31.4 | One time range per dashboard, and the macros a statement reaches it through |
+| F31.5 | Dashboard variables — from a query, a list or a constant — bound as parameters wherever the driver allows |
+| F31.6 | Grafana dashboards imported and exported, with a report of what could not come along |
+| F31.7 | Dashboards a deployment ships, in the studio's own shape or as Grafana JSON |
+| F31.8 | One validated colour order across every theme, with the table view where contrast cannot carry it |
 
 ## 10. Safety behaviour
 

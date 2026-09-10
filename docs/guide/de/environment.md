@@ -29,7 +29,7 @@
 | `WDS_QUALITY_FILE` | Datenqualitätsregeln, die zur Bereitstellung gehören, als JSON — siehe [Administration](administration.md) |
 | `WDS_CONNECTIONS_FILE` | Verbindungen als JSON-Datei (oder mehrere), dasselbe Array wie in `WDS_CONNECTIONS` — für die zehn Altsysteme, für die eine Wand aus Variablen die falsche Form ist |
 | `WDS_MASK_FILE` | die Maskierungs-Grundlinie als JSON: `{ "maskByDefault": true, "extra": [...], "never": [...] }`. Zählt zusätzlich zu den Variablen |
-| `WDS_DASHBOARD_FILE` | Dashboards, die zur Bereitstellung gehören. Sichtbar unter **Tools → Dashboard**, mit Kennzeichnung und ohne Bearbeiten |
+| `WDS_DASHBOARD_FILE` | Dashboards, die zur Bereitstellung gehören — eine Datei, mehrere Dateien oder ein Ordner, in der eigenen Form des Studios oder als Grafana-JSON, pro Datei unterschieden. Sichtbar unter **Tools → Dashboard**, mit Kennzeichnung und ohne Bearbeiten — siehe [Dashboards](dashboards.md) |
 | `WDS_SNIPPETS_FILE` | Editor-Snippets für alle, die dieses Studio öffnen. Ein eigenes Snippet mit gleichem Präfix gewinnt für die jeweilige Person |
 | `WDS_PREFERENCES_FILE` | womit ein Studio startet, bevor jemand eine Einstellung geändert hat — Zeitzone, Zeilen pro Seite und der Rest |
 | `WDS_SAFETY_NET`, `WDS_SAFETY_MAX_ROWS` | die Zeilen sichern, bevor ein Statement alle nimmt: `DELETE`/`UPDATE` ohne `WHERE`, `TRUNCATE` |

@@ -9,6 +9,7 @@
 - [Query editor](editor.md)
 - [Query builder](query-builder.md)
 - [Results and export](results.md)
+- [Dashboards](dashboards.md)
 - [Editing data](editing.md)
 - [Schema editing](schema.md)
 - [Analysis](analysis.md)

@@ -25,7 +25,7 @@
 | `WDS_SAVED_QUERIES_DIR` | folder of `.sql` files imported as saved queries at start — see [Query editor](editor.md) |
 | `WDS_CONNECTIONS_FILE` | connections as a JSON file (or several), the same array `WDS_CONNECTIONS` holds — for the ten legacy servers a wall of variables is the wrong shape for |
 | `WDS_MASK_FILE` | the masking baseline as JSON: `{ "maskByDefault": true, "extra": [...], "never": [...] }`. Counts alongside the three variables above |
-| `WDS_DASHBOARD_FILE` | dashboards the deployment ships. Shown in **Tools → Dashboard** with a badge, and not editable there |
+| `WDS_DASHBOARD_FILE` | dashboards the deployment ships — a file, several files or a folder, in the studio's own shape or as Grafana JSON, told apart per file. Shown in **Tools → Dashboard** with a badge, and not editable there — see [Dashboards](dashboards.md) |
 | `WDS_SNIPPETS_FILE` | editor snippets for everybody who opens this studio. A person's own snippet with the same prefix wins for them |
 | `WDS_PREFERENCES_FILE` | what a studio starts with before anybody changed a preference — the time zone, rows per page, and the rest |
 | `WDS_SEED_SQL` | a script, or a folder of `{CONNECTION}.sql`, run once per connection — see [Getting started](getting-started.md) |

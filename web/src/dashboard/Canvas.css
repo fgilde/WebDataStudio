@@ -1,0 +1,35 @@
+/* GridStack ships its own grey; a dashboard belongs to the theme it is opened in. */
+
+.grid-stack {
+  background: transparent;
+}
+
+.grid-stack-item-content {
+  overflow: hidden;
+  inset: 0;
+}
+
+/* The placeholder while something is being dragged: the theme's accent at a whisper. */
+.grid-stack > .grid-stack-placeholder > .placeholder-content {
+  background: var(--mantine-primary-color-light);
+  border: 1px dashed var(--mantine-primary-color-filled);
+  border-radius: var(--mantine-radius-md);
+}
+
+/* The resize corner, visible only while the dashboard is being edited — which is the only mode
+   where GridStack renders it at all. */
+.grid-stack-item > .ui-resizable-se {
+  background-image: none;
+  border-right: 2px solid var(--mantine-color-dimmed);
+  border-bottom: 2px solid var(--mantine-color-dimmed);
+  width: 9px;
+  height: 9px;
+  right: 6px;
+  bottom: 6px;
+  opacity: 0.5;
+  transform: none;
+}
+
+.grid-stack-item:hover > .ui-resizable-se {
+  opacity: 1;
+}

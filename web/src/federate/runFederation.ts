@@ -1,4 +1,4 @@
-import { readNdjson, type QueryChunk } from "../query/runQuery";
+import { readNdjson, type DashboardRunContext, type QueryChunk } from "../query/runQuery";
 
 export interface FederationSource { connectionId: string; sql: string; alias: string }
 
@@ -6,6 +6,9 @@ export interface FederationRequest {
   sources: FederationSource[];
   sql: string;
   maxRowsPerSource?: number;
+  /// The dashboard a widget belongs to. Each source is expanded with its own engine's dialect and
+  /// the joining SQL with DuckDB's.
+  dashboard?: DashboardRunContext;
 }
 
 export interface FederationPlan { sources: { alias: string; ddl: string }[] }

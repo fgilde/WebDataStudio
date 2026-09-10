@@ -23,6 +23,19 @@ export interface QueryRequest {
   /// Keep going after a statement fails. Off stops at the first error, which is what a migration
   /// wants.
   continueOnError?: boolean;
+  /// The dashboard a widget belongs to, when this is a widget's statement: the time range and the
+  /// variable values somebody chose. The server expands the macros; a query tab sends nothing here
+  /// and `$__timeFilter` in a tab stays the text a person typed.
+  dashboard?: DashboardRunContext;
+}
+
+/// What a widget's statement may read from the dashboard around it.
+export interface DashboardRunContext {
+  from?: string;
+  to?: string;
+  variables?: Record<string, string[]>;
+  /// How wide the widget is on screen, which is what `$__interval` is computed from.
+  widthPx?: number;
 }
 
 export interface QueryRun {

@@ -1,4 +1,5 @@
 import type { OpenedConnection } from "./connections/openFromUrl";
+import type { Dashboard } from "./dashboard/model";
 
 export const base = "/api";
 
@@ -1440,38 +1441,33 @@ export const rowHistory = (conn: string, ref: string, key: Record<string, string
   return fetch(`${base}/data/${conn}/history?${params}`).then(r => ok<RowHistoryDto>(r));
 };
 
-/// One box on a dashboard: a statement, and what to draw with what comes back.
-export interface DashboardTileDto {
-  title: string;
-  connectionId: string;
-  sql: string;
-  /// "number" shows the first cell, "table" the rows, "chart" a bar per row.
-  view: string;
-  width: number;
-}
-
-export interface DashboardDto {
-  id: string;
-  name: string;
-  tiles: DashboardTileDto[];
-  /// How often the tiles run themselves. 0 means only when asked.
-  refreshSeconds: number;
-  updatedAt: string;
-  /// True for one the deployment ships: shown here, changed where it is written.
-  fromFile?: boolean;
-}
+/// A dashboard as the server keeps it. The model lives in `dashboard/model.ts`; this is only the
+/// wire, so the two cannot drift.
+export type DashboardDto = Dashboard;
 
 export const listDashboards = (): Promise<{ available: boolean; dashboards: DashboardDto[] }> =>
   fetch(`${base}/dashboards`).then(r => ok<{ available: boolean; dashboards: DashboardDto[] }>(r));
 
-export const saveDashboard = (id: string, body: {
-  name: string; tiles: DashboardTileDto[]; refreshSeconds: number;
-}): Promise<DashboardDto> =>
+export const saveDashboard = (id: string, body: Partial<Dashboard>): Promise<DashboardDto> =>
   fetch(id ? `${base}/dashboards/${id}` : `${base}/dashboards`, json(id ? "PUT" : "POST", body))
     .then(r => ok<DashboardDto>(r));
 
 export const deleteDashboard = (id: string): Promise<void> =>
   fetch(`${base}/dashboards/${id}`, { method: "DELETE" }).then(r => ok<void>(r));
+
+/// A dashboard from somewhere else, in whatever shape it arrived in — ours, the old tile shape, or
+/// Grafana's. Nothing has to say which; the server decides and answers with what it could not
+/// take along. Nothing is kept until it is saved.
+export const importDashboard = (text: string): Promise<{
+  dashboard: DashboardDto; notes: string[];
+}> =>
+  fetch(`${base}/dashboards/import`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: text,
+  }).then(r => ok<{ dashboard: DashboardDto; notes: string[] }>(r));
+
+/// The dashboard as Grafana's own schema, ready to paste into theirs.
+export const exportDashboardToGrafana = (id: string): Promise<string> =>
+  fetch(`${base}/dashboards/${id}/grafana`).then(async r => (r.ok ? r.text() : fail(r)));
 
 export const serverLog = (conn: string, lines = 200): Promise<ServerLogDto> =>
   fetch(`${base}/admin/logs/${conn}?lines=${lines}`).then(r => ok<ServerLogDto>(r));

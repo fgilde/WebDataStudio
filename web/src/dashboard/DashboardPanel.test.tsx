@@ -1,13 +1,30 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
-import { DashboardPanel } from "./DashboardPanel";
+import type { Dashboard } from "./model";
+
+window.matchMedia ??= ((query: string) => ({
+  matches: false, media: query, onchange: null,
+  addListener: () => {}, removeListener: () => {},
+  addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+})) as typeof window.matchMedia;
+
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
+
+// Mantine's dropdown scrolls the highlighted option into view; jsdom has no scrolling.
+Element.prototype.scrollIntoView ??= () => {};
 
 const listDashboards = vi.fn();
 const saveDashboard = vi.fn();
 const deleteDashboard = vi.fn();
 const listConnections = vi.fn();
+const importDashboard = vi.fn();
+const exportDashboardToGrafana = vi.fn();
 const runQuery = vi.fn();
 
 vi.mock("../api", () => ({
@@ -15,11 +32,32 @@ vi.mock("../api", () => ({
   saveDashboard: (...args: unknown[]) => saveDashboard(...args),
   deleteDashboard: (...args: unknown[]) => deleteDashboard(...args),
   listConnections: (...args: unknown[]) => listConnections(...args),
+  importDashboard: (...args: unknown[]) => importDashboard(...args),
+  exportDashboardToGrafana: (...args: unknown[]) => exportDashboardToGrafana(...args),
 }));
 
 vi.mock("../query/runQuery", () => ({ runQuery: (...args: unknown[]) => runQuery(...args) }));
+vi.mock("../federate/runFederation", () => ({ runFederation: vi.fn(async () => {}) }));
 
-/// A run that answers with one row of one number, the way a "how many" tile is used.
+// GridStack moves DOM nodes and measures them, neither of which jsdom does; the canvas has its own
+// check in scripts/smoke-dashboard.mjs, where there is a browser. Here it is a plain list, so the
+// test is about the panel.
+vi.mock("./Canvas", () => ({
+  Canvas: ({ dashboard, children }: {
+    dashboard: Dashboard; children: (widget: unknown) => unknown;
+  }) => <div data-testid="canvas">{dashboard.widgets.map(widget => (
+    <div key={widget.id}>{children(widget) as never}</div>
+  ))}</div>,
+}));
+
+// A canvas element is what ECharts wants, and jsdom has none.
+vi.mock("./charts/EChart", () => ({
+  EChart: () => <div data-testid="chart" />,
+}));
+
+const { DashboardPanel } = await import("./DashboardPanel");
+
+/// A run that answers one row of one number, the way a "how many" widget is used.
 const answers = (rows: unknown[][]) => (_request: unknown, onChunk: (chunk: unknown) => void) => {
   onChunk({ type: "columns", statement: 0, columns: [{ name: "n", dataType: "int", nullable: false }] });
   onChunk({ type: "rows", statement: 0, rows });
@@ -28,121 +66,175 @@ const answers = (rows: unknown[][]) => (_request: unknown, onChunk: (chunk: unkn
   return { runId: Promise.resolve("r1"), done: Promise.resolve(), cancel: () => Promise.resolve() };
 };
 
-const dashboard = {
-  id: "d1", name: "Morning", refreshSeconds: 0, updatedAt: "2026-08-29T08:00:00Z",
-  tiles: [{ title: "Orders today", connectionId: "c1", sql: "SELECT count(*)", view: "number", width: 1 }],
-};
+const dashboard = (over: Partial<Dashboard> = {}): Dashboard => ({
+  id: "d1",
+  name: "Morning",
+  refreshSeconds: 0,
+  updatedAt: "2026-09-10T08:00:00Z",
+  layout: { columns: 24, rowHeight: 40 },
+  timeRange: { from: "now-24h", to: "now" },
+  variables: [],
+  widgets: [
+    {
+      id: "w1", type: "Stat", title: "Orders today",
+      position: { x: 0, y: 0, w: 6, h: 4 },
+      source: { kind: "Sql", connectionId: "c1", sql: "SELECT count(*) FROM orders" },
+      mapping: {},
+      options: { legend: true, thresholds: [] },
+    },
+  ],
+  ...over,
+});
 
-const wrap = () => render(<MantineProvider><DashboardPanel /></MantineProvider>);
+const draw = () => render(<MantineProvider><DashboardPanel /></MantineProvider>);
 
-describe("a page of statements", () => {
+afterEach(cleanup);
+
+describe("a page of widgets", () => {
   beforeEach(() => {
-    cleanup();
-    listDashboards.mockReset();
-    saveDashboard.mockReset();
-    runQuery.mockReset();
-
-    listDashboards.mockResolvedValue({ available: true, dashboards: [dashboard] });
-    listConnections.mockResolvedValue([{ id: "c1", name: "SHOP", engine: "postgresql" }]);
-    runQuery.mockImplementation(answers([[42]]));
+    listDashboards.mockReset().mockResolvedValue({ available: true, dashboards: [dashboard()] });
+    listConnections.mockReset().mockResolvedValue([
+      { id: "c1", name: "SHOP", engine: "postgresql", readOnly: false, color: null, group: null,
+        source: "Stored", summary: "", tunnelled: false },
+    ]);
+    saveDashboard.mockReset().mockImplementation(async (_id: string, body: Dashboard) => ({
+      ...body, id: "d1",
+    }));
+    deleteDashboard.mockReset().mockResolvedValue(undefined);
+    importDashboard.mockReset();
+    exportDashboardToGrafana.mockReset().mockResolvedValue("{}");
+    runQuery.mockReset().mockImplementation(answers([[42]]));
   });
 
-  it("runs each tile and shows what came back", async () => {
-    wrap();
+  it("runs each widget and shows what came back", async () => {
+    draw();
 
-    expect(await screen.findByText("Orders today")).toBeTruthy();
-    expect(await screen.findByText("42")).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("Orders today")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("42")).toBeTruthy());
 
-    // Through the same query path as a query tab, with a cap of its own.
-    expect(runQuery).toHaveBeenCalledWith(
-      expect.objectContaining({ connectionId: "c1", sql: "SELECT count(*)", maxRows: 200 }),
-      expect.any(Function));
+    // The widget's statement goes through the query path, with the dashboard's range attached.
+    const [request] = runQuery.mock.calls[0];
+    expect(request.sql).toBe("SELECT count(*) FROM orders");
+    expect(request.dashboard).toMatchObject({ from: "now-24h", to: "now" });
   });
 
-  it("shows what failed on the tile rather than swallowing it", async () => {
+  it("says what failed on the widget rather than swallowing it", async () => {
     runQuery.mockImplementation((_request: unknown, onChunk: (chunk: unknown) => void) => {
       onChunk({ type: "error", statement: 0, text: "relation \"orders\" does not exist", code: null, line: null, column: null });
       return { runId: Promise.resolve(null), done: Promise.resolve(), cancel: () => Promise.resolve() };
     });
 
-    wrap();
+    draw();
 
-    expect(await screen.findByText(/does not exist/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText(/does not exist/)).toBeTruthy());
   });
 
-  it("says why it cannot keep one when there is no workspace", async () => {
-    listDashboards.mockResolvedValue({ available: false, dashboards: [] });
-    wrap();
+  /// The range is the dashboard's own control, and changing it re-runs the widgets.
+  it("re-runs everything when the range changes", async () => {
+    draw();
 
-    expect(await screen.findByText(/no workspace file/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("42")).toBeTruthy());
+    runQuery.mockClear();
+
+    const picker = screen.getAllByLabelText("Time range")
+      .find(one => one.tagName === "INPUT")!;
+
+    fireEvent.click(picker);
+    fireEvent.click(await screen.findByText("Last 7 days"));
+
+    await waitFor(() => expect(runQuery).toHaveBeenCalled());
+    expect(runQuery.mock.calls.at(-1)![0].dashboard).toMatchObject({ from: "now-7d" });
+  });
+
+  it("keeps a variable's value and sends it with the statement", async () => {
+    listDashboards.mockResolvedValue({
+      available: true,
+      dashboards: [dashboard({
+        variables: [{
+          name: "region", kind: "Custom", values: ["eu", "us"], multi: false, includeAll: false,
+          default: "eu",
+        }],
+      })],
+    });
+
+    draw();
+
+    await waitFor(() => expect(screen.getByText("42")).toBeTruthy());
+
+    expect(runQuery.mock.calls.at(-1)![0].dashboard.variables).toMatchObject({ region: ["eu"] });
+  });
+
+  it("edits, adds a widget and saves", async () => {
+    draw();
+
+    await waitFor(() => expect(screen.getByText("Orders today")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.click(await screen.findByRole("button", { name: /add widget/i }));
+    fireEvent.click(await screen.findByText(/rows as rows/i));
+
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() => expect(saveDashboard).toHaveBeenCalled());
+
+    const [id, body] = saveDashboard.mock.calls[0] as [string, Dashboard];
+    expect(id).toBe("d1");
+    expect(body.widgets).toHaveLength(2);
+    expect(body.widgets[1].type).toBe("Table");
+  });
+
+  /// A dashboard the deployment ships is shown and not changed: the way to alter one is a copy.
+  it("says a shipped dashboard belongs to the deployment", async () => {
+    listDashboards.mockResolvedValue({
+      available: true,
+      dashboards: [dashboard({ id: "shipped:Ops", name: "Ops", fromFile: true })],
+    });
+
+    draw();
+
+    await waitFor(() => expect(screen.getByText(/shipped with the deployment/i)).toBeTruthy());
   });
 
   it("explains itself when there is nothing to show yet", async () => {
     listDashboards.mockResolvedValue({ available: true, dashboards: [] });
-    wrap();
 
-    expect(await screen.findByText(/a page of statements/i)).toBeTruthy();
+    draw();
+
+    await waitFor(() => expect(screen.getByText(/no dashboard open/i)).toBeTruthy());
   });
 
-  /// A new dashboard opens with one empty tile in it: an editor with nothing in it looks like an
-  /// editor that cannot do anything, which is exactly how it read.
-  it("saves a new one with the tile it started with", async () => {
-    listDashboards.mockResolvedValue({ available: true, dashboards: [] });
-    saveDashboard.mockResolvedValue({ ...dashboard, id: "d2", name: "Evening" });
+  it("says a studio without a workspace cannot keep one", async () => {
+    listDashboards.mockResolvedValue({ available: false, dashboards: [] });
 
-    wrap();
+    draw();
 
-    fireEvent.click(await screen.findByRole("button", { name: "New dashboard" }));
-    fireEvent.change(await screen.findByLabelText("Name"), { target: { value: "Evening" } });
-
-    // No hunting for "add a tile" first: there is already a row to fill in.
-    fireEvent.change(await screen.findByLabelText("Statement of tile 1"),
-      { target: { value: "SELECT 1" } });
-
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
-
-    await waitFor(() => expect(saveDashboard).toHaveBeenCalledWith("", expect.objectContaining({
-      name: "Evening",
-      tiles: [expect.objectContaining({ sql: "SELECT 1", connectionId: "c1" })],
-    })));
+    await waitFor(() => expect(screen.getByText(/no workspace file/i)).toBeTruthy());
   });
 
-  /// The way from "I made a dashboard" to "there is something in it" was a small pencil icon, and
-  /// somebody looking for it did not find it.
-  it("says what to do next when a dashboard has no tiles", async () => {
-    listDashboards.mockResolvedValue({
-      available: true,
-      dashboards: [{ ...dashboard, tiles: [] }],
+  /// Pasting a Grafana dashboard is the same gesture as pasting one of ours, and what could not
+  /// come along is shown rather than swallowed.
+  it("imports pasted JSON and shows its notes", async () => {
+    importDashboard.mockResolvedValue({
+      dashboard: dashboard({ id: "", name: "Pasted" }),
+      notes: ["'CPU' queries a metrics datasource"],
     });
 
-    wrap();
+    draw();
 
-    expect(await screen.findByText(/has no tiles yet/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("Orders today")).toBeTruthy());
 
-    fireEvent.click(screen.getByRole("button", { name: "Add the first tile" }));
-    expect(await screen.findByLabelText("Statement of tile 1")).toBeTruthy();
-  });
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    fireEvent.click(await screen.findByText(/paste json/i));
 
-  /// A page the deployment ships is shown here and changed where it is written.
-  it("says a dashboard belongs to the deployment rather than letting somebody edit it", async () => {
-    listDashboards.mockResolvedValue({
-      available: true,
-      dashboards: [{ ...dashboard, fromFile: true }],
+    fireEvent.change(await screen.findByLabelText("The dashboard as JSON"), {
+      target: { value: '{"title":"Pasted","panels":[]}' },
     });
+    fireEvent.click(screen.getByRole("button", { name: /^import$/i }));
 
-    wrap();
+    await waitFor(() => expect(importDashboard).toHaveBeenCalledWith('{"title":"Pasted","panels":[]}'));
+    await waitFor(() => expect(screen.getByText(/metrics datasource/i)).toBeTruthy());
 
-    expect(await screen.findByText("from the deployment")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Edit tiles" })).toHaveProperty("disabled", true);
-    expect(screen.getByLabelText("Delete this dashboard")).toHaveProperty("disabled", true);
-  });
-
-  it("puts the tiles of an existing dashboard one click away", async () => {
-    wrap();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Edit tiles" }));
-
-    const statement = await screen.findByLabelText("Statement of tile 1");
-    expect((statement as HTMLInputElement).value).toBe("SELECT count(*)");
+    // Nothing was saved: an import is a draft until somebody keeps it.
+    expect(saveDashboard).not.toHaveBeenCalled();
   });
 });

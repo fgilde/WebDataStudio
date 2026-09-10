@@ -13,6 +13,20 @@ await mkdir(out, { recursive: true });
 
 const browser = await chromium.launch();
 
+/// One widget for the dashboard shot. Everything a widget can say is optional except its statement,
+/// which is the point of the model: the frame asks for the source, the roles and the options apart.
+const widget = (title, type, sql, position, options = {}, mapping = {}) => ({
+  id: "",
+  type,
+  title,
+  position,
+  source: sql === null || sql === undefined
+    ? { kind: "Sql" }
+    : { kind: "Sql", connectionId: postgres?.id, sql },
+  mapping,
+  options: { legend: true, thresholds: [], ...options },
+});
+
 // Whether this studio has a server-based connection: the shots that need one say so and are
 // skipped otherwise.
 const probe = await browser.newContext();
@@ -328,6 +342,70 @@ for (const [theme, suffix] of [["ocean", "dark"], ["github-light", "light"]]) {
     await maximize();
     await shot("inspect");
     await restore();
+
+    // --- a dashboard, built for the shot ---------------------------------------------------------
+    // Built through the API rather than clicked together: what the picture shows should be the same
+    // widgets every time, whatever the stack this runs against happens to have saved.
+    const canvas = {
+      name: "Shop, at a glance",
+      refreshSeconds: 0,
+      timeRange: { from: "now-90d", to: "now" },
+      variables: [{
+        name: "status", kind: "Custom", values: ["new", "shipped", "cancelled"],
+        multi: false, includeAll: true, default: "shipped",
+      }],
+      widgets: [
+        widget("Overview", "Row", null, { x: 0, y: 0, w: 24, h: 1 }),
+        widget("Customers", "Stat", "SELECT count(*) AS n FROM customers",
+          { x: 0, y: 1, w: 5, h: 4 }, { thresholds: [{ value: 1, level: "good" }] }),
+        widget("Shipped share", "Gauge",
+          "SELECT round(100.0 * count(*) FILTER (WHERE status = 'shipped') / greatest(count(*), 1), 1) AS pct FROM orders",
+          { x: 5, y: 1, w: 5, h: 4 },
+          { min: 0, max: 100, unit: "percent", thresholds: [{ value: 25, level: "warning" }, { value: 50, level: "good" }] }),
+        widget("Orders by status", "Bar",
+          "SELECT status, count(*) AS orders FROM orders GROUP BY status ORDER BY orders DESC",
+          { x: 10, y: 1, w: 7, h: 4 }, {}, { category: "status", values: ["orders"] }),
+        widget("Page views per path", "Pie",
+          "SELECT path, count(*) AS views FROM page_views GROUP BY path ORDER BY views DESC",
+          { x: 17, y: 1, w: 7, h: 4 }, {}, { category: "path", values: ["views"] }),
+        widget("Page views per day", "Line",
+          "SELECT date_trunc('day', viewed_at) AS day, count(*) AS views FROM page_views "
+          + "WHERE $__timeFilter(viewed_at) GROUP BY day ORDER BY day",
+          { x: 0, y: 5, w: 12, h: 6 }, {}, { category: "day", values: ["views"] }),
+        widget("Slowest paths", "List",
+          "SELECT path, round(avg(ms)) AS avg_ms FROM page_views GROUP BY path ORDER BY avg_ms DESC LIMIT 8",
+          { x: 12, y: 5, w: 6, h: 6 }, {}, { category: "path", values: ["avg_ms"] }),
+        widget("Orders that are $status", "Table",
+          "SELECT id, status, placed_at FROM orders WHERE status = $status ORDER BY placed_at DESC LIMIT 20",
+          { x: 18, y: 5, w: 6, h: 6 }),
+      ],
+    };
+
+    const saved = await (await page.request.post(`${baseUrl}/api/dashboards`, { data: canvas })).json();
+
+    try {
+      await tool(/^Dashboard/);
+      await page.getByText("Shop, at a glance").first().waitFor({ timeout: 25000 });
+      // Every widget has run and every chart has drawn: three canvases is the two charts plus the
+      // gauge, and waiting for them beats waiting a fixed time.
+      await page.waitForFunction(() => document.querySelectorAll("canvas").length >= 3,
+        null, { timeout: 25000 });
+      await page.waitForTimeout(1200);
+
+      // Maximised, a dashboard is what the shot is about; the explorer beside it is not.
+      await page.getByRole("tab", { name: "Dashboard" }).click({ button: "right" });
+      await page.getByText("Maximize", { exact: true }).click();
+      await page.waitForTimeout(900);
+
+      await shot("dashboards");
+
+      await page.getByRole("tab", { name: "Dashboard" }).click({ button: "right" });
+      await page.getByText("Restore", { exact: true }).click();
+      await page.waitForTimeout(600);
+    } finally {
+      // The stack this ran against does not keep a dashboard nobody asked for.
+      await page.request.delete(`${baseUrl}/api/dashboards/${saved.id}`).catch(() => {});
+    }
 
     // The dashboard, which needs a server to have numbers about. Back to the default arrangement
     // first: the structure panel from the shots above is not part of this one.

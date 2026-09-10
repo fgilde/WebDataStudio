@@ -1,5 +1,7 @@
 # Dashboards
 
+![Dashboards](../../assets/screenshots/dashboards-dark.png)
+
 Ein Dashboard ist hier eine Leinwand: vierundzwanzig Spalten, Widgets, die sich ziehen und in der
 Größe ändern lassen, eine Zeitspanne für die Seite und Variablen, die ihre Statements lesen.
 **Tools → Dashboard.**

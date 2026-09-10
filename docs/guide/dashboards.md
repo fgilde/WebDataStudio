@@ -1,5 +1,7 @@
 # Dashboards
 
+![Dashboards](../assets/screenshots/dashboards-dark.png)
+
 A dashboard here is a canvas: twenty-four columns, widgets you drag and resize, one time range for
 the page, and variables its statements read. **Tools → Dashboard.**
 

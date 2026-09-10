@@ -153,6 +153,12 @@ for everything you brought, files included.
 A closed door takes its button with it rather than showing one that answers with a refusal, and the
 refusal — for anybody who asks the API directly — names the setting that would allow it.
 
+**A folder of samples needs the browser open.** `WDS_FILE_ROOTS` mounted next to
+`WDS_ALLOW_FILE_BROWSE=false` is a folder nobody can reach by clicking: visitors then get to it only
+through a `?u=/data/files/<name>/<file>` link. On a viewer whose whole point is "there is something
+here to look at", leave the browser on; on one exposed to the internet, keep it closed and hand out
+links — a listing of a container's folders is a description of the deployment.
+
 "Nobody may add anything" is those three set to `false`. That is worth having on its own: a
 deployment whose connections come from an app host can close the form and keep everything else.
 

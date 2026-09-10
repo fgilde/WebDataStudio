@@ -209,6 +209,12 @@ Eine geschlossene Tür nimmt ihren Knopf mit, statt einen zu zeigen, der mit ein
 antwortet — und die Ablehnung, für alle, die die API direkt fragen, nennt die Einstellung, die es
 erlauben würde.
 
+**Ein Ordner mit Beispieldateien braucht einen offenen Browser.** `WDS_FILE_ROOTS` neben
+`WDS_ALLOW_FILE_BROWSE=false` ist ein Ordner, den niemand per Klick erreicht: Besucher kommen dann
+nur über einen Link `?u=/data/files/<Name>/<Datei>` daran. Bei einem Viewer, dessen ganzer Sinn
+„hier gibt es was zu sehen" ist, lass den Browser an; bei einem im offenen Internet lass ihn zu und
+verteile Links — eine Auflistung der Container-Ordner ist eine Beschreibung der Bereitstellung.
+
 „Niemand darf etwas hinzufügen" sind diese drei auf `false`. Das ist auch allein nützlich: ein
 Deployment, dessen Verbindungen aus einem App-Host kommen, schließt das Formular und lässt den Rest.
 

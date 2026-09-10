@@ -166,8 +166,14 @@ function cartesian(type: WidgetType, data: ChartData, mapping: WidgetMapping,
         },
         // Up to four series carry their own labels, so identity is never colour alone.
         label: !spark && drawn.length <= 4 && !line && pivoted.categories.length <= 12
-          ? { show: true, position: horizontal ? "right" : "top", color: theme.text, fontSize: 10,
-            formatter: (p: { value: number }) => format(p.value, options) }
+          ? {
+            show: true,
+            // Inside the segment when stacked: above it would read as the bar's own total.
+            position: stacked ? "inside" : horizontal ? "right" : "top",
+            color: stacked ? "#ffffff" : theme.text,
+            fontSize: 10,
+            formatter: (p: { value: number }) => format(p.value, options),
+          }
           : { show: false },
         endLabel: line && !spark && drawn.length > 1 && drawn.length <= 4
           ? { show: true, color: theme.text, fontSize: 10, formatter: "{a}" }
@@ -246,11 +252,31 @@ function pie(type: WidgetType, data: ChartData, mapping: WidgetMapping, options:
         tooltip: { ...tooltip(theme), trigger: "item" },
         series: [{
           type: "treemap",
-          data: slices.slice(0, 60),
+          // Fills its box: the defaults leave a wide margin, which in a widget is most of the room.
+          left: 2,
+          right: 2,
+          top: 2,
+          bottom: 2,
+          width: undefined,
+          height: undefined,
+          // A treemap's leaves are not series: they are one measure, so they take the sequential
+          // ramp by size rather than the categorical order, which past eight leaves would have to
+          // repeat itself.
+          data: slices.slice(0, 40).map((one, index, all) => ({
+            ...one,
+            itemStyle: {
+              color: theme.sequential[
+                Math.min(theme.sequential.length - 1,
+                  Math.round((1 - index / Math.max(1, all.length - 1)) * (theme.sequential.length - 1)))
+              ],
+            },
+          })),
           roam: false,
           nodeClick: false,
           breadcrumb: { show: false },
-          label: { show: true, color: "#ffffff", fontSize: 11 },
+          // A leaf too small to read is drawn rather than dropped: the picture is the point.
+          visibleMin: 0,
+          label: { show: true, color: "#ffffff", fontSize: 11, overflow: "truncate" },
           itemStyle: { borderColor: theme.dark ? "#1a1a19" : "#fcfcfb", borderWidth: 2, gapWidth: 2 },
         }],
       },

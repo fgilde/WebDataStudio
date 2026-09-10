@@ -225,6 +225,8 @@ export function DashboardPanel({ onOpenInEditor }: {
           }))}
           value={draft ? null : current}
           disabled={draft !== null}
+          // Picking the one already open must not close it: there is no "no dashboard" to pick.
+          allowDeselect={false}
           onChange={value => { setCurrent(value); setNotes([]); }}
           aria-label="Dashboard" />
 

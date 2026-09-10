@@ -1,0 +1,34 @@
+/* The about drawer's two animations. Both are slow on purpose: this is a panel somebody opened to
+   read, not a place to wave at them. */
+
+@keyframes wds-about-logo {
+  0%, 100% { transform: translateY(0); filter: drop-shadow(0 6px 18px rgba(43, 140, 255, 0.28)); }
+  50% { transform: translateY(-5px); filter: drop-shadow(0 12px 26px rgba(139, 92, 246, 0.42)); }
+}
+
+.wds-about-logo {
+  animation: wds-about-logo 4.5s ease-in-out infinite;
+}
+
+/* The gilde mark is one stroked path with pathLength="1", which is what its own site animates: the
+   dash walks from "nothing drawn" to "drawn", so the G writes itself. Once, on open — a mark that
+   erases itself every few seconds is a fidget, not a signature. */
+@keyframes wds-about-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+.wds-about-draw path {
+  stroke-dasharray: 1;
+  animation: wds-about-draw 1.4s ease-out both;
+}
+
+.wds-about-draw path:nth-child(2) {
+  animation-delay: 0.9s;
+}
+
+/* Somebody who asked their system not to animate things means it. */
+@media (prefers-reduced-motion: reduce) {
+  .wds-about-logo, .wds-about-draw path { animation: none; }
+  .wds-about-draw path { stroke-dashoffset: 0; }
+}

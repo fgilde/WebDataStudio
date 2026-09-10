@@ -562,6 +562,7 @@ it works for every engine whose capability set claims support for it.
 | F30.48 | A session that ends: a lifetime, a ceiling, a sweeper, and a button to forget it now |
 | F30.49 | The hosts the studio may connect to at all, whatever the connection string says |
 | F30.50 | The empty state of a studio somebody brings their own data to |
+| F30.51 | A deployment's own icon, in the header, on the login screen and in the browser tab |
 
 ## 10. Safety behaviour
 

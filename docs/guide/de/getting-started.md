@@ -12,6 +12,29 @@ Das Volume hält die Anwendungsdatenbank: in der Oberfläche angelegte Verbindun
 gespeicherte Abfragen, Snippets und Layouts. Verbindungen aus Umgebungsvariablen werden bei jedem
 Start neu gelesen und landen dort nie.
 
+## Welcher Build läuft hier
+
+Das **i** in der Kopfleiste öffnet eine Info-Schublade: Version, Commit und wann das Image gebaut
+wurde, dazu die Links zur Dokumentation, zum Repository und zur Website. Dieselben drei Werte
+liefert `GET /api/health`, was der schnellere Weg ist, ein frisch gezogenes `:latest` von einem
+alten lokalen Image zu unterscheiden.
+
+## Aussehen wie deins
+
+`WDS_TITLE` setzt einen Namen in die Kopfleiste, `WDS_THEME` wählt die Startfarben, und `WDS_ICON`
+ersetzt das Icon — in der Kopfleiste, auf dem Login-Bildschirm und im Browser-Tab:
+
+```bash
+-e WDS_ICON=https://intranet.example.com/brand/mark.svg
+-e WDS_ICON=/brand/mark.png -v ./mark.png:/brand/mark.png:ro
+```
+
+Entweder eine URL, die der Browser selbst laden kann, oder eine in den Container eingebundene
+Datei — die liefert das Studio selbst unter `/api/brand/icon` aus, und zwar vor dem Login, damit der
+Login-Bildschirm sie zeigen kann. Erkannt werden `svg`, `png`, `jpg`, `webp`, `gif` und `ico` an der
+Endung. Ein Pfad, der nicht existiert, ist ein Tippfehler in einer Bereitstellung und kein Grund,
+den Start zu verweigern: das Studio kommt hoch und nimmt das mitgelieferte Icon.
+
 ## Mit Docker Compose
 
 ```yaml

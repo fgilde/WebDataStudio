@@ -9,6 +9,7 @@
 | `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app; the account is an admin |
 | `WDS_USERS` | several accounts: `name:role:secret[:conn,conn]` entries separated by `;`. Read-only in the studio; an admin makes further accounts in the panel — see [Safety](safety.md#accounts-an-admin-makes) |
 | `WDS_TITLE` | a name for this studio, shown in the header, on the login screen and in the browser tab |
+| `WDS_ICON` | this deployment's own icon: a URL, or a file mounted into the container, which the studio then serves itself. Used in the header, on the login screen and in the browser tab; without it the shipped icon stays |
 | `WDS_THEME` | the theme the studio comes up in, by id (`ocean`, `aspire`, `nord`, …). A person who picks another one keeps their choice; an id the studio does not have is ignored |
 | `WDS_TRANSACTION_IDLE_SECONDS` | how long a transaction a query tab holds open may sit untouched before the server rolls it back (default 900). A closed browser ends the same way |
 | `WDS_OIDC_AUTHORITY`, `WDS_OIDC_CLIENT_ID`, `WDS_OIDC_CLIENT_SECRET` | sign in with an identity provider instead of a list of accounts — see [Safety](safety.md#signing-in-with-an-identity-provider) |

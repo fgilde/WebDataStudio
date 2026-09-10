@@ -11,6 +11,9 @@ export interface Me {
   /// The theme this deployment wants the studio to start in, from WDS_THEME. A person's own choice
   /// is kept in their browser and wins over it.
   theme?: string | null;
+  /// The icon this deployment wants in the header and on the login screen, from WDS_ICON. Null
+  /// means the one the studio ships.
+  icon?: string | null;
   /// The identity provider, where one is configured. `only` means there are no local accounts, so
   /// the login screen has nothing else to offer.
   sso?: { enabled: boolean; label: string; only: boolean };

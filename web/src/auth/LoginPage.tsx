@@ -5,10 +5,13 @@ import {
 } from "@mantine/core";
 import { IconBrandGithub } from "@tabler/icons-react";
 import { login } from "../api";
+import { BrandIcon } from "../components/BrandIcon";
 import { DOCS_URL, GILDE_URL, GITHUB_URL } from "../components/BrandLinks";
 
-export function LoginPage({ title, sso, onSuccess }: {
+export function LoginPage({ title, icon, sso, onSuccess }: {
   title?: string | null;
+  /// What this deployment wants shown instead of our icon, from WDS_ICON.
+  icon?: string | null;
   /// The identity provider, where the deployment configured one.
   sso?: { enabled: boolean; label: string; only: boolean };
   onSuccess: () => void;
@@ -34,8 +37,8 @@ export function LoginPage({ title, sso, onSuccess }: {
     <Center h="100vh" p="md">
       <Stack align="center" gap="lg" w="100%" maw={420}>
         {/* The icon at a size worth looking at: this screen has nothing else to show. */}
-        <img src="/brand/icon.svg" alt="WebDataStudio" width={112} height={112}
-          style={{ display: "block", filter: "drop-shadow(0 8px 24px rgba(0,0,0,.35))" }} />
+        <BrandIcon src={icon} size={112} alt={title ?? "WebDataStudio"}
+          style={{ filter: "drop-shadow(0 8px 24px rgba(0,0,0,.35))" }} />
 
         <Stack align="center" gap={2}>
           <Title order={2} fw={700}>WebDataStudio</Title>

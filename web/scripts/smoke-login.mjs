@@ -1,7 +1,9 @@
-// Browser check for the login screen, the studio title and the brand links.
-// Needs a server started with WDS_USER, WDS_PASSWORD and WDS_TITLE:
+// Browser check for the login screen, the studio title, the about drawer and a deployment's own
+// icon. Needs a server started with WDS_USER, WDS_PASSWORD and WDS_TITLE, and optionally WDS_ICON:
 //
 //   WDS_USER=admin WDS_PASSWORD=secret WDS_TITLE="analytics studio" ./WebDataStudio.Server
+//
+// Set WDS_ICON on the server and ICON_SRC here to the source the browser should end up with.
 //
 // BASE_URL defaults to :5006, so it does not collide with the anonymous server the other
 // smoke checks use.
@@ -31,7 +33,7 @@ try {
   await page.getByRole("button", { name: "Sign in" }).waitFor({ timeout: 15000 });
 
   // The icon is the point of this screen; a broken source would render at zero width.
-  const icon = page.getByAltText("WebDataStudio").first();
+  const icon = page.locator("main, body").first().locator("img").first();
   await icon.waitFor({ timeout: 5000 });
   const box = await icon.boundingBox();
   if (!box || box.width < 64) throw new Error(`the icon renders at ${box?.width ?? 0}px`);
@@ -78,13 +80,49 @@ try {
   await page.locator("input[type=password]").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  await page.getByAltText("WebDataStudio").first().waitFor({ timeout: 15000 });
-  await page.getByText(title.toUpperCase()).waitFor({ timeout: 10000 });
-
-  // The same two links live in the header, next to the theme button.
-  await page.getByRole("link", { name: "Source on GitHub" }).waitFor({ timeout: 5000 });
-  await page.getByRole("link", { name: "Documentation" }).waitFor({ timeout: 5000 });
+  await page.getByText(title.toUpperCase()).waitFor({ timeout: 15000 });
 } catch (e) { await fail("studio", e); }
+
+// --- where this studio comes from is one drawer behind the i ------------------------
+try {
+  await page.getByRole("button", { name: "About" }).click();
+
+  // The version comes from /api/health, so this also proves the drawer's own round trip.
+  await page.getByText("Version").waitFor({ timeout: 10000 });
+  await page.locator(".mantine-Drawer-content").getByText(/^v\d+\.\d+/).waitFor({ timeout: 5000 });
+
+  for (const name of ["Documentation", "Source on GitHub", "Website", "gilde.org"])
+    await page.getByRole("link", { name }).waitFor({ timeout: 5000 });
+
+  const drawer = await page.locator(".mantine-Drawer-content")
+    .locator("a").evaluateAll(links => links.map(a => a.getAttribute("href")));
+
+  for (const expected of ["https://www.gilde.org", "https://github.com/fgilde/WebDataStudio",
+    "https://fgilde.github.io/WebDataStudio"]) {
+    if (!drawer.includes(expected)) throw new Error(`no link to ${expected}: ${drawer.join(", ")}`);
+  }
+
+  // The mark that draws itself: one stroked path, animated by AboutDrawer.css.
+  const drawn = await page.locator(".wds-about-draw path").first()
+    .evaluate(node => getComputedStyle(node).animationName);
+  if (drawn === "none") throw new Error("the gilde mark is not animated");
+
+  await page.screenshot({ path: "smoke-login-about.png" });
+  await page.keyboard.press("Escape");
+} catch (e) { await fail("about", e); }
+
+// --- a deployment's own icon, where one is configured -------------------------------
+const wanted = process.env.ICON_SRC;
+if (wanted) {
+  try {
+    const src = await page.locator("header img").first().getAttribute("src");
+    if (src !== wanted) throw new Error(`the header icon is ${src}, not ${wanted}`);
+
+    const box = await page.locator("header img").first().boundingBox();
+    if (!box || box.width < 12) throw new Error(`the header icon renders at ${box?.width ?? 0}px`);
+    console.log(`ok   the header shows ${src}`);
+  } catch (e) { await fail("icon", e); }
+}
 
 await page.screenshot({ path: "smoke-login.png" });
 await browser.close();

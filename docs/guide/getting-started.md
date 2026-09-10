@@ -14,8 +14,11 @@ start and never written there.
 
 ## Which build am I running
 
-The version sits in the bottom right corner of the studio, and its tooltip carries the commit and
-the build time. `GET /api/health` returns the same three values, which is the quicker way to tell a
+The **i** in the header opens an about drawer with the version, the commit and when the image was
+built, next to the links to the documentation, the repository and the website.
+
+The version also sits in the bottom right corner of the studio, and its tooltip carries the commit
+and the build time. `GET /api/health` returns the same three values, which is the quicker way to tell a
 pulled `:latest` from a stale local image:
 
 ```bash
@@ -25,6 +28,22 @@ curl -s http://localhost:8080/api/health
 
 Published images count the patch number up on their own; a version reading `1.1.0-dev` was built
 by hand rather than pulled.
+
+## Making it look like yours
+
+`WDS_TITLE` puts a name in the header, `WDS_THEME` picks the colours it starts in, and `WDS_ICON`
+replaces the icon in the header, on the login screen and in the browser tab:
+
+```bash
+-e WDS_ICON=https://intranet.example.com/brand/mark.svg
+-e WDS_ICON=/brand/mark.png -v ./mark.png:/brand/mark.png:ro
+```
+
+Either a URL the browser can fetch or a file mounted into the container — the studio serves the
+second one itself at `/api/brand/icon`, before the login screen, so the login screen can show it.
+`svg`, `png`, `jpg`, `webp`, `gif` and `ico` are recognised by extension. A path that is not there
+is a typo in a deployment, not a reason to refuse to start: the studio comes up and falls back to
+the icon it ships.
 
 ## With Docker Compose
 

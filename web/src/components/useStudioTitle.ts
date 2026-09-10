@@ -1,19 +1,29 @@
 import { useEffect, useState } from "react";
-import { me } from "../api";
+import { me, type Me } from "../api";
 
-let cached: Promise<string | null> | null = null;
+let cached: Promise<Me | null> | null = null;
 
-/// The studio's name, from WDS_TITLE. Fetched once: it cannot change while the page is open.
-export function useStudioTitle(): string | null {
-  const [title, setTitle] = useState<string | null>(null);
+/// What the deployment said about itself, fetched once: none of it changes while the page is open.
+function useStudio<T>(pick: (state: Me) => T, none: T): T {
+  const [value, setValue] = useState<T>(none);
 
   useEffect(() => {
-    cached ??= me().then(state => state.title ?? null).catch(() => null);
+    cached ??= me().catch(() => null);
 
     let cancelled = false;
-    cached.then(value => { if (!cancelled) setTitle(value); });
+    cached.then(state => { if (!cancelled && state) setValue(pick(state)); });
     return () => { cancelled = true; };
+    // The picker is a literal at every call site; re-running on its identity would refetch forever.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return title;
+  return value;
 }
+
+/// The studio's name, from WDS_TITLE.
+export const useStudioTitle = (): string | null =>
+  useStudio(state => state.title ?? null, null);
+
+/// The icon this deployment wants, from WDS_ICON. Null means the one we ship.
+export const useStudioIcon = (): string | null =>
+  useStudio(state => state.icon ?? null, null);

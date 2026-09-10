@@ -1,30 +1,39 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { ActionIcon, AppShell, Divider, Group, Text, Tooltip } from "@mantine/core";
-import { IconCommand, IconDatabaseCog, IconLayoutBoard, IconPalette, IconTable } from "@tabler/icons-react";
+import {
+  IconCommand, IconDatabaseCog, IconInfoCircle, IconLayoutBoard, IconPalette, IconTable,
+} from "@tabler/icons-react";
 import { Link, useLocation } from "react-router-dom";
 import { ThemeDrawer } from "../ThemeDrawer";
 import { ChatDock } from "../assist/ChatDock";
 import { UserMenu } from "../auth/UserMenu";
 import { McpButton } from "../mcp/McpButton";
-import { BrandLinks } from "./BrandLinks";
+import { AboutDrawer } from "./AboutDrawer";
+import { BrandIcon } from "./BrandIcon";
 import { ToolsMenu } from "../shell/ToolsMenu";
 import { emit } from "../shell/bus";
-import { useStudioTitle } from "./useStudioTitle";
+import { useStudioIcon, useStudioTitle } from "./useStudioTitle";
 
 export function AppShellFrame({ children }: { children: ReactNode }) {
   const [themeOpen, setThemeOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const { pathname } = useLocation();
   const title = useStudioTitle();
+  const icon = useStudioIcon();
 
   return (
     <AppShell header={{ height: 44 }} padding={0}>
       <AppShell.Header>
         <Group h="100%" px="sm" justify="space-between" style={{ position: "relative" }}>
           <Group gap="sm">
-            {/* The wordmark carries the product name, so no second text label next to it. */}
-            <img src="/brand/logo.svg" alt="WebDataStudio" height={33}
-              style={{ display: "block" }} />
+            {/* The wordmark carries the product name, so no second text label next to it. A
+                deployment with its own icon gets that instead: putting somebody else's logo next
+                to ours is the one arrangement nobody asked for. */}
+            {icon
+              ? <BrandIcon src={icon} size={28} alt={title ?? "Studio"} />
+              : <img src="/brand/logo.svg" alt="WebDataStudio" height={33}
+                  style={{ display: "block" }} />}
             <Tooltip label="Studio">
               <ActionIcon component={Link} to="/" aria-label="Studio" variant={pathname === "/" ? "light" : "subtle"}>
                 <IconTable size={17} />
@@ -79,9 +88,14 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
             <McpButton />
             {/* Only on a studio with accounts; it renders nothing otherwise. */}
             <UserMenu />
-            {/* What this studio does, and where it comes from, are two different kinds of link. */}
+            {/* What this studio does and where it comes from are two different questions, and
+                only the first one gets asked all day. */}
             <Divider orientation="vertical" my={12} mx={4} />
-            <BrandLinks />
+            <Tooltip label="About WebDataStudio">
+              <ActionIcon variant="subtle" aria-label="About" onClick={() => setAboutOpen(true)}>
+                <IconInfoCircle size={18} />
+              </ActionIcon>
+            </Tooltip>
           </Group>
         </Group>
       </AppShell.Header>
@@ -89,6 +103,7 @@ export function AppShellFrame({ children }: { children: ReactNode }) {
       {/* In the corner, over everything, and absent unless assistance is configured. */}
       <ChatDock onUseStatement={sql => emit("use-sql", sql)} />
       <ThemeDrawer opened={themeOpen} onClose={() => setThemeOpen(false)} />
+      <AboutDrawer opened={aboutOpen} onClose={() => setAboutOpen(false)} />
     </AppShell>
   );
 }

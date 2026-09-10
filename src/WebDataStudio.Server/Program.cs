@@ -156,6 +156,7 @@ builder.Services.AddSingleton<SessionConnections>();
 // Ends the sessions nobody came back to, and deletes what they brought with them.
 builder.Services.AddHostedService<SessionSweeper>();
 builder.Services.AddSingleton(sp => StudioAccess.From(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<StudioBrand>();
 builder.Services.AddSingleton(sp => ConnectHosts.From(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton(sp => UrlConnectionOptions.From(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<UrlConnectionOpener>();
@@ -427,6 +428,8 @@ app.Use(async (ctx, next) =>
     var open = !path.StartsWithSegments("/api")
                || path.StartsWithSegments("/api/auth")
                || path.StartsWithSegments("/api/health")
+               // The login screen shows the deployment's own icon, and nobody is signed in there.
+               || path.StartsWithSegments("/api/brand")
                // A shared result is meant to be openable by whoever has the link — but only when
                // the deployment said so.
                || (shares.Enabled && shares.Public && path.StartsWithSegments("/api/share"));

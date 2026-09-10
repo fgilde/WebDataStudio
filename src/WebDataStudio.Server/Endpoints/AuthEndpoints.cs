@@ -28,6 +28,17 @@ public static class AuthEndpoints
 
         var oidc = app.Services.GetRequiredService<OidcOptions>();
 
+        // A deployment's own icon. Null here means the shipped one, which the client owns: it has
+        // the file, so a studio nobody rebranded looks exactly as it did before.
+        var brand = app.Services.GetRequiredService<StudioBrand>();
+
+        // Before the login screen, so it is not behind the login. Nothing about a file somebody
+        // mounted on purpose is a secret, and a locked-out browser showing a broken image instead of
+        // the deployment's logo is the wrong kind of careful.
+        api.MapGet("/brand/icon", () => brand.FilePath is null
+            ? Results.NotFound()
+            : Results.File(brand.FilePath, brand.ContentType)).AllowAnonymous();
+
         api.MapGet("/auth/me", (HttpContext ctx, CurrentUser current, StudioAccess access) => Results.Ok(new
         {
             anonymous = users.Anonymous,
@@ -39,6 +50,8 @@ public static class AuthEndpoints
             title,
             // Where to start. A person's own choice is kept in their browser and wins over this.
             theme,
+            // The icon in the header and on the login screen. Null means ours.
+            icon = brand.Icon,
             // Whether there is a provider to offer, and what its button says. A studio with a
             // provider and no local accounts shows only that button.
             sso = new { enabled = oidc.Enabled, label = oidc.Label, only = oidc.Enabled && users.All.Count == 0 },

@@ -6,9 +6,11 @@ export const GITHUB_URL = "https://github.com/fgilde/WebDataStudio";
 // them yet.
 export const DOCS_URL = "https://fgilde.github.io/WebDataStudio/guide/";
 export const GILDE_URL = "https://www.gilde.org";
+/// The product's own page, for somebody who wants the pitch rather than the repository.
+export const SITE_URL = "https://fgilde.github.io/WebDataStudio";
 
-/// The three places this studio comes from, as icons. Used in the header; the login screen shows
-/// the same set with labels.
+/// The two places this studio comes from, as icons. Used on the shared-result page, which belongs
+/// to whoever has the link and has no header to open an about drawer from.
 export function BrandLinks({ size = 18 }: { size?: number }) {
   return (
     <Group gap={2} wrap="nowrap">

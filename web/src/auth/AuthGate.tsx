@@ -19,8 +19,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
     document.title = state?.title ? `${state.title} · WebDataStudio` : "WebDataStudio";
   }, [state?.title]);
 
+  // And the tab's icon, where a deployment brought its own. The link element is in index.html, so
+  // a studio nobody rebranded needs nothing here.
+  useEffect(() => {
+    if (!state?.icon) return;
+    document.querySelector<HTMLLinkElement>("link[rel~='icon']")?.setAttribute("href", state.icon);
+  }, [state?.icon]);
+
   if (!state) return <Center h="100vh"><Loader /></Center>;
   // No credentials configured: no login screen at all.
   if (state.anonymous || state.authenticated) return <>{children}</>;
-  return <LoginPage title={state.title} sso={state.sso} onSuccess={refresh} />;
+  return <LoginPage title={state.title} icon={state.icon} sso={state.sso} onSuccess={refresh} />;
 }

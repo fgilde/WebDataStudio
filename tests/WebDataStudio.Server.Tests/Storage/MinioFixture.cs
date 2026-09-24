@@ -14,11 +14,21 @@ public sealed class MinioFixture : IAsyncDisposable
     public const string AccessKey = "wds-tests";
     public const string SecretKey = "wds-tests-secret";
 
+    /// MinIO stopped publishing images: `minio/minio` on Docker Hub and on quay.io answers every pull
+    /// with "access denied". Chainguard builds the same server from source and publishes it; only its
+    /// `latest` is free, so the digest pins it — a test run must not change under a moving tag.
+    /// To update: `docker buildx imagetools inspect cgr.dev/chainguard/minio:latest`.
+    public const string Image =
+        "cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1";
+
     private readonly IContainer _container = new ContainerBuilder()
-        .WithImage("minio/minio:RELEASE.2025-04-22T22-12-26Z")
+        .WithImage(Image)
         .WithEnvironment("MINIO_ROOT_USER", AccessKey)
         .WithEnvironment("MINIO_ROOT_PASSWORD", SecretKey)
         .WithCommand("server", "/data")
+        // The image declares no volume, so /data would sit on the container's overlay filesystem,
+        // where MinIO's own housekeeping fails with "rename across devices not allowed".
+        .WithTmpfsMount("/data")
         .WithPortBinding(9000, true)
         .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request =>
             request.ForPath("/minio/health/live").ForPort(9000)))

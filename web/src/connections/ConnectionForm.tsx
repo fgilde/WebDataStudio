@@ -44,6 +44,7 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
   });
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [sslMode, setSslMode] = useState("default");
   const [tunnel, setTunnel] = useState<TunnelInput | null>(initial?.tunnel ?? null);
   const [presets, setPresets] = useState<ConnectionPresetDto[]>([]);
@@ -61,7 +62,9 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
   const patchTunnel = (patch: Partial<TunnelInput>) =>
     setTunnel(t => ({ ...(t ?? { host: "", port: 22, user: "" }), ...patch }));
 
-  const complete = (): ConnectionInput => ({ ...value, tunnel });
+  // A tunnel without a host is not a tunnel: a browser filling the SSH fields with a saved login
+  // would otherwise send one, and the server would fail it for the missing user.
+  const complete = (): ConnectionInput => ({ ...value, tunnel: tunnel?.host.trim() ? tunnel : null });
 
   const test = async () => {
     setBusy(true);
@@ -85,7 +88,7 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
           }))} />
       )}
 
-      <TextInput label="Name" value={value.name} required
+      <TextInput label="Name" value={value.name} required autoComplete="off"
         onChange={e => { const name = e.currentTarget.value; setValue(v => ({ ...v, name })); }} />
       <Select label="Engine" searchable nothingFoundMessage="No such engine" maxDropdownHeight={320}
         data={[...ENGINES].sort((a, b) => a.label.localeCompare(b.label))
@@ -93,7 +96,7 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
         value={value.engine} onChange={id => id && setValue(v => ({ ...v, engine: id }))} />
 
       {presets.length > 0 &&
-        <Select label="Start from" clearable searchable
+        <Select label="Start from" clearable searchable autoComplete="off"
           placeholder="Azure SQL, Synapse, Fabric, a bucket…"
           description={presets.find(p => p.id === preset)?.description
             ?? "Fills in the connection string; the placeholders in braces are yours to replace"}
@@ -107,6 +110,7 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
             }));
           }} />}
       <Textarea label="Connection string" autosize minRows={2} value={value.connectionString}
+        autoComplete="off"
         onChange={e => setConnectionString(e.currentTarget.value)}
         description={"Either shape: Host=db;Port=5432;Database=shop;Username=u;Password=pw — or a "
           + "URL, postgres://u:pw@db:5432/shop. A password with # or ? in it is fine in both."} />
@@ -121,7 +125,7 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
           </Accordion.Control>
           <Accordion.Panel>
             <Stack gap="xs">
-              <TextInput size="xs" label="Group" placeholder="production" value={value.group ?? ""}
+              <TextInput size="xs" label="Group" placeholder="production" autoComplete="off" value={value.group ?? ""}
                 onChange={e => { const group = e.currentTarget.value || null; setValue(v => ({ ...v, group })); }} />
               <ColorInput size="xs" label="Colour" format="hex" value={value.color ?? ""}
                 swatches={["#e03131", "#f08c00", "#2f9e44", "#1971c2", "#9c36b5"]}
@@ -138,21 +142,21 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
           <Accordion.Panel>
             <Stack gap="xs">
               <Group grow>
-                <TextInput size="xs" label="SSH host" value={tunnel?.host ?? ""}
+                <TextInput size="xs" label="SSH host" autoComplete="off" value={tunnel?.host ?? ""}
                   onChange={e => patchTunnel({ host: e.currentTarget.value })} />
                 <NumberInput size="xs" label="Port" min={1} max={65535} value={tunnel?.port ?? 22}
                   onChange={v => patchTunnel({ port: Number(v) || 22 })} />
               </Group>
-              <TextInput size="xs" label="SSH user" value={tunnel?.user ?? ""}
+              <TextInput size="xs" label="SSH user" autoComplete="off" value={tunnel?.user ?? ""}
                 onChange={e => patchTunnel({ user: e.currentTarget.value })} />
-              <PasswordInput size="xs" label="SSH password" value={tunnel?.password ?? ""}
+              <PasswordInput size="xs" label="SSH password" autoComplete="new-password" value={tunnel?.password ?? ""}
                 onChange={e => patchTunnel({ password: e.currentTarget.value || null })} />
               {/* A key wins over a password; both would just confuse the server. */}
               <Textarea size="xs" label="Private key" autosize minRows={2} maxRows={6}
                 value={tunnel?.privateKey ?? ""}
                 placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
                 onChange={e => patchTunnel({ privateKey: e.currentTarget.value || null })} />
-              <PasswordInput size="xs" label="Key passphrase" value={tunnel?.passphrase ?? ""}
+              <PasswordInput size="xs" label="Key passphrase" autoComplete="new-password" value={tunnel?.passphrase ?? ""}
                 onChange={e => patchTunnel({ passphrase: e.currentTarget.value || null })} />
               <Button size="compact-xs" variant="subtle" color="red" disabled={!tunnel}
                 onClick={() => setTunnel(null)}>Remove the tunnel</Button>
@@ -182,8 +186,11 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
         <Button variant="default" onClick={test} loading={busy}>Test</Button>
         <Group>
           <Button variant="subtle" onClick={onCancel}>Cancel</Button>
-          <Button onClick={() => onSubmit(complete())}
-            disabled={!value.name || !value.connectionString}>Save</Button>
+          <Button loading={saving} disabled={!value.name || !value.connectionString}
+            onClick={() => {
+              setSaving(true);
+              onSubmit(complete()).finally(() => setSaving(false));
+            }}>Save</Button>
         </Group>
       </Group>
     </Stack>

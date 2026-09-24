@@ -226,8 +226,13 @@ export function ExplorerTree({ refresh = 0, onSelect, onAction, onDropFiles }: {
   // Two characters: one is a typo waiting to happen and would search the whole server for "a".
   const searching = filter.trim().length >= 2;
 
-  useEffect(() => { listConnections().then(setConnections).catch(() => setConnections([])); },
-    [nonce, refresh]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    listConnections().then(setConnections).catch(() => setConnections([]))
+      .finally(() => setLoading(false));
+  }, [nonce, refresh]);
 
   // What each engine can do decides which menu items exist at all.
   useEffect(() => {
@@ -276,6 +281,9 @@ export function ExplorerTree({ refresh = 0, onSelect, onAction, onDropFiles }: {
           <IconRefresh size={14} />
         </ActionIcon>
       </Group>
+
+      {/* An empty tree while the list is on its way reads as "no connections". */}
+      {loading && connections.length === 0 && <Loader size="xs" ml={12} my={6} />}
 
       {searching ? (
         <ObjectSearch connections={connections} filter={filter.trim()}

@@ -127,7 +127,13 @@ export function ConnectionsPage() {
           onCancel={() => setAdding(false)}
           onCreated={() => { setAdding(false); refresh(); }}
           onSubmit={async value => {
-            try { await createConnection(value); setAdding(false); refresh(); }
+            // The answer is the connection: shown at once, not after a second round trip.
+            try {
+              const created = await createConnection(value);
+              setItems(list => [...list.filter(c => c.id !== created.id), created]);
+              setAdding(false);
+              refresh();
+            }
             catch (e) { setError(e instanceof Error ? e.message : String(e)); }
           }} />
       </Modal>

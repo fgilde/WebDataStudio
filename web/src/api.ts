@@ -743,17 +743,29 @@ export const lookupValues = (conn: string, ref: string, column: string, search?:
     .then(r => ok<LookupItemDto[]>(r));
 };
 
+export interface PlanPropertyDto { name: string; value: string | null; children: PlanPropertyDto[] }
 export interface PlanNodeDto {
   operation: string; detail: string | null;
   estimatedCost: number | null; estimatedRows: number | null;
   actualRows: number | null; actualMs: number | null;
   children: PlanNodeDto[]; warnings: string[];
+  nodeId?: number | null; object?: string | null; properties?: PlanPropertyDto[] | null;
+}
+export interface PlanStatementDto {
+  text: string | null; type: string | null; cost: number | null;
+  properties: PlanPropertyDto[]; warnings: string[]; missingIndexes: string[];
+  root: PlanNodeDto | null;
+}
+/// A plan as the engine wrote it: every statement, and its own text when it can be saved.
+export interface PlanDocumentDto {
+  engine: string; raw: string | null; rawFormat: string | null; statements: PlanStatementDto[];
 }
 export interface FindingDto {
   category: string; severity: string; title: string; detail: string; statement: string | null;
 }
 export interface AnalyzeResultDto {
   plan: PlanNodeDto | null;
+  document?: PlanDocumentDto | null;
   summary: { totalCost: number | null; maxNodeCost: number; nodeCount: number } | null;
   planError: string | null;
   findings: FindingDto[];
@@ -788,6 +800,10 @@ export const tryIndex = (conn: string, sql: string, ddl: string): Promise<IndexT
 export const analyzeQuery = (connectionId: string, sql: string, actual = false): Promise<AnalyzeResultDto> =>
   fetch(`${base}/query/analyze`, json("POST", { connectionId, sql, actual }))
     .then(r => ok<AnalyzeResultDto>(r));
+
+/// A saved plan — .sqlplan or the XML SSMS writes — read on the server, without a connection.
+export const openPlan = (text: string): Promise<AnalyzeResultDto> =>
+  fetch(`${base}/plans/open`, json("POST", { text })).then(r => ok<AnalyzeResultDto>(r));
 
 export const healthReport = (connectionId: string, schema?: string): Promise<{ findings: FindingDto[] }> =>
   fetch(`${base}/analyze/${connectionId}${schema ? `?schema=${encodeURIComponent(schema)}` : ""}`)

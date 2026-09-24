@@ -1,21 +1,32 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   Modal, parseThemeColor, useComputedColorScheme, useMantineTheme,
 } from "@mantine/core";
 
 const WIDGETS_URL = "https://connect.gilde.org/widgets/v1.js";
 
-declare module "react" {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace JSX {
-    interface IntrinsicElements {
-      "gilde-contact": React.HTMLAttributes<HTMLElement> & Record<string, string>;
-      "gilde-support": React.HTMLAttributes<HTMLElement> & Record<string, string>;
-    }
-  }
-}
-
 export type GildeWidget = "contact" | "support";
+
+/// The widget element, made by hand with attributes only. React 19 writes a property instead of an
+/// attribute once a custom element is defined, and the widget's `inline` is a getter: the second
+/// form opened threw, and took the whole page with it.
+function WidgetElement({ tag, attributes, label }: {
+  tag: string; attributes: Record<string, string>; label: string;
+}) {
+  const host = useRef<HTMLDivElement>(null);
+  const key = JSON.stringify(attributes);
+
+  useEffect(() => {
+    const element = document.createElement(tag);
+    for (const [name, value] of Object.entries(JSON.parse(key) as Record<string, string>))
+      element.setAttribute(name, value);
+    element.textContent = label;
+    host.current?.append(element);
+    return () => element.remove();
+  }, [tag, key, label]);
+
+  return <div ref={host} />;
+}
 
 /// gilde.org's contact and support forms, inline in a modal: the widget's own button would open a
 /// second dialog on top of the drawer. The script is only fetched once somebody asks for a form, so
@@ -59,12 +70,15 @@ export function GildeConnectModal({ widget, onClose }: {
         body: { padding: 0, display: "flex", justifyContent: "center" },
       }}>
       {widget === "contact" && (
-        <gilde-contact {...common} title="Contact WebDataStudio">Contact WebDataStudio</gilde-contact>
+        <WidgetElement tag="gilde-contact" label="Contact WebDataStudio"
+          attributes={{ ...common, title: "Contact WebDataStudio" }} />
       )}
       {widget === "support" && (
-        <gilde-support {...common} show-support-hint="false" support-layout="rows"
-          show-support-icons="true" show-support-qr="true"
-          title="Support WebDataStudio">Support WebDataStudio</gilde-support>
+        <WidgetElement tag="gilde-support" label="Support WebDataStudio"
+          attributes={{
+            ...common, "show-support-hint": "false", "support-layout": "rows",
+            "show-support-icons": "true", "show-support-qr": "true", title: "Support WebDataStudio",
+          }} />
       )}
     </Modal>
   );

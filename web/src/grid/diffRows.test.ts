@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeDiff, diffRows } from "./diffRows";
+import { comparable, describeDiff, diffRows } from "./diffRows";
 
 describe("diffRows", () => {
   it("marks a changed cell and says which one", () => {
@@ -42,11 +42,28 @@ describe("diffRows", () => {
     expect(diff.flags).toEqual(["same", "same"]);
   });
 
-  it("compares by position without key columns", () => {
+  // Without an ORDER BY the server may hand the same rows back in another order — a UNION ALL does.
+  // A row that is still there, wherever it is now, has not changed.
+  it("does not call a row that only moved changed, without key columns", () => {
     const diff = diffRows([[1, "ada"], [2, "linus"]], [[2, "linus"], [1, "ada"]]);
 
-    expect(diff.flags).toEqual(["changed", "changed"]);
+    expect(diff.flags).toEqual(["same", "same"]);
+    expect(diff.cells.size).toBe(0);
     expect(diff.removed).toEqual([]);
+  });
+
+  it("still marks a changed row without key columns, against the row at its place", () => {
+    const diff = diffRows([[1, "ada"], [2, "linus"]], [[2, "linus"], [1, "grace"]]);
+
+    expect(diff.flags).toEqual(["same", "changed"]);
+    expect([...diff.cells]).toEqual(["1:1"]);
+    expect(diff.removed).toEqual([]);
+  });
+
+  it("counts duplicates, without key columns", () => {
+    const diff = diffRows([[1], [1]], [[1], [1], [1]]);
+
+    expect(diff.flags).toEqual(["same", "same", "added"]);
   });
 
   it("treats a shorter result as rows gone, without a key", () => {
@@ -79,5 +96,22 @@ describe("diffRows", () => {
     const diff = diffRows(previous, next, [0, 1]);
 
     expect(diff.flags).toEqual(["same", "changed"]);
+  });
+});
+
+describe("comparable", () => {
+  // Comparing a COUNT(*) with the query before it marked every row of the next one as changed.
+  it("compares only a re-run of the same statement with the same columns", () => {
+    const run = { sql: "SELECT id FROM t", columns: ["id"], rows: [[1]] };
+
+    expect(comparable(run, { ...run, rows: [[2]] })).toBe(true);
+    expect(comparable(run, { ...run, sql: "SELECT COUNT(*) FROM t" })).toBe(false);
+    expect(comparable(run, { ...run, columns: ["id", "name"] })).toBe(false);
+    expect(comparable(null, run)).toBe(false);
+  });
+
+  it("does not care about whitespace around the statement", () => {
+    const run = { sql: "SELECT id FROM t", columns: ["id"], rows: [] };
+    expect(comparable(run, { ...run, sql: "\n  SELECT id FROM t  \n" })).toBe(true);
   });
 });

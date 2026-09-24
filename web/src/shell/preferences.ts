@@ -20,6 +20,9 @@ export interface Preferences {
   /// Which clock timestamps are shown on: "local", "utc", or an IANA name like "Europe/Berlin".
   /// Only what is shown — a value with no zone of its own is never converted.
   timeZone: string;
+  /// The most rows one query result fetches. 0 leaves it to the studio (WDS_MAX_ROWS, 1000 unless
+  /// a deployment says otherwise); a capped result can always fetch the rest.
+  queryMaxRows: number;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -30,6 +33,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   inspectBeforeRun: true,
   notifyAfterSeconds: 30,
   timeZone: "local",
+  queryMaxRows: 0,
 };
 
 const KEY = "preferences";

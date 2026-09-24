@@ -19,8 +19,10 @@ import { KeepArchiveButton } from "../archive/KeepArchiveButton";
 
 type View = "grid" | "form" | "transposed" | "pivot" | "chart" | "map" | "compare";
 
-export function ResultArea({ result, onExport, changed, connectionId, sql }: {
+export function ResultArea({ result, onExport, changed, connectionId, sql, onFetchAll }: {
   result: ResultState;
+  /// Runs the last statement again without the row cap, for a result that was capped.
+  onFetchAll?: () => void;
   onExport?: () => void;
   /// Cells that changed since the previous run of the same query, for watch mode.
   changed?: ReadonlySet<string>;
@@ -128,7 +130,7 @@ export function ResultArea({ result, onExport, changed, connectionId, sql }: {
               </Group>
               <div style={{ flex: 1, minHeight: 0 }}>
                 {view === "grid" ? <ResultGrid result={s} onSelectionChange={onSelectionChange}
-                    changed={s.index === 0 ? changed : undefined} />
+                    changed={s.index === 0 ? changed : undefined} onFetchAll={onFetchAll} />
                   : view === "form" ? <RowFormView result={s} index={formRow} onIndexChange={setFormRow} />
                   : view === "transposed" ? <TransposedView columns={s.columns} rows={s.rows} />
                   : view === "pivot" ? <PivotView columns={s.columns} rows={s.rows} />

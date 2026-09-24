@@ -81,6 +81,11 @@ export function PreferencesModal({ commands, opened, onClose }: {
               max={3600} step={10} suffix=" s" value={prefs.notifyAfterSeconds}
               description="Only while you are looking at something else. 0 switches it off."
               onChange={value => store({ notifyAfterSeconds: Math.max(0, Number(value) || 0) })} />
+
+            <NumberInput size="xs" w={220} label="Rows a query fetches at most" min={0} step={1000}
+              thousandSeparator="," value={prefs.queryMaxRows}
+              description="0 uses the studio's default (1,000 unless WDS_MAX_ROWS says otherwise). A capped result can fetch the rest."
+              onChange={value => store({ queryMaxRows: Math.max(0, Math.floor(Number(value) || 0)) })} />
           </Stack>
         </Tabs.Panel>
 

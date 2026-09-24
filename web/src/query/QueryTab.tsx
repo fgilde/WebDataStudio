@@ -8,7 +8,7 @@ import {
 import { notifications } from "@mantine/notifications";
 import { AssistModal } from "../assist/AssistModal";
 import { QueryEditor } from "../editor/QueryEditor";
-import { describeDiff, diffRows } from "../grid/diffRows";
+import { comparable, describeDiff, diffRows, type RunSnapshot } from "../grid/diffRows";
 import { ResultArea } from "./ResultArea";
 import { SplitPane } from "../dock/SplitPane";
 import { runQuery, type QueryRun } from "./runQuery";
@@ -16,7 +16,7 @@ import { applyChunk, createResultState, type ResultState } from "./resultStore";
 import { addHistory, health, inspectSql, type SqlFindingDto } from "../api";
 import { preferences } from "../shell/preferences";
 import { describeRun, notifyLongRun, shouldNotify } from "../shell/notifyLongRun";
-import { findParameters } from "../editor/parameters";
+import { askedFor, declaredValues, prepareRun } from "../editor/parameters";
 import { ParameterDialog } from "../editor/ParameterDialog";
 import { InspectionDialog } from "./InspectionDialog";
 import { useUserSnippets } from "../editor/SnippetManager";
@@ -28,6 +28,9 @@ import { parseQuery } from "../odata/query";
 import type { DialectId } from "../sql/splitStatements";
 
 export interface QueryTabState { connectionId: string; dialect: DialectId; sql: string }
+
+/// "Fetch all": the server's cap is an int, and nothing a browser holds comes near this.
+const ALL_ROWS = 2_147_483_647;
 
 export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", initialSql = "",
   onSqlChange, onOpenObject, onExport }: {
@@ -46,7 +49,8 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   const [result, setResult] = useState<ResultState>(createResultState);
   const [running, setRunning] = useState(false);
   const activeRun = useRef<QueryRun | null>(null);
-  const [pending, setPending] = useState<{ sql: string; names: string[] } | null>(null);
+  const [pending, setPending] =
+    useState<{ sql: string; names: string[]; initial: Record<string, string> } | null>(null);
   // Remembered per tab: re-running the same query with a different id is the common case.
   const [lastValues, setLastValues] = useState<Record<string, string>>({});
   const [snippets] = useUserSnippets();
@@ -69,7 +73,9 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   const [assistOpen, setAssistOpen] = useState(false);
   // The rows the last run produced, to diff the next one against. A ref rather than state: the
   // comparison happens inside a run, not during a render.
-  const lastRows = useRef<unknown[][] | null>(null);
+  const lastRun = useRef<RunSnapshot | null>(null);
+  // What ran last, so "Fetch all" can run exactly that again without the cap.
+  const lastRunArgs = useRef<{ text: string; parameters?: Record<string, string | null> } | null>(null);
   // What the pre-run read found, and the statement it was about.
   const [inspection, setInspection] =
     useState<{ sql: string; findings: SqlFindingDto[] } | null>(null);
@@ -80,8 +86,10 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
     health().then(state => setAssistAvailable(state.assist === true)).catch(() => {});
   }, []);
 
-  const run = useCallback(async (text: string, parameters?: Record<string, string | null>) => {
+  const run = useCallback(async (text: string, parameters?: Record<string, string | null>,
+    maxRows?: number) => {
     if (!text.trim()) return;
+    lastRunArgs.current = { text, parameters };
 
     setResult(createResultState());
     setRunning(true);
@@ -91,6 +99,7 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
     const active = runQuery({
       connectionId, sql: text, parameters, transactional, continueOnError,
       transactionId: held?.id ?? null,
+      maxRows: maxRows ?? (preferences().queryMaxRows || undefined),
     }, chunk => {
       state = applyChunk(state, chunk);
       setResult(state);
@@ -107,13 +116,17 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
       // not something to watch.
       const first = state.statements[0];
       if (first && !first.error) {
-        const previous = lastRows.current;
-        if (previous) {
-          const diff = diffRows(previous, first.rows);
+        const current = { sql: text, columns: first.columns.map(column => column.name), rows: first.rows };
+        // Only the same query run again is compared; anything else is simply a new result.
+        if (comparable(lastRun.current, current)) {
+          const diff = diffRows(lastRun.current!.rows, first.rows);
           setChanged(diff.cells);
           setWatchNote(describeDiff(diff));
+        } else {
+          setChanged(undefined);
+          setWatchNote(null);
         }
-        lastRows.current = first.rows;
+        lastRun.current = current;
       }
 
       const last = state.statements[state.statements.length - 1];
@@ -216,14 +229,15 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
     }
   }, [watchSeconds, firstWatchError]);
 
-  // A statement with bind variables asks for them once, then runs with the values as parameters.
+  // A statement with variables it does not declare asks for them once, then runs with the values
+  // as parameters. One that declares them all runs as written.
   const start = useCallback((text: string) => {
-    const names = findParameters(text, engine);
+    const names = askedFor(text, engine);
     if (names.length === 0) return run(text);
 
-    setPending({ sql: text, names });
+    setPending({ sql: text, names, initial: { ...lastValues, ...declaredValues(sql, engine) } });
     return Promise.resolve();
-  }, [run, engine]);
+  }, [run, engine, lastValues, sql]);
 
   // Before that: a read of the SQL. An UPDATE with no WHERE, an accidental cross product, = NULL.
   // It warns and never refuses — the dialog's other button runs it anyway.
@@ -318,7 +332,7 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
               setWatchSeconds(value === null ? null : Number(value));
               setWatchNote(null);
               setChanged(undefined);
-              lastRows.current = null;
+              lastRun.current = null;
             }} />
         </Tooltip>
         {watchNote && (
@@ -350,6 +364,10 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
         }
         bottom={
           <ResultArea result={result} changed={changed} connectionId={connectionId} sql={sql}
+            onFetchAll={() => {
+              const last = lastRunArgs.current;
+              if (last) void run(last.text, last.parameters, ALL_ROWS);
+            }}
             onExport={onExport ? () => onExport(sql) : undefined} />
         } />
 
@@ -366,13 +384,15 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
           }} />
       )}
 
-      <ParameterDialog names={pending?.names ?? null} initial={lastValues}
+      {/* Asked only for variables the text does not declare — a part run without its DECLARE.
+          The tab's DECLAREs fill it, so Enter runs the part as the whole script would. */}
+      <ParameterDialog names={pending?.names ?? null} initial={pending?.initial ?? lastValues}
         onCancel={() => setPending(null)}
         onRun={values => {
-          const text = pending?.sql ?? "";
+          const prepared = prepareRun(pending?.sql ?? "", values, engine);
           setLastValues(values);
           setPending(null);
-          void run(text, values);
+          void run(prepared.sql, prepared.parameters);
         }} />
     </div>
   );

@@ -21,8 +21,18 @@ const ROW_HEIGHT = 24;
 /// its columns before the rows are measured; the header's resize handle overrides it.
 const DEFAULT_WIDTH = 160;
 
-export function ResultGrid({ result, onSelectionChange, changed }: {
+/// The row-number column: stuck to the left edge while the columns scroll past it.
+const NUMBER_CELL: React.CSSProperties = {
+  position: "sticky", left: 0, zIndex: 1, padding: "2px 6px", textAlign: "right",
+  color: "var(--mantine-color-dimmed)", fontSize: "var(--mantine-font-size-xs)",
+  borderBottom: "1px solid var(--mantine-color-default-border)",
+  borderRight: "1px solid var(--mantine-color-default-border)",
+};
+
+export function ResultGrid({ result, onSelectionChange, changed, onFetchAll }: {
   result: StatementResult;
+  /// Runs the statement again without the row cap. Offered only when the result was capped.
+  onFetchAll?: () => void;
   onSelectionChange?: (values: unknown[]) => void;
   /// Cells that changed since the previous run, as `row:column` indexes into the result's own rows.
   /// Watch mode fills this; it is ignored while the grid sorts or filters, because then a row's
@@ -139,6 +149,8 @@ export function ResultGrid({ result, onSelectionChange, changed }: {
   });
 
   const virtualItems = virtualizer.getVirtualItems();
+  // Wide enough for the last number, so the column does not jump while scrolling.
+  const numberWidth = 16 + String(Math.max(rows.length, 1)).length * 8;
   const total = virtualizer.getTotalSize();
   const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
   const paddingBottom = virtualItems.length > 0 ? total - virtualItems[virtualItems.length - 1].end : 0;
@@ -186,6 +198,9 @@ export function ResultGrid({ result, onSelectionChange, changed }: {
           {result.truncated && " · capped"}
           {result.elapsedMs !== null && ` · ${result.elapsedMs} ms`}
         </Text>
+        {result.truncated && onFetchAll && (
+          <Button size="compact-xs" variant="light" onClick={onFetchAll}>Fetch all</Button>
+        )}
       </Group>
 
       {groupBy !== null ? (
@@ -194,16 +209,30 @@ export function ResultGrid({ result, onSelectionChange, changed }: {
         </div>
       ) : (
       <div ref={parentRef} style={{ flex: 1, overflow: "auto", minHeight: 0 }}>
-        <table style={{ borderCollapse: "collapse", width: "max-content", minWidth: "100%" }}>
+        {/* Fixed layout: every column is exactly as wide as it is set, the table as wide as their
+            sum or the pane, and the filler column at the end takes whatever is left over. */}
+        <table style={{
+          borderCollapse: "collapse", tableLayout: "fixed", minWidth: "100%",
+          width: numberWidth + visibleColumns.reduce((sum, c) => sum + (widths[c.name] ?? DEFAULT_WIDTH), 0),
+        }}>
           {/* One column model for head and body. Without it a resized header and its cells drift
               apart, and a wide result collapses because each part sizes itself. */}
           <colgroup>
+            <col style={{ width: numberWidth }} />
             {visibleColumns.map(c => (
               <col key={c.index} style={{ width: widths[c.name] ?? DEFAULT_WIDTH }} />
             ))}
+            {/* The rest of the width goes here, not to the columns: a one-column result would
+                otherwise stretch the row numbers across half the screen. */}
+            <col />
           </colgroup>
           <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--mantine-color-default)" }}>
             <tr>
+              {/* The row number every other studio shows: the place in this result as it is
+                  sorted and filtered now, not the row's place in the original. */}
+              <th style={{ ...NUMBER_CELL, zIndex: 2, background: "var(--mantine-color-default)" }}>
+                <Text size="xs" fw={600} c="dimmed">#</Text>
+              </th>
               {visibleColumns.map(c => (
                 <th key={c.index} style={{
                   textAlign: "left", padding: "2px 8px", whiteSpace: "nowrap", position: "relative",
@@ -267,6 +296,7 @@ export function ResultGrid({ result, onSelectionChange, changed }: {
                     }} />
                 </th>
               ))}
+              <th aria-hidden style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }} />
             </tr>
           </thead>
           {/* Virtualised with spacer rows rather than absolute positioning: a row taken out of
@@ -277,6 +307,9 @@ export function ResultGrid({ result, onSelectionChange, changed }: {
 
             {virtualItems.map(item => (
               <tr key={item.key} style={{ height: ROW_HEIGHT }}>
+                <td data-testid="row-number" style={{ ...NUMBER_CELL, background: "var(--mantine-color-body)" }}>
+                  {item.index + 1}
+                </td>
                 {visibleColumns.map(c => {
                   const isSelected = selected.some(s => s.row === item.index && s.col === c.index);
                   const isChanged = highlightable && changed?.has(`${item.index}:${c.index}`);
@@ -300,6 +333,7 @@ export function ResultGrid({ result, onSelectionChange, changed }: {
                     </td>
                   );
                 })}
+                <td aria-hidden style={{ borderBottom: "1px solid var(--mantine-color-default-border)" }} />
               </tr>
             ))}
 

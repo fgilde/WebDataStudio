@@ -41,7 +41,40 @@ public sealed record PlanNode(
     double? ActualRows,
     double? ActualMs,
     IReadOnlyList<PlanNode> Children,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<string> Warnings,
+    /// The engine's own id for the node, which is what SSMS shows and what people quote.
+    int? NodeId = null,
+    /// What the node reads or writes: [schema].[table].[index].
+    string? Object = null,
+    /// Everything else the engine said about the node, as the tree a property grid shows.
+    IReadOnlyList<PlanProperty>? Properties = null);
+
+/// One row of a property grid: a value, a group of rows, or both.
+public sealed record PlanProperty(string Name, string? Value, IReadOnlyList<PlanProperty> Children);
+
+public sealed record PlanStatement(
+    string? Text,
+    string? Type,
+    double? Cost,
+    IReadOnlyList<PlanProperty> Properties,
+    IReadOnlyList<string> Warnings,
+    /// Ready to run: CREATE INDEX statements with the server's estimated impact as a comment.
+    IReadOnlyList<string> MissingIndexes,
+    PlanNode? Root);
+
+/// A plan as the engine wrote it down: every statement of the batch, and the original text so it
+/// can be saved in the engine's own format and opened by its own tools.
+public sealed record PlanDocument(
+    string Engine,
+    string? Raw,
+    /// "sqlplan" for SQL Server; null where there is nothing worth exporting.
+    string? RawFormat,
+    IReadOnlyList<PlanStatement> Statements)
+{
+    /// The shape every engine without a richer plan answers with: one statement, its tree.
+    public static PlanDocument Single(string engine, PlanNode root) =>
+        new(engine, null, null, [new PlanStatement(null, null, root.EstimatedCost, [], [], [], root)]);
+}
 
 public enum AnalyzeScope { Connection, Schema, Table, Query }
 

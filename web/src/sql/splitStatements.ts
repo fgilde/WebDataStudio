@@ -178,3 +178,10 @@ export function framedRange(sql: string, statement: SqlStatement): { start: numb
   }
   return { start, end };
 }
+
+/// What "Run" runs, from the keyboard and from the button alike: the selection when there is one,
+/// else the statement under the cursor. Null when there is nothing to run.
+export function textToRun(sql: string, selection: string | null, offset: number, dialect: DialectId): string | null {
+  if (selection && selection.trim()) return selection;
+  return statementAt(sql, offset, dialect)?.text ?? null;
+}

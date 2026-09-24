@@ -74,6 +74,7 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   // The rows the last run produced, to diff the next one against. A ref rather than state: the
   // comparison happens inside a run, not during a render.
   const lastRun = useRef<RunSnapshot | null>(null);
+  const editorCommands = useRef<{ runCurrent: () => void } | null>(null);
   // What ran last, so "Fetch all" can run exactly that again without the cap.
   const lastRunArgs = useRef<{ text: string; parameters?: Record<string, string | null> } | null>(null);
   // What the pre-run read found, and the statement it was about.
@@ -258,7 +259,9 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <Group gap={4} p={2}>
         <Tooltip label="Run selection or statement (F5)">
-          <ActionIcon variant="subtle" aria-label="Run" disabled={running} onClick={() => execute(sql)}>
+          {/* The same as F5: the selection or the statement under the cursor, never the whole tab. */}
+          <ActionIcon variant="subtle" aria-label="Run" disabled={running}
+            onClick={() => editorCommands.current ? editorCommands.current.runCurrent() : execute(sql)}>
             <IconPlayerPlay size={16} />
           </ActionIcon>
         </Tooltip>
@@ -360,7 +363,7 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
           <QueryEditor value={sql} dialect={dialect} connectionId={connectionId} error={firstError}
             language={engine === "mongodb" ? "javascript" : engine === "redis" || engine === "odata" ? "plaintext" : "sql"}
             onChange={setSql} onRun={execute} onRunAll={execute} onOpenObject={onOpenObject}
-            snippets={snippets} />
+            snippets={snippets} commands={editorCommands} />
         }
         bottom={
           <ResultArea result={result} changed={changed} connectionId={connectionId} sql={sql}

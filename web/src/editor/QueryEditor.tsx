@@ -8,11 +8,11 @@ import { useSqlLanguageFeatures } from "./useSqlLanguageFeatures";
 import type { Snippet } from "./snippets";
 import { formatSql } from "./formatSql";
 import { readFontSize, writeFontSize, zoomFor } from "./editorZoom";
-import { statementAt, type DialectId } from "../sql/splitStatements";
+import { textToRun, type DialectId } from "../sql/splitStatements";
 import type { QueryError } from "../query/resultStore";
 
 export function QueryEditor({ value, dialect, language = "sql", connectionId, error,
-  onChange, onRun, onRunAll, onOpenObject, snippets = [] }: {
+  onChange, onRun, onRunAll, onOpenObject, snippets = [], commands }: {
   value: string;
   dialect: DialectId;
   /// Non-SQL engines get a different editor language: MongoDB commands read as JavaScript, Redis
@@ -25,6 +25,9 @@ export function QueryEditor({ value, dialect, language = "sql", connectionId, er
   onRunAll: (sql: string) => void;
   onOpenObject?: (ref: string) => void;
   snippets?: Snippet[];
+  /// The editor's own "Run", for a toolbar button: the selection or the statement under the cursor,
+  /// exactly what F5 and Ctrl+Enter run.
+  commands?: React.MutableRefObject<{ runCurrent: () => void } | null>;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const [editor, setEditor] = useState<monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -107,15 +110,15 @@ export function QueryEditor({ value, dialect, language = "sql", connectionId, er
     const run = () => {
       const model = editor.getModel();
       const selection = editor.getSelection();
+      const position = editor.getPosition();
       if (!model) return;
 
-      if (selection && !selection.isEmpty()) { onRun(model.getValueInRange(selection)); return; }
-
-      const position = editor.getPosition();
-      if (!position) return;
-      const statement = statementAt(model.getValue(), model.getOffsetAt(position), dialect);
-      if (statement) onRun(statement.text);
+      const text = textToRun(model.getValue(),
+        selection && !selection.isEmpty() ? model.getValueInRange(selection) : null,
+        position ? model.getOffsetAt(position) : model.getValueLength(), dialect);
+      if (text) onRun(text);
     };
+    if (commands) commands.current = { runCurrent: run };
 
     const runOne = editor.addAction({
       id: "wds.run", label: "Run selection or statement",
@@ -133,7 +136,10 @@ export function QueryEditor({ value, dialect, language = "sql", connectionId, er
       run: () => editor.setValue(formatSql(editor.getValue(), dialect)),
     });
 
-    return () => { runOne.dispose(); runAll.dispose(); format.dispose(); };
+    return () => {
+      runOne.dispose(); runAll.dispose(); format.dispose();
+      if (commands) commands.current = null;
+    };
   }, [editor, dialect, onRun, onRunAll]);
 
   return <div ref={host} style={{ height: "100%", width: "100%" }} />;

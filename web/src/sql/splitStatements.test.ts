@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { framedRange, splitStatements, statementAt } from "./splitStatements";
+import { framedRange, splitStatements, statementAt, textToRun } from "./splitStatements";
 
 const texts = (sql: string, dialect: "postgresql" | "sqlserver" = "postgresql") =>
   splitStatements(sql, dialect).map(s => s.text.trim());
@@ -114,5 +114,23 @@ describe("statementAt without semicolons", () => {
   it("still splits at semicolons as before", () => {
     const text = "SELECT 1;\nSELECT 2";
     expect(statementAt(text, text.length, "sqlserver")?.text.trim()).toBe("SELECT 2");
+  });
+});
+
+describe("textToRun", () => {
+  const sql = "SELECT 1;\nSELECT 2;\n\nSELECT 3";
+
+  // The Run button and Ctrl+Enter run the same thing: the selection, else the statement under the
+  // cursor — only "Run script" runs everything.
+  it("runs the selection when there is one", () => {
+    expect(textToRun(sql, "SELECT 2", 0, "sqlserver")).toBe("SELECT 2");
+  });
+
+  it("runs the statement under the cursor otherwise", () => {
+    expect(textToRun(sql, null, sql.indexOf("2"), "sqlserver")?.trim()).toBe("SELECT 2");
+  });
+
+  it("runs nothing in an empty editor", () => {
+    expect(textToRun("  ", null, 0, "sqlserver")).toBeNull();
   });
 });

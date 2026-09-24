@@ -18,7 +18,7 @@ public static class AnalysisEndpoints
                 var (driver, session) = await factory.OpenAsync(body.ConnectionId, ct);
                 await using (session)
                 {
-                    PlanNode? plan = null;
+                    PlanDocument? document = null;
                     string? planError = null;
 
                     if (driver.Caps.EstimatedPlan)
@@ -27,7 +27,7 @@ public static class AnalysisEndpoints
                         {
                             var mode = body.Actual == true && driver.Caps.ActualPlan
                                 ? PlanMode.Actual : PlanMode.Estimated;
-                            plan = await driver.ExplainAsync(session, body.Sql, mode, ct);
+                            document = await driver.ExplainDocumentAsync(session, body.Sql, mode, ct);
                         }
                         catch (Exception e)
                         {
@@ -37,15 +37,19 @@ public static class AnalysisEndpoints
                         }
                     }
 
+                    // The tree the rules and the old views read: the first statement that has one.
+                    var plan = document?.Statements.FirstOrDefault(s => s.Root is not null)?.Root;
+
                     var tables = await LoadTablesAsync(driver, session, body.Sql, ct);
                     var findings = new List<AnalyzeFinding>();
 
-                    if (plan is not null) findings.AddRange(PlanRules.Evaluate(plan));
+                    if (document is not null) findings.AddRange(PlanFindings.From(document));
                     findings.AddRange(IndexAdvisor.Suggest(body.Sql, plan, tables, driver.Dialect));
 
                     return Results.Ok(new
                     {
                         plan,
+                        document,
                         summary = plan is null ? null : PlanSummaryBuilder.Summarize(plan),
                         planError,
                         findings = Deduplicate(findings),

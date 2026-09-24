@@ -1,5 +1,4 @@
 using System.Data.Common;
-using System.Xml.Linq;
 using Microsoft.Data.SqlClient;
 using WebDataStudio.Server.Drivers.Abstractions;
 using WebDataStudio.Server.Models;
@@ -276,7 +275,11 @@ public sealed class SqlServerDriver : AdoDriverBase
         SchemaNodeRef? target, CancellationToken ct) =>
         Analysis.SqlServerAnalyzer.RunAsync(session, target?.Path.FirstOrDefault(), ct);
 
-    public override async Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct)
+    public override async Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct) =>
+        (await ExplainDocumentAsync(session, sql, mode, ct)).Statements.FirstOrDefault(s => s.Root is not null)?.Root
+        ?? new PlanNode("Plan", null, null, null, null, null, [], []);
+
+    public override async Task<PlanDocument> ExplainDocumentAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct)
     {
         // SHOWPLAN_XML returns the estimated plan without executing; STATISTICS XML executes and
         // returns the actual plan as an extra result set.
@@ -304,31 +307,7 @@ public sealed class SqlServerDriver : AdoDriverBase
         }
 
         if (xml is null) throw new InvalidOperationException("the server returned no execution plan");
-
-        var ns = XNamespace.Get("http://schemas.microsoft.com/sqlserver/2004/07/showplan");
-        var root = XDocument.Parse(xml).Descendants(ns + "RelOp").FirstOrDefault();
-        return root is null
-            ? new PlanNode("Plan", null, null, null, null, null, [], [])
-            : Convert(root, ns);
-
-        static PlanNode Convert(XElement element, XNamespace ns)
-        {
-            var children = element.Descendants(ns + "RelOp")
-                .Where(e => e.Parent?.Parent == element)
-                .Select(e => Convert(e, ns)).ToList();
-
-            var operation = (string?)element.Attribute("PhysicalOp") ?? "RelOp";
-            var estimatedRows = (double?)element.Attribute("EstimateRows");
-
-            var warnings = new List<string>();
-            if (operation.Contains("Scan", StringComparison.OrdinalIgnoreCase) && estimatedRows > 1000)
-                warnings.Add("scan over many rows");
-            if (element.Descendants(ns + "Warnings").Any()) warnings.Add("the server reported a plan warning");
-
-            return new PlanNode(operation, (string?)element.Attribute("LogicalOp"),
-                (double?)element.Attribute("EstimatedTotalSubtreeCost"), estimatedRows,
-                (double?)element.Attribute("ActualRows"), null, children, warnings);
-        }
+        return ShowplanParser.Parse(xml);
     }
 
     private static async Task<string?> ReadPlanXmlAsync(DbDataReader reader, CancellationToken ct)

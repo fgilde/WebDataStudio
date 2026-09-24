@@ -40,6 +40,9 @@ public abstract class AdoDriverBase : IDbDriver
     public virtual Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct) =>
         throw new NotSupportedException($"{Info.Label} does not support execution plans");
 
+    public virtual async Task<PlanDocument> ExplainDocumentAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct) =>
+        PlanDocument.Single(Info.Id, await ExplainAsync(session, sql, mode, ct));
+
     public virtual Task<AnalyzeReport> AnalyzeAsync(IDbSession session, AnalyzeScope scope, SchemaNodeRef? target, CancellationToken ct) =>
         Task.FromResult(new AnalyzeReport([]));
 

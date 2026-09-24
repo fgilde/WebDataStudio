@@ -56,6 +56,11 @@ public interface IDbDriver
 
     Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct);
 
+    /// The plan as a document: every statement, and the engine's own text when it has a format
+    /// worth saving. Engines without one answer with their tree as a single statement.
+    async Task<PlanDocument> ExplainDocumentAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct) =>
+        PlanDocument.Single(Info.Id, await ExplainAsync(session, sql, mode, ct));
+
     /// What to select from for this object. A database returns the qualified name; object storage
     /// returns a reader over the file, which is the same thing said differently. Null means nothing
     /// here reads it, and the UI offers a preview instead of a query that would fail.

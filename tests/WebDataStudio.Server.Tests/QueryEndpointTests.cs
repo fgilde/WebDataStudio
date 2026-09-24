@@ -192,4 +192,22 @@ public class QueryEndpointTests : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.False(body.GetProperty("ok").GetBoolean());
     }
+
+    [Fact]
+    public async Task Analyze_returns_the_plan_as_a_document_too()
+    {
+        await using var factory = Factory();
+        var client = factory.CreateClient();
+        var id = (await client.GetFromJsonAsync<JsonElement>("/api/connections"))[0].GetProperty("id").GetString();
+
+        var response = await client.PostAsJsonAsync("/api/query/analyze",
+            new { connectionId = id, sql = "SELECT * FROM people WHERE name = 'ada'" });
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var statement = body.GetProperty("document").GetProperty("statements")[0];
+        Assert.Equal(body.GetProperty("plan").GetProperty("operation").GetString(),
+            statement.GetProperty("root").GetProperty("operation").GetString());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("document").GetProperty("rawFormat").ValueKind);
+    }
 }

@@ -19,6 +19,8 @@ export interface CommandContext {
   addBucket: () => void;
   /// A file that should simply be a table.
   importFile: () => void;
+  /// Asks for a .sqlplan or .xml and opens it as a plan tab.
+  openPlanFile: () => void;
   refreshExplorer: () => void;
   goToObject: () => void;
   /// Opens one of the tools in `tools.ts`. One entry point rather than one callback per tool: the
@@ -72,6 +74,7 @@ export function buildCommands(context: CommandContext): Command[] {
     { id: "import.file", label: "Import a file as a new table — CSV, TSV, JSON, Parquet", group: "Connections", disabled: !context.activeConnection, run: context.importFile },
     { id: "explorer.refresh", label: "Refresh explorer", group: "Connections", shortcut: "F6", run: context.refreshExplorer },
     { id: "explorer.goto", label: "Go to object", group: "Connections", shortcut: "Ctrl+Shift+O", run: context.goToObject },
+    { id: "plan.open", label: "Open execution plan — .sqlplan, .xml", group: "Query", run: context.openPlanFile },
 
     ...tools,
     { id: "result.export", label: "Export result", group: "Tools", shortcut: "Ctrl+E", run: context.exportResult },

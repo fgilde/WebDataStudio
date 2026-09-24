@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { DockviewReact } from "dockview-react";
 import type { DockviewApi, DockviewReadyEvent, DockviewGroupPanel, IDockviewPanelProps } from "dockview-react";
-import { ActionIcon, Group, Modal, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Group, Modal, ScrollArea, Text, Tooltip, UnstyledButton } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
 import { IconBookmarks, IconSquarePlus, IconZoomCode } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
@@ -59,6 +59,7 @@ import {
   previewRename, previewComment, previewDrop, previewSchemaChange, previewTriggerState,
   refreshStatement, saveTabs, uploadObject,
   type Connection, type ForeignKeyDto, type DependencyReportDto,
+  type AnalyzeResultDto,
 } from "../api";
 import { announce, parameterFrom, withoutParameter } from "../connections/openFromUrl";
 import { ExportDialog, type ExportTarget } from "../export/ExportDialog";
@@ -70,6 +71,9 @@ import { ObjectEditor, type ObjectEditorTarget, type EditableKind } from "../ddl
 import { SequenceDialog, type SequenceTarget } from "../ddl/SequenceDialog";
 import { saveAs } from "../storage/saveAs";
 import { FileViewerModal, type ViewableFile } from "../storage/FileViewerModal";
+import { PlanDocumentView } from "../plan/PlanDocumentView";
+import { planFiles } from "../plan/planFiles";
+import { openPlanFile } from "../plan/planModel";
 import type { DialectId } from "../sql/splitStatements";
 
 interface TabState {
@@ -98,6 +102,8 @@ interface ShellState {
   exportObject: (connectionId: string, objectRef: string, label: string) => void;
   followForeignKey: (from: DataTabState, fk: ForeignKeyDto, value: unknown) => void;
   runStatement: (connectionId: string, sql: string) => void;
+  /// A saved plan file, opened in a tab of its own.
+  openPlanTab: (name: string, result: AnalyzeResultDto) => void;
   openData: (connectionId: string, objectRef: string, tableName: string,
     filter?: { column: string; value: string }) => void;
   dialectOf: (connectionId: string) => DialectId;
@@ -202,8 +208,44 @@ function PlanDockPanel() {
   const tab = shell.tabs[shell.tabs.length - 1];
   if (!tab) return <Text size="xs" c="dimmed" p="xs">Open a query tab to explain a statement.</Text>;
 
-  return <PlanPanel connectionId={tab.connectionId} sql={tab.sql}
+  return <PlanPanel connectionId={tab.connectionId} sql={tab.sql} onOpenPlan={shell.openPlanTab}
     onRunStatement={statement => shell.runStatement(tab.connectionId, statement)} />;
+}
+
+function PlanFileDockPanel(props: IDockviewPanelProps<{ fileId: string; name: string }>) {
+  const shell = useShell();
+  const [showFindings, setShowFindings] = useState(false);
+  const result = planFiles.get(props.params.fileId);
+  // A restored layout remembers the tab, not the megabytes behind it.
+  if (!result?.document) {
+    return <Text size="xs" c="dimmed" p="xs">This plan was open in an earlier session. Open the file again to see it.</Text>;
+  }
+
+  // There is no connection behind a file: an index it asks for opens against the first query tab's.
+  const connectionId = shell.tabs[0]?.connectionId ?? shell.connections[0]?.id;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <PlanDocumentView document={result.document} name={props.params.name}
+          onRunStatement={connectionId ? statement => shell.runStatement(connectionId, statement) : undefined} />
+      </div>
+      {result.findings.length > 0 && (
+        <div style={{ borderTop: "1px solid var(--mantine-color-default-border)" }}>
+          <UnstyledButton px={6} py={2} onClick={() => setShowFindings(v => !v)}>
+            <Text size="xs" fw={600}>{showFindings ? "Hide" : "Show"} {result.findings.length} findings</Text>
+          </UnstyledButton>
+          {showFindings && (
+            <ScrollArea.Autosize mah={200} px={6}>
+              {result.findings.map((f, i) => (
+                <Text key={i} size="xs"><b>{f.title}</b> — <span style={{ opacity: .7 }}>{f.detail}</span></Text>
+              ))}
+            </ScrollArea.Autosize>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function HealthDockPanel() {
@@ -412,7 +454,7 @@ const components = {
   ...toolComponents,
   explorer: ExplorerDockPanel,
   structure: StructurePanel, query: QueryPanel, welcome: WelcomePanel,
-  data: DataPanel, plan: PlanDockPanel, designer: DesignerPanel,
+  data: DataPanel, plan: PlanDockPanel, designer: DesignerPanel, planFile: PlanFileDockPanel,
 };
 
 /// The default arrangement, in one place: the initial layout and the reset command must produce
@@ -758,6 +800,15 @@ export function DockShell() {
     });
     flashPanel(api.current?.getPanel(id)?.group.element);
   }, [focusPanel]);
+
+  const openPlanTab = useCallback((name: string, result: AnalyzeResultDto) => {
+    const fileId = planFiles.put(result);
+    api.current?.addPanel({
+      id: fileId, component: "planFile", title: `Plan · ${name}`, params: { fileId, name },
+      position: centerGroup.current ? { referenceGroup: centerGroup.current } : undefined,
+    });
+    flashPanel(api.current?.getPanel(fileId)?.group.element);
+  }, []);
 
   /// A file dropped on a node in the tree. The node decides what that means, so nothing has to be
   /// asked first: a bucket folder takes the file as it is, a table takes its rows, and a schema turns
@@ -1330,6 +1381,19 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     goToObject: () => setGotoOpen(true),
     addBucket: () => navigate("/connections?bucket=1"),
     importFile: () => setNewTable({ connectionId: activeConnection }),
+    openPlanFile: () => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".sqlplan,.xml";
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        openPlanFile(file)
+          .then(result => openPlanTab(file.name.replace(/\.(sqlplan|xml)$/i, ""), result))
+          .catch(e => notifications.show({ color: "red", message: e instanceof Error ? e.message : String(e) }));
+      };
+      input.click();
+    },
     // Every tool goes through the one registry: a panel is focused, a per-connection tool is
     // opened, and the tab it asked for travels with it.
     openTool: tool => {
@@ -1365,7 +1429,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     },
     showShortcuts: () => setShortcutsOpen(true),
     openPreferences: () => setPrefsOpen(true),
-  }), [activeConnection, focusPanel, newTab, openInBuilder, openTool, resetLayout, selection, showExplorer, tabs, exportQuery]);
+  }), [activeConnection, focusPanel, newTab, openInBuilder, openPlanTab, openTool, resetLayout, selection, showExplorer, tabs, exportQuery]);
 
   // Ctrl+K everywhere, "?" only outside a text field — otherwise it eats a question mark.
   useEffect(() => {
@@ -1490,7 +1554,7 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     <ShellContext.Provider value={{
       connections,
       selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey,
-      runStatement, openData, dialectOf, exportObject,
+      runStatement, openData, dialectOf, exportObject, openPlanTab,
       explorer: {
         nonce: explorerNonce,
         activeConnection,

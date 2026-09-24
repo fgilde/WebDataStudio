@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PlanNodeDto } from "../api";
 import {
+  decodePlanBytes, encodePlanBytes,
   costShare, edgeWidth, filterProperties, flattenPlan, layoutPlan, operatorFamily, ownCost, rowsOut,
 } from "./planModel";
 
@@ -76,5 +77,22 @@ describe("planModel", () => {
       { name: "Index Scan", value: null, children: [{ name: "Object", value: "[dbo].[Orders]", children: [] }] },
     ]);
     expect(filterProperties(props, "estimate").map(p => p.name)).toEqual(["Estimate Rows"]);
+  });
+
+  it("reads a plan the way SSMS saves it: UTF-16 with a byte order mark", () => {
+    const text = '<?xml version="1.0" encoding="utf-16"?><ShowPlanXML/>';
+    const le = new Uint8Array([0xff, 0xfe, ...[...text].flatMap(c => [c.charCodeAt(0), 0])]);
+    const be = new Uint8Array([0xfe, 0xff, ...[...text].flatMap(c => [0, c.charCodeAt(0)])]);
+    const utf8bom = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(text)]);
+    expect(decodePlanBytes(le.buffer)).toBe(text);
+    expect(decodePlanBytes(be.buffer)).toBe(text);
+    expect(decodePlanBytes(utf8bom.buffer)).toBe(text);
+    expect(decodePlanBytes(new TextEncoder().encode(text).buffer)).toBe(text);
+  });
+
+  it("writes a plan back as UTF-16 LE with a byte order mark, as SSMS expects", () => {
+    const bytes = encodePlanBytes("<a/>");
+    expect([...bytes]).toEqual([0xff, 0xfe, 0x3c, 0, 0x61, 0, 0x2f, 0, 0x3e, 0]);
+    expect(decodePlanBytes(bytes.buffer as ArrayBuffer)).toBe("<a/>");
   });
 });

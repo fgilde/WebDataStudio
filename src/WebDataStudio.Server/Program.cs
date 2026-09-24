@@ -39,8 +39,13 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(
     o => o.MultipartBodyLengthLimit = uploadMaxBytes + 1024 * 1024);
 
 // Enums travel as their names: "Table", not 8. The SPA switches on these strings.
+// The depth is an execution plan's: every operator is two levels (the node and its children), and
+// a join-heavy statement nests dozens of them — far past the default of 64.
 builder.Services.ConfigureHttpJsonOptions(o =>
-    o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
+{
+    o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    o.SerializerOptions.MaxDepth = 1024;
+});
 
 // Resolved from DI rather than from builder.Configuration: configuration sources added by a host
 // builder (WebApplicationFactory in tests, and anything layered on later) only land in the composed

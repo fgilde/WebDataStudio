@@ -2,10 +2,21 @@
 
 ## Ausführungspläne
 
-Das Panel **Plan** erklärt das Statement im aktiven Abfrage-Tab, geschätzt oder tatsächlich. Der
-Plan ist Baum und Grafik zugleich, mit einer Heatmap über die Kosten — der teure Knoten ist der,
-den du zuerst siehst. Sequenzielle Scans auf großen Tabellen, fehlende Indizes und Auslagerungen
-auf Platte werden benannt.
+Das **Plan**-Panel zeichnet den Plan wie SSMS: von rechts nach links, von den Tabellen zum Ergebnis,
+jeder Operator mit seinem Anteil an den Kosten, seinen Zeilen (tatsächlich von geschätzt, wenn der
+Plan gelaufen ist) und seiner Zeit, und Pfeile so dick wie die Zeilen, die sie tragen. Ein Klick
+auf einen Operator zeigt alles, was der Server dazu gemeldet hat – Prädikate, Ausgabespalten, die
+Laufzeitzähler jedes Threads. Die Suche findet einen Operator oder eine Tabelle; Enter springt zum
+nächsten.
+
+Auf SQL Server ist der ganze Plan da, mit Memory Grant, Waits, Warnungen und den Indexen, die der
+Server vermisst. **Save** schreibt ihn als `.sqlplan` oder `.xml`, die SSMS und Rider öffnen.
+**Open plan** (der Ordner-Knopf, *Open execution plan* in der Befehlspalette oder eine aufs Panel
+gezogene Datei) liest so eine Datei wieder ein – aus SSMS, von einem Kollegen, von letzter Woche –
+in einen eigenen Tab, ohne Connection.
+
+Geschätzt oder tatsächlich: ein tatsächlicher Plan führt das Statement aus. Sequenzielle Scans auf
+großen Tabellen, fehlende Indizes und Auslagerungen auf Platte stehen unter **Findings**.
 
 ## Index-Berater
 

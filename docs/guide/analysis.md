@@ -2,9 +2,20 @@
 
 ## Execution plans
 
-The **Plan** panel explains the statement in the active query tab, estimated or actual. The plan is
-both a tree and a graph, with a heat map over the cost so the expensive node is the one you see
-first. Sequential scans on large tables, missing indexes and spills to disk are called out.
+The **Plan** panel draws the plan the way SSMS does: right to left, from the tables to the result,
+every operator with its share of the statement's cost, its rows (actual of estimated when the plan
+ran) and its time, and arrows as thick as the rows they carry. Click an operator for every property
+the server reported — predicates, output columns, the runtime counters of each thread. The search
+box finds an operator or a table; Enter jumps to the next one.
+
+On SQL Server the whole plan is there, including memory grant, waits, warnings and the indexes the
+server asks for. **Save** writes it as `.sqlplan` or `.xml`, which SSMS and Rider open. **Open plan**
+(the folder button, *Open execution plan* in the command palette, or a file dropped on the panel)
+reads such a file back — from SSMS, from a colleague, from last week — into its own tab, without a
+connection.
+
+Estimated or actual: an actual plan runs the statement. Sequential scans on large tables, missing
+indexes and spills to disk are called out under **Findings**.
 
 ## Index advisor
 

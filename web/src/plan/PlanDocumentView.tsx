@@ -1,8 +1,10 @@
 import { useState } from "react";
 import {
-  ActionIcon, Alert, Badge, Button, Group, Menu, Select, Stack, Text, TextInput, Tooltip,
+  ActionIcon, Alert, Badge, Button, Group, Menu, ScrollArea, Select, Stack, Text, TextInput, Tooltip,
 } from "@mantine/core";
-import { IconChevronDown, IconCopy, IconDownload, IconPlayerPlay, IconSearch } from "@tabler/icons-react";
+import {
+  IconAlertTriangle, IconChevronDown, IconCopy, IconDownload, IconPlayerPlay, IconSearch,
+} from "@tabler/icons-react";
 import type { PlanDocumentDto, PlanNodeDto } from "../api";
 import { PlanGraph } from "./PlanGraph";
 import { PlanProperties } from "./PlanProperties";
@@ -20,6 +22,7 @@ export function PlanDocumentView({ document, name, onRunStatement }: {
   const [selected, setSelected] = useState<{ id: string; node: PlanNodeDto } | null>(null);
   const [search, setSearch] = useState("");
   const [cursor, setCursor] = useState(0);
+  const [notesOpen, setNotesOpen] = useState(false);
 
   const q = search.trim().toLowerCase();
   const matches = q && statement?.root
@@ -30,6 +33,12 @@ export function PlanDocumentView({ document, name, onRunStatement }: {
   const matchSet = new Set(matches);
 
   if (!statement?.root) return <Text size="xs" c="dimmed" p="xs">This plan has no statement with an operator tree.</Text>;
+
+  // A plan repeats a warning for every column it converts; once each is what anybody reads.
+  const warnings = [...new Set(statement.warnings)];
+  const noteCount = warnings.length + statement.missingIndexes.length;
+  // A few notes stay in view; a long list folds behind its count so the graph keeps the room.
+  const showNotes = noteCount <= 3 || notesOpen;
 
   const header = statement.properties.filter(p =>
     ["Degree Of Parallelism", "Memory Grant", "Compile Time", "Statement Optm Level", "Cardinality Estimation Model Version"]
@@ -65,9 +74,18 @@ export function PlanDocumentView({ document, name, onRunStatement }: {
         )}
       </Group>
 
-      {(statement.warnings.length > 0 || statement.missingIndexes.length > 0) && (
-        <Stack gap={2} px={6}>
-          {statement.warnings.map((w, i) => <Text key={i} size="xs" c="orange">⚠ {w}</Text>)}
+      {noteCount > 3 && (
+        <Button size="compact-xs" variant="subtle" color="orange" mx={6} style={{ alignSelf: "flex-start" }}
+          leftSection={<IconAlertTriangle size={12} />} rightSection={<IconChevronDown size={10} />}
+          onClick={() => setNotesOpen(o => !o)}>
+          {[warnings.length > 0 && `${warnings.length} warning${warnings.length === 1 ? "" : "s"}`,
+            statement.missingIndexes.length > 0 && `${statement.missingIndexes.length} missing index${statement.missingIndexes.length === 1 ? "" : "es"}`]
+            .filter(Boolean).join(" · ")}
+        </Button>
+      )}
+      {showNotes && noteCount > 0 && (
+        <ScrollArea.Autosize mah={180} px={6}>
+          {warnings.map((w, i) => <Text key={i} size="xs" c="orange">⚠ {w}</Text>)}
           {statement.missingIndexes.map((ddl, i) => (
             <Alert key={i} variant="light" color="teal" p={4}>
               <Group gap={4} wrap="nowrap">
@@ -87,7 +105,7 @@ export function PlanDocumentView({ document, name, onRunStatement }: {
               </Group>
             </Alert>
           ))}
-        </Stack>
+        </ScrollArea.Autosize>
       )}
 
       <div style={{ flex: 1, minHeight: 0, display: "flex" }}>

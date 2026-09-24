@@ -96,7 +96,7 @@ export function filterProperties(props: PlanPropertyDto[], query: string): PlanP
 
 /// The plan in its engine's own format, so SSMS or Rider opens it as if it had written it.
 export function savePlanFile(raw: string, name: string, extension: "sqlplan" | "xml") {
-  const url = URL.createObjectURL(new Blob([raw], { type: "application/xml" }));
+  const url = URL.createObjectURL(new Blob([encodePlanBytes(raw)], { type: "application/xml" }));
   const link = document.createElement("a");
   link.href = url;
   link.download = `${name}.${extension}`;
@@ -106,4 +106,30 @@ export function savePlanFile(raw: string, name: string, extension: "sqlplan" | "
 
 /// A plan file from disk, read on the server — the one parser, so a file gets the same findings as
 /// a plan fetched live.
-export const openPlanFile = async (file: File): Promise<AnalyzeResultDto> => openPlan(await file.text());
+export const openPlanFile = async (file: File): Promise<AnalyzeResultDto> =>
+  openPlan(decodePlanBytes(await file.arrayBuffer()));
+
+/// SSMS saves plans as UTF-16 with a byte order mark; `File.text()` would read that as UTF-8 and
+/// hand the server noise. The mark says which it is; without one it is UTF-8.
+export function decodePlanBytes(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const encoding = bytes[0] === 0xff && bytes[1] === 0xfe ? "utf-16le"
+    : bytes[0] === 0xfe && bytes[1] === 0xff ? "utf-16be"
+      : "utf-8";
+  // TextDecoder drops the byte order mark of the encoding it was given.
+  return new TextDecoder(encoding).decode(bytes);
+}
+
+/// The other way round, in the shape SSMS writes: UTF-16 LE behind its byte order mark. The XML
+/// inside says encoding="utf-16", and a reader that trusts that would refuse UTF-8 bytes.
+export function encodePlanBytes(text: string): Uint8Array<ArrayBuffer> {
+  const bytes = new Uint8Array(2 + text.length * 2);
+  bytes[0] = 0xff;
+  bytes[1] = 0xfe;
+  for (let i = 0; i < text.length; i++) {
+    const unit = text.charCodeAt(i);
+    bytes[2 + i * 2] = unit & 0xff;
+    bytes[3 + i * 2] = unit >> 8;
+  }
+  return bytes;
+}

@@ -57,4 +57,26 @@ public class PlanOpenEndpointTests : IDisposable
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.False(string.IsNullOrWhiteSpace(body.GetProperty("message").GetString()));
     }
+
+    [Fact]
+    public async Task Opens_a_plan_deeper_than_the_default_json_depth()
+    {
+        // Real plans nest far deeper than System.Text.Json's default of 64: every operator is two
+        // levels (the node and its children list), and a join-heavy statement is dozens deep.
+        var nested = "<RelOp NodeId=\"99\" PhysicalOp=\"Constant Scan\" LogicalOp=\"Constant Scan\" EstimateRows=\"1\"><OutputList /><ConstantScan /></RelOp>";
+        for (var i = 0; i < 80; i++)
+            nested = $"<RelOp NodeId=\"{i}\" PhysicalOp=\"Compute Scalar\" LogicalOp=\"Compute Scalar\" EstimateRows=\"1\"><OutputList /><ComputeScalar>{nested}</ComputeScalar></RelOp>";
+        var plan = $"""
+            <ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" Version="1.6">
+              <BatchSequence><Batch><Statements>
+                <StmtSimple StatementText="SELECT 1" StatementType="SELECT"><QueryPlan>{nested}</QueryPlan></StmtSimple>
+              </Statements></Batch></BatchSequence>
+            </ShowPlanXML>
+            """;
+
+        await using var factory = Factory();
+        var response = await factory.CreateClient().PostAsJsonAsync("/api/plans/open", new { text = plan });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }

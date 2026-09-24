@@ -47,4 +47,14 @@ describe("PlanDocumentView", () => {
     draw(doc(null));
     expect(screen.queryByRole("button", { name: /Save/ })).toBeNull();
   });
+
+  it("folds a long list of warnings behind a count, each warning once", () => {
+    const many = doc("sqlplan");
+    many.statements[1].warnings = [...Array(6)].map((_, i) => `Plan Affecting Convert: ${i % 3}`);
+    draw(many);
+
+    // Six warnings, three distinct: counted, and not in the way until asked for.
+    fireEvent.click(screen.getByRole("button", { name: /3 warnings/ }));
+    expect(screen.getAllByText(/Plan Affecting Convert: \d/)).toHaveLength(3);
+  });
 });

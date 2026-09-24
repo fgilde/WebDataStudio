@@ -4,7 +4,7 @@ import {
   type Edge, type Node, type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { Group, Text, Tooltip } from "@mantine/core";
+import { Group, Text, Tooltip, useComputedColorScheme } from "@mantine/core";
 import {
   IconAlertTriangle, IconArrowsSplit, IconBolt, IconCalculator, IconDatabaseEdit, IconFilter,
   IconFocus2, IconLayersIntersect, IconListSearch, IconSortDescending, IconStack2, IconSum,
@@ -39,7 +39,9 @@ const PlanCard = memo(function PlanCard({ data }: NodeProps<Node<CardData>>) {
       background: `linear-gradient(${heat}, ${heat}), var(--mantine-color-body)`,
       border: `${selected ? 2 : 1}px solid ${selected ? "var(--mantine-primary-color-filled)"
         : match ? "var(--mantine-color-yellow-5)" : "var(--mantine-color-default-border)"}`,
-      boxShadow: match ? "0 0 0 3px var(--mantine-color-yellow-3)" : undefined,
+      // Selected wins over a search hit: the property grid is showing this one.
+      boxShadow: selected ? "0 0 0 3px var(--mantine-primary-color-light)"
+        : match ? "0 0 0 3px var(--mantine-color-yellow-3)" : undefined,
     }}>
       {/* The rows arrive from the right and leave to the left. */}
       <Handle type="target" position={Position.Right} style={{ opacity: 0 }} />
@@ -79,6 +81,7 @@ function Graph({ root, statementCost, selected, onSelect, matches, focus }: Para
   const layout = useMemo(() => layoutPlan(root), [root]);
   const maxOwn = useMemo(() => Math.max(0, ...layout.nodes.map(n => ownCost(n.node))), [layout]);
   const flow = useReactFlow();
+  const scheme = useComputedColorScheme("dark");
 
   const nodes: Node<CardData>[] = useMemo(() => layout.nodes.map(({ id, node, position }) => ({
     id, type: "plan", position, draggable: false,
@@ -92,7 +95,7 @@ function Graph({ root, statementCost, selected, onSelect, matches, focus }: Para
     id: e.id, source: e.source, target: e.target, type: "smoothstep",
     label: e.rows === null ? undefined : Math.round(e.rows).toLocaleString(),
     labelStyle: { fontSize: 9 }, labelShowBg: false,
-    style: { strokeWidth: edgeWidth(e.rows) },
+    style: { strokeWidth: edgeWidth(e.rows), stroke: "var(--mantine-color-dimmed)" },
   })), [layout]);
 
   // Search steps through matches: the one in focus is centred.
@@ -102,12 +105,15 @@ function Graph({ root, statementCost, selected, onSelect, matches, focus }: Para
   }, [focus, layout, flow]);
 
   return (
-    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView minZoom={0.05}
+    <ReactFlow nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView minZoom={0.05} colorMode={scheme}
       onlyRenderVisibleElements nodesConnectable={false} proOptions={{ hideAttribution: true }}
       onNodeClick={(_, n) => onSelect(n.id, (n.data as CardData).node)} onPaneClick={() => onSelect(null, null)}>
-      <Background gap={24} size={1} />
+      <Background gap={24} size={1} color="var(--mantine-color-default-border)" />
       <Controls showInteractive={false} />
-      {layout.nodes.length > 20 && <MiniMap pannable zoomable />}
+      {layout.nodes.length > 20 && (
+        <MiniMap pannable zoomable bgColor="var(--mantine-color-body)" maskColor="rgba(0, 0, 0, 0.35)"
+          nodeColor="var(--mantine-color-default-border)" />
+      )}
     </ReactFlow>
   );
 }

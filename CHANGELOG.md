@@ -8,6 +8,61 @@ A section here is the body of that release: the release workflow reads the one t
 (`scripts/release-notes.mjs`) and the generated commit list follows it. So a new version is written
 down here *before* it is tagged — a tag with no section still publishes, with the commit list alone.
 
+## 1.8.0
+
+Execution plans you can read like SSMS, and a query editor that runs what you meant.
+
+### Execution plans
+
+- **The plan is a graph**, drawn right to left the way SSMS and Rider draw it: an icon per operator,
+  its share of the statement's cost, actual of estimated rows, its time, and arrows as thick as the
+  rows they carry. Search finds an operator or a table and Enter steps to the next one.
+- **Every property the server reported**, one click on an operator away: seek predicates, output
+  columns, the runtime counters of each thread, memory fractions — as a property grid with a filter.
+  The statement's own header shows memory grant, compile time and degree of parallelism.
+- **SQL Server's whole plan**, not five attributes of it: every statement of a batch (actual plans
+  too), plan warnings, waits, and the indexes the server asks for as ready `CREATE INDEX` statements.
+  Actual plans now show actual rows at all — they were read from the wrong element before — and
+  estimates count every execution, so the inner side of a loop no longer looks badly misjudged.
+- **Save as `.sqlplan` or `.xml`**, byte for byte what SSMS writes (UTF-16), and **open one again**
+  — from the plan panel, *Open execution plan* in the command palette, or a file dropped on the panel
+  — into a tab of its own, without a connection, with its findings.
+
+### The query editor
+
+- **A frame around the statement under the cursor**, in the theme's accent: exactly what F5,
+  Ctrl+Enter and the Run button run. A blank line before a new `SELECT`, `INSERT`, `DECLARE`… ends a
+  statement even without a semicolon, so the query at the bottom of a script runs on its own.
+- **The Run button runs what F5 runs** — the selection or the statement under the cursor. It used
+  to run the whole tab, like the button next to it.
+- **SQL Server scripts run batch by batch**, as in SSMS: a `DECLARE` reaches every statement after it
+  up to the next `GO`, instead of "Must declare the scalar variable".
+- **Variables the script declares are not asked for.** Running a part without its `DECLARE` asks for
+  the rest, prefilled with the values the script gives them, and sends them as parameters.
+
+### Results
+
+- **Row numbers** in a narrow column that stays put while the columns scroll.
+- **Fetch all** on a result that hit the row cap, for the same statement with the same parameters.
+- **Changed rows are only marked against the same query run again.** Running a `COUNT(*)` and then
+  another statement marked the second one's rows as changed, and a `UNION ALL` without `ORDER BY`
+  counted every row that only moved.
+
+### Connections
+
+- **A browser's saved login no longer turns into an SSH tunnel.** Chrome filled the collapsed SSH
+  fields, and a connection string that was fine failed on "user required". Saving shows that it is
+  working, and the new connection is in the list at once.
+
+### The studio's own look
+
+- **Contact and support** from gilde.org in the about drawer, on the website and in the docs.
+
+### Fixed
+
+- The second contact or support form opened in the about drawer no longer blanks the page.
+- A plan deeper than 64 levels — any real join-heavy statement — no longer fails to serialise.
+
 ## 1.7.0
 
 Dashboards worth putting on a wall.

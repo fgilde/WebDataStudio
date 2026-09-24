@@ -60,4 +60,15 @@ public class StatementSplitterTests
         Assert.Equal(1, statements[0].StartLine);
         Assert.Equal(2, statements[1].StartLine);
     }
+
+    // A T-SQL variable lives as long as its batch: splitting at the semicolon after a DECLARE
+    // left the SELECT asking for a variable nobody had declared.
+    [Fact]
+    public void Batches_keep_a_declare_with_the_statements_that_use_it()
+    {
+        var batches = StatementSplitter.Split("DECLARE @x int = 1;\nSELECT @x;\nGO\nSELECT 2;", SqlServer, batches: true)
+            .Select(s => s.Text.Trim()).ToArray();
+
+        Assert.Equal(["DECLARE @x int = 1;\nSELECT @x;", "SELECT 2;"], batches);
+    }
 }

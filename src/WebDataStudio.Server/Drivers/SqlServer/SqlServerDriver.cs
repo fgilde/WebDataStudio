@@ -275,6 +275,8 @@ public sealed class SqlServerDriver : AdoDriverBase
         SchemaNodeRef? target, CancellationToken ct) =>
         Analysis.SqlServerAnalyzer.RunAsync(session, target?.Path.FirstOrDefault(), ct);
 
+    protected override bool RunsBatches => true;
+
     public override async Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct) =>
         (await ExplainDocumentAsync(session, sql, mode, ct)).Statements.FirstOrDefault(s => s.Root is not null)?.Root?.Bare()
         ?? new PlanNode("Plan", null, null, null, null, null, [], []);

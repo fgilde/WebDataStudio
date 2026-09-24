@@ -66,4 +66,35 @@ public class SqlServerContractTests(SqlServerFixture fixture) : DriverContractTe
         foreach (var schema in system) Assert.Contains(schema, shown);
         Assert.Contains("dbo", shown);
     }
+
+    [Fact]
+    public async Task A_script_runs_as_a_batch_so_its_variables_reach_every_statement()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec, TestContext.Current.CancellationToken);
+        var request = new ScriptRequest("DECLARE @x int = 41;\nSELECT @x + 1 AS answer;", 100, 30, "dbo");
+
+        var chunks = new List<ResultChunk>();
+        await foreach (var chunk in fixture.Driver.ExecuteAsync(session, request, TestContext.Current.CancellationToken))
+            chunks.Add(chunk);
+
+        Assert.DoesNotContain(chunks, c => c is ResultChunk.Error);
+        var rows = Assert.Single(chunks.OfType<ResultChunk.Rows>());
+        Assert.Equal(42, Convert.ToInt32(rows.Items[0][0]));
+    }
+
+    [Fact]
+    public async Task A_read_only_connection_refuses_a_write_later_in_the_batch()
+    {
+        await using var session = await fixture.Driver.OpenAsync(fixture.Spec with { ReadOnly = true },
+            TestContext.Current.CancellationToken);
+        // One batch now, so the check has to look at every statement in it, not at its first word.
+        var request = new ScriptRequest("SELECT 1;\nDELETE FROM people;", 100, 30, "dbo");
+
+        var chunks = new List<ResultChunk>();
+        await foreach (var chunk in fixture.Driver.ExecuteAsync(session, request, TestContext.Current.CancellationToken))
+            chunks.Add(chunk);
+
+        Assert.Contains(chunks, c => c is ResultChunk.Error { Code: "WDS_READONLY" });
+        Assert.DoesNotContain(chunks, c => c is ResultChunk.Rows);
+    }
 }

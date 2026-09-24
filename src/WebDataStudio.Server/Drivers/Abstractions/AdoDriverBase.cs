@@ -37,6 +37,10 @@ public abstract class AdoDriverBase : IDbDriver
             ? $"{Dialect.QuoteIdentifier(target.Path[0])}.{Dialect.QuoteIdentifier(target.Name)}"
             : Dialect.QuoteIdentifier(target.Name);
 
+    /// Whether a script runs batch by batch rather than statement by statement. SQL Server's
+    /// variables live as long as a batch, so a DECLARE has to travel with the statements after it.
+    protected virtual bool RunsBatches => false;
+
     public virtual Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct) =>
         throw new NotSupportedException($"{Info.Label} does not support execution plans");
 
@@ -50,7 +54,7 @@ public abstract class AdoDriverBase : IDbDriver
         IDbSession session, ScriptRequest request, [EnumeratorCancellation] CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var statements = StatementSplitter.Split(request.Sql, Dialect);
+        var statements = StatementSplitter.Split(request.Sql, Dialect, RunsBatches);
 
         // A transaction the caller holds open — the query tab's transaction mode — is joined
         // rather than nested: the statements enlist in it, and committing it is not this method's
@@ -65,6 +69,9 @@ public abstract class AdoDriverBase : IDbDriver
         var owned = ambient is null && transaction is not null;
 
         var failed = false;
+        // The client keeps one result per number. A batch can return several result sets, so the
+        // number counts result sets, not statements; a statement with one set keeps its old number.
+        var results = new ResultNumber();
 
         try
         {
@@ -72,19 +79,22 @@ public abstract class AdoDriverBase : IDbDriver
             {
                 var statement = statements[index];
 
-                if (session.Spec.ReadOnly && !Dialect.IsReadOnlyStatement(statement.Text))
+                // A batch is several statements: every one of them has to be a read.
+                if (session.Spec.ReadOnly && !StatementSplitter.Split(statement.Text, Dialect)
+                        .All(part => Dialect.IsReadOnlyStatement(part.Text)))
                 {
                     failed = true;
-                    yield return new ResultChunk.Error(index,
+                    yield return new ResultChunk.Error(results.Current,
                         "this connection is read-only; the statement was not executed", "WDS_READONLY", null, null);
                     yield break;
                 }
 
-                await foreach (var chunk in RunOneAsync(session, statement.Text, index, request, transaction, ct))
+                await foreach (var chunk in RunOneAsync(session, statement.Text, results, request, transaction, ct))
                 {
                     if (chunk is ResultChunk.Error) failed = true;
                     yield return chunk;
                 }
+                results.Current++;
 
                 // A failure inside a transaction poisons what follows — PostgreSQL refuses every
                 // later statement outright — so a transaction always stops. Without one, "keep
@@ -105,7 +115,7 @@ public abstract class AdoDriverBase : IDbDriver
     }
 
     private async IAsyncEnumerable<ResultChunk> RunOneAsync(
-        IDbSession session, string sql, int index, ScriptRequest request,
+        IDbSession session, string sql, ResultNumber results, ScriptRequest request,
         DbTransaction? transaction, [EnumeratorCancellation] CancellationToken ct)
     {
         var watch = Stopwatch.StartNew();
@@ -126,31 +136,36 @@ public abstract class AdoDriverBase : IDbDriver
             // A rejected statement is data for the client, not an exception for the pipeline.
             // C# forbids yielding from a catch block, so the chunk is emitted just below.
             var (line, column) = LocateError(e, sql);
-            failure = new ResultChunk.Error(index, e.Message, e.SqlState, line, column);
+            failure = new ResultChunk.Error(results.Current, e.Message, e.SqlState, line, column);
         }
 
         if (failure is not null || reader is null)
         {
             await command.DisposeAsync();
-            yield return failure ?? new ResultChunk.Error(index, "the driver returned no reader", null, null, null);
+            yield return failure ?? new ResultChunk.Error(results.Current, "the driver returned no reader", null, null, null);
             yield break;
         }
 
         await using (reader)
         await using (command)
         {
+            var first = true;
             do
             {
+                // Each further result set of the same batch gets a number of its own.
+                if (!first) results.Current++;
+                first = false;
+
                 if (reader.FieldCount == 0)
                 {
-                    yield return new ResultChunk.End(index, reader.RecordsAffected, watch.ElapsedMilliseconds, false);
+                    yield return new ResultChunk.End(results.Current, reader.RecordsAffected, watch.ElapsedMilliseconds, false);
                     continue;
                 }
 
                 var columns = new ColumnMeta[reader.FieldCount];
                 for (var i = 0; i < reader.FieldCount; i++)
                     columns[i] = new ColumnMeta(reader.GetName(i), reader.GetDataTypeName(i), true);
-                yield return new ResultChunk.Columns(index, columns);
+                yield return new ResultChunk.Columns(results.Current, columns);
 
                 var buffer = new List<object?[]>(ChunkSize);
                 long read = 0;
@@ -168,18 +183,20 @@ public abstract class AdoDriverBase : IDbDriver
 
                     if (buffer.Count >= ChunkSize)
                     {
-                        yield return new ResultChunk.Rows(index, buffer.ToArray());
-                        yield return new ResultChunk.Progress(index, read, watch.ElapsedMilliseconds);
+                        yield return new ResultChunk.Rows(results.Current, buffer.ToArray());
+                        yield return new ResultChunk.Progress(results.Current, read, watch.ElapsedMilliseconds);
                         buffer.Clear();
                     }
                 }
 
-                if (buffer.Count > 0) yield return new ResultChunk.Rows(index, buffer.ToArray());
-                yield return new ResultChunk.End(index, reader.RecordsAffected, watch.ElapsedMilliseconds, truncated);
+                if (buffer.Count > 0) yield return new ResultChunk.Rows(results.Current, buffer.ToArray());
+                yield return new ResultChunk.End(results.Current, reader.RecordsAffected, watch.ElapsedMilliseconds, truncated);
             }
             while (await reader.NextResultAsync(ct));
         }
     }
+
+    private sealed class ResultNumber { public int Current; }
 
     /// Values that do not survive JSON round-tripping become strings the grid can render.
     protected virtual object? Normalize(object value) => value switch

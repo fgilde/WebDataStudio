@@ -9,7 +9,9 @@ public sealed record Statement(string Text, int StartOffset, int EndOffset, int 
 /// to know where strings, comments, quoted identifiers and dollar-quoted bodies begin and end.
 public static class StatementSplitter
 {
-    public static IReadOnlyList<Statement> Split(string sql, SqlDialect dialect)
+    /// `batches` keeps the semicolons in and splits only at GO: SQL Server's unit of execution, the
+    /// one its variables live in.
+    public static IReadOnlyList<Statement> Split(string sql, SqlDialect dialect, bool batches = false)
     {
         var statements = new List<Statement>();
         var current = new StringBuilder();
@@ -116,7 +118,7 @@ public static class StatementSplitter
                 continue;
             }
 
-            if (c == ';')
+            if (c == ';' && !batches)
             {
                 Flush(i);
                 i++;

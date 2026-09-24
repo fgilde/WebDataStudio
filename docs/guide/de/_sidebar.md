@@ -18,6 +18,7 @@
 - [Engine-Funktionsumfang](/de/engines.md)
 - [Tastenkürzel](/de/shortcuts.md)
 - [Entwicklung](/de/development.md)
+- [Kontakt und Unterstützung](/de/contact.md)
 
 - [Webseite](https://fgilde.github.io/WebDataStudio/de/)
 - [Funktionsmatrix](../../features.md)

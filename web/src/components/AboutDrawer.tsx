@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import {
   Anchor, Badge, Button, Code, Divider, Drawer, Group, Stack, Text,
 } from "@mantine/core";
-import { IconBrandGithub, IconBook2, IconExternalLink, IconWorld } from "@tabler/icons-react";
+import {
+  IconBrandGithub, IconBook2, IconExternalLink, IconHeart, IconMail, IconWorld,
+} from "@tabler/icons-react";
 import { health, type HealthDto } from "../api";
 import { DOCS_URL, GILDE_URL, GITHUB_URL, SITE_URL } from "./BrandLinks";
+import { GildeConnectModal, type GildeWidget } from "./GildeConnect";
 import "./AboutDrawer.css";
 
 /// gilde.org's own mark, from https://www.gilde.org/gilde/logo.svg. Inline rather than an `img`
@@ -39,6 +42,7 @@ const when = (value: string | undefined) => {
 /// do all day, and "where does this come from" is a question somebody asks once.
 export function AboutDrawer({ opened, onClose }: { opened: boolean; onClose: () => void }) {
   const [info, setInfo] = useState<HealthDto | null>(null);
+  const [form, setForm] = useState<GildeWidget | null>(null);
 
   // Only once it is opened: nobody needs a round trip for a drawer they never touch.
   useEffect(() => {
@@ -50,7 +54,9 @@ export function AboutDrawer({ opened, onClose }: { opened: boolean; onClose: () 
   const built = when(info?.built);
 
   return (
-    <Drawer opened={opened} onClose={onClose} position="right" size={380} padding="md"
+    // Escape belongs to the form while one is open, not to the drawer behind it.
+    <Drawer opened={opened} onClose={onClose} closeOnEscape={form === null}
+      position="right" size={380} padding="md"
       title="About">
       <Stack gap="lg">
         <Stack align="center" gap="xs" pt="xs">
@@ -105,6 +111,13 @@ export function AboutDrawer({ opened, onClose }: { opened: boolean; onClose: () 
           </Button>
         </Stack>
 
+        <Group grow gap="xs">
+          <Button variant="light" leftSection={<IconMail size={16} />}
+            onClick={() => setForm("contact")}>Contact</Button>
+          <Button variant="light" color="pink" leftSection={<IconHeart size={16} />}
+            onClick={() => setForm("support")}>Support</Button>
+        </Group>
+
         <Divider label="made at" labelPosition="center" />
 
         <Anchor href={GILDE_URL} target="_blank" rel="noreferrer" underline="never" c="dimmed"
@@ -115,6 +128,7 @@ export function AboutDrawer({ opened, onClose }: { opened: boolean; onClose: () 
           </Group>
         </Anchor>
       </Stack>
+      <GildeConnectModal widget={form} onClose={() => setForm(null)} />
     </Drawer>
   );
 }

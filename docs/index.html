@@ -19,6 +19,7 @@
       <a href="#compare">Comparison</a>
       <a href="#download">Download</a>
       <a href="guide/">Docs</a>
+      <a href="#contact">Contact</a>
       <a href="https://github.com/fgilde/WebDataStudio">GitHub</a>
       <a href="de/">DE</a>
     </nav>
@@ -442,6 +443,23 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
   </div>
 </section>
 
+<section id="contact">
+  <div class="wrap">
+    <h2>Say hello</h2>
+    <p class="sub">A question, an idea, a bug that is not quite a GitHub issue — or a coffee for the next release.</p>
+
+    <!-- gilde.org's forms, inline: this page is the homepage, so the widget needs no link back to
+         it, and the page's own footer already says who made it. -->
+    <div class="connect">
+      <gilde-contact project="fgilde/WebDataStudio" widget="contact" inline theme="dark" accent="#22d3c5" language="en" width="560" radius="18" padding="28" show-logo="true" show-description="false" show-homepage="false" show-preview-notice="false" show-footer="false"
+        title="Contact WebDataStudio">Contact WebDataStudio</gilde-contact>
+      <gilde-support project="fgilde/WebDataStudio" widget="support" inline theme="dark" accent="#8b5cf6" language="en" width="560" radius="18" padding="28" show-logo="true" show-description="false" show-homepage="false" show-preview-notice="false" show-footer="false"
+        show-support-hint="false" support-layout="rows" show-support-icons="true"
+        show-support-qr="true" title="Support WebDataStudio">Support WebDataStudio</gilde-support>
+    </div>
+  </div>
+</section>
+
 <footer>
   <div class="wrap">
     <span>MIT licensed · built by <a href="https://github.com/fgilde">fgilde</a></span>
@@ -456,5 +474,6 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
 
 <script src="assets/lightbox.js"></script>
 <script type="module" src="https://quickrun.org/components.js"></script>
+<script type="module" src="https://connect.gilde.org/widgets/v1.js"></script>
 </body>
 </html>

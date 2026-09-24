@@ -25,6 +25,7 @@
 - [Engine capabilities](engines.md)
 - [Keyboard shortcuts](shortcuts.md)
 - [Development](development.md)
+- [Contact and support](contact.md)
 
 - [Website](https://fgilde.github.io/WebDataStudio/)
 - [Feature matrix](../features.md)

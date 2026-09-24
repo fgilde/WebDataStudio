@@ -246,3 +246,10 @@ footer .spacer { margin-left: auto; }
 @media (prefers-color-scheme: light) {
   /* The site keeps its dark palette on purpose: it shows the product in its default theme. */
 }
+
+/* The contact and support forms side by side, one above the other once there is no room. */
+.connect {
+  display: grid; gap: 20px; justify-items: center;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+}
+.connect > * { max-width: 100%; }

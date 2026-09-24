@@ -19,6 +19,7 @@
       <a href="#compare">Vergleich</a>
       <a href="#download">Download</a>
       <a href="../guide/#/de/">Doku</a>
+      <a href="#contact">Kontakt</a>
       <a href="https://github.com/fgilde/WebDataStudio">GitHub</a>
       <a href="../">EN</a>
     </nav>
@@ -452,6 +453,23 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
   </div>
 </section>
 
+<section id="contact">
+  <div class="wrap">
+    <h2>Schreib uns</h2>
+    <p class="sub">Eine Frage, eine Idee, ein Fehler, der nicht ganz ein GitHub-Issue ist — oder ein Kaffee für das nächste Release.</p>
+
+    <!-- gilde.org's forms, inline: this page is the homepage, so the widget needs no link back to
+         it, and the page's own footer already says who made it. -->
+    <div class="connect">
+      <gilde-contact project="fgilde/WebDataStudio" widget="contact" inline theme="dark" accent="#22d3c5" language="de" width="560" radius="18" padding="28" show-logo="true" show-description="false" show-homepage="false" show-preview-notice="false" show-footer="false"
+        title="Kontakt WebDataStudio">Kontakt WebDataStudio</gilde-contact>
+      <gilde-support project="fgilde/WebDataStudio" widget="support" inline theme="dark" accent="#8b5cf6" language="de" width="560" radius="18" padding="28" show-logo="true" show-description="false" show-homepage="false" show-preview-notice="false" show-footer="false"
+        show-support-hint="false" support-layout="rows" show-support-icons="true"
+        show-support-qr="true" title="WebDataStudio unterst&#252;tzen">WebDataStudio unterst&#252;tzen</gilde-support>
+    </div>
+  </div>
+</section>
+
 <footer>
   <div class="wrap">
     <span>MIT-Lizenz · gebaut von <a href="https://github.com/fgilde">fgilde</a></span>
@@ -466,5 +484,6 @@ builder.AddContainer("studio", "ghcr.io/fgilde/webdatastudio")
 
 <script src="../assets/lightbox.js"></script>
 <script type="module" src="https://quickrun.org/components.js"></script>
+<script type="module" src="https://connect.gilde.org/widgets/v1.js"></script>
 </body>
 </html>

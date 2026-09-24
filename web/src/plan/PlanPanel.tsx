@@ -1,21 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionIcon, Alert, Badge, Button, Card, Code, Group, Loader, Modal, ScrollArea, SegmentedControl,
   Stack, Table, Tabs, Text, Tooltip,
 } from "@mantine/core";
 import { notifications } from "@mantine/notifications";
-import { IconAlertTriangle, IconCopy, IconPlayerPlay, IconRefresh } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCopy, IconFolderOpen, IconPlayerPlay, IconRefresh } from "@tabler/icons-react";
 import {
   analyzeQuery, applyScript, previewScript, tryIndex,
   type AnalyzeResultDto, type DdlPreviewDto, type IndexTrialDto, type PlanNodeDto,
 } from "../api";
+import { PlanDocumentView } from "./PlanDocumentView";
+import { openPlanFile } from "./planModel";
 import { heatColor } from "./heat";
 import { comparePlans, describeComparison } from "./comparePlans";
 
-export function PlanPanel({ connectionId, sql, onRunStatement }: {
+export function PlanPanel({ connectionId, sql, onRunStatement, onOpenPlan }: {
   connectionId: string;
   sql: string;
   onRunStatement?: (statement: string) => void;
+  /// A saved plan file was opened; where it is shown is the dock's business.
+  onOpenPlan?: (name: string, result: AnalyzeResultDto) => void;
 }) {
   const [mode, setMode] = useState<"estimated" | "actual">("estimated");
   const [result, setResult] = useState<AnalyzeResultDto | null>(null);
@@ -27,6 +31,11 @@ export function PlanPanel({ connectionId, sql, onRunStatement }: {
   // The plan before this one, kept so two runs of the same statement can be held against each
   // other: "what changed since it was fast" is the question people actually have.
   const [previous, setPrevious] = useState<PlanNodeDto | null>(null);
+
+  const fileInput = useRef<HTMLInputElement>(null);
+  const open = (file: File) => openPlanFile(file)
+    .then(result => onOpenPlan?.(file.name.replace(/\.(sqlplan|xml)$/i, ""), result))
+    .catch(e => setError(e instanceof Error ? e.message : String(e)));
 
   const load = async (next = mode) => {
     if (!sql.trim()) return;
@@ -53,7 +62,9 @@ export function PlanPanel({ connectionId, sql, onRunStatement }: {
   const maxCost = result?.summary?.maxNodeCost ?? 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}
+      onDragOver={e => { if (onOpenPlan && e.dataTransfer.types.includes("Files")) e.preventDefault(); }}
+      onDrop={e => { const f = e.dataTransfer.files[0]; if (onOpenPlan && f) { e.preventDefault(); open(f); } }}>
       <Group gap={6} p={4} wrap="nowrap">
         <SegmentedControl size="xs" value={mode} data={[
           { label: "Estimated", value: "estimated" },
@@ -64,6 +75,17 @@ export function PlanPanel({ connectionId, sql, onRunStatement }: {
             <IconRefresh size={14} />
           </ActionIcon>
         </Tooltip>
+        {onOpenPlan && (
+          <>
+            <Tooltip label="Open a saved plan — .sqlplan or .xml">
+              <ActionIcon size="sm" variant="subtle" aria-label="Open plan" onClick={() => fileInput.current?.click()}>
+                <IconFolderOpen size={14} />
+              </ActionIcon>
+            </Tooltip>
+            <input ref={fileInput} type="file" accept=".sqlplan,.xml" hidden aria-label="Plan file"
+              onChange={e => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ""; if (f) open(f); }} />
+          </>
+        )}
         {result?.summary && (
           <Text size="xs" c="dimmed">
             {result.summary.nodeCount} nodes · total cost {result.summary.totalCost?.toFixed(1) ?? "?"}
@@ -84,8 +106,9 @@ export function PlanPanel({ connectionId, sql, onRunStatement }: {
       {busy && !result && <Loader size="xs" m="xs" />}
 
       {result && (
-        <Tabs defaultValue="tree" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        <Tabs defaultValue={result.document ? "graph" : "tree"} style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
           <Tabs.List>
+            {result.document && <Tabs.Tab value="graph">Graph</Tabs.Tab>}
             <Tabs.Tab value="tree">Tree</Tabs.Tab>
             {diff.length > 0 && <Tabs.Tab value="changed">Since the last run</Tabs.Tab>}
             <Tabs.Tab value="findings">
@@ -95,6 +118,12 @@ export function PlanPanel({ connectionId, sql, onRunStatement }: {
               )}
             </Tabs.Tab>
           </Tabs.List>
+
+          {result.document && (
+            <Tabs.Panel value="graph" style={{ flex: 1, minHeight: 0 }}>
+              <PlanDocumentView document={result.document} name="plan" onRunStatement={onRunStatement} />
+            </Tabs.Panel>
+          )}
 
           <Tabs.Panel value="tree" style={{ flex: 1, minHeight: 0 }}>
             <ScrollArea h="100%">

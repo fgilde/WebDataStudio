@@ -5,10 +5,12 @@ import { MantineProvider } from "@mantine/core";
 
 const analyzeQuery = vi.fn();
 const tryIndex = vi.fn();
+const openPlanMock = vi.fn();
 
 vi.mock("../api", () => ({
   analyzeQuery: (...args: unknown[]) => analyzeQuery(...args),
   tryIndex: (...args: unknown[]) => tryIndex(...args),
+  openPlan: (...args: unknown[]) => openPlanMock(...args),
   applyScript: vi.fn(),
   previewScript: vi.fn(),
 }));
@@ -100,5 +102,17 @@ describe("PlanPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try it" }));
 
     await waitFor(() => expect(screen.getByText(/could not be dropped/)).toBeTruthy());
+  });
+
+  it("opens a dropped .sqlplan file and hands it to the caller", async () => {
+    const onOpenPlan = vi.fn();
+    openPlanMock.mockResolvedValue({ plan: null, document: null, summary: null, planError: null, findings: [] });
+    render(<MantineProvider><PlanPanel connectionId="c" sql="SELECT 1" onOpenPlan={onOpenPlan} /></MantineProvider>);
+
+    const file = new File(["<ShowPlanXML/>"], "slow.sqlplan");
+    fireEvent.change(screen.getByLabelText("Plan file"), { target: { files: [file] } });
+
+    await waitFor(() => expect(onOpenPlan).toHaveBeenCalledWith("slow", expect.anything()));
+    expect(openPlanMock).toHaveBeenCalledWith("<ShowPlanXML/>");
   });
 });

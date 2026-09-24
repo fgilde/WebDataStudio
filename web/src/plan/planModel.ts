@@ -1,5 +1,5 @@
 import dagre from "@dagrejs/dagre";
-import type { PlanNodeDto, PlanPropertyDto } from "../api";
+import { openPlan, type AnalyzeResultDto, type PlanNodeDto, type PlanPropertyDto } from "../api";
 
 export type OperatorFamily =
   | "seek" | "scan" | "lookup" | "join" | "aggregate" | "sort" | "spool" | "compute" | "filter"
@@ -103,3 +103,7 @@ export function savePlanFile(raw: string, name: string, extension: "sqlplan" | "
   link.click();
   URL.revokeObjectURL(url);
 }
+
+/// A plan file from disk, read on the server — the one parser, so a file gets the same findings as
+/// a plan fetched live.
+export const openPlanFile = async (file: File): Promise<AnalyzeResultDto> => openPlan(await file.text());

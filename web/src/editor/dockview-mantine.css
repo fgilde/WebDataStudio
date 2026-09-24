@@ -17,9 +17,26 @@
   color: var(--mantine-color-dimmed) !important;
 }
 
-/* The statement F5 would run, tinted just enough to be visible in every theme. */
+/* The statement Ctrl+Enter would run, framed in the theme's accent like Rider does. Inset shadows
+   rather than borders: Monaco sizes each line's box itself, and a border would push it taller. */
 .wds-active-statement {
-  background-color: color-mix(in srgb, var(--mantine-primary-color-filled) 10%, transparent);
+  --wds-frame: color-mix(in srgb, var(--mantine-primary-color-filled) 70%, transparent);
+  background-color: color-mix(in srgb, var(--mantine-primary-color-filled) 7%, transparent);
+  box-shadow: inset 2px 0 0 var(--wds-frame), inset -1px 0 0 var(--wds-frame);
+}
+.wds-active-statement-first {
+  box-shadow: inset 2px 0 0 var(--wds-frame), inset -1px 0 0 var(--wds-frame), inset 0 1px 0 var(--wds-frame);
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+.wds-active-statement-last {
+  box-shadow: inset 2px 0 0 var(--wds-frame), inset -1px 0 0 var(--wds-frame), inset 0 -1px 0 var(--wds-frame);
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+.wds-active-statement-single {
+  box-shadow: inset 0 0 0 1px var(--wds-frame), inset 2px 0 0 var(--wds-frame);
+  border-radius: 4px;
 }
 
 /* A tool pane that was activated flashes its border, so a click on History is visible even when

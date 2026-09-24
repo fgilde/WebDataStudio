@@ -101,7 +101,8 @@ export function savePlanFile(raw: string, name: string, extension: "sqlplan" | "
   link.href = url;
   link.download = `${name}.${extension}`;
   link.click();
-  URL.revokeObjectURL(url);
+  // Not in the same tick: some browsers cancel a download of megabytes whose URL is already gone.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /// A plan file from disk, read on the server — the one parser, so a file gets the same findings as

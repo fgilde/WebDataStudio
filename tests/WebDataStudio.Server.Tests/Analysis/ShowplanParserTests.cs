@@ -191,4 +191,50 @@ public class ShowplanParserTests
     private static IEnumerable<WebDataStudio.Server.Drivers.Abstractions.PlanProperty> Flatten(
         WebDataStudio.Server.Drivers.Abstractions.PlanProperty property) =>
         new[] { property }.Concat(property.Children.SelectMany(Flatten));
+
+    private static string OneStatement(string statementText, string relOps) => $"""
+        <ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" Version="1.6">
+          <BatchSequence><Batch><Statements>
+            <StmtSimple StatementText="{statementText}" StatementType="SELECT"><QueryPlan>{relOps}</QueryPlan></StmtSimple>
+          </Statements></Batch></BatchSequence>
+        </ShowPlanXML>
+        """;
+
+    [Fact]
+    public void Estimates_count_every_execution_like_the_actual_rows_do()
+    {
+        // The inner side of a loop: one row per execution, fifty executions. Actual rows are summed
+        // over executions, so the estimate has to be as well or every loop looks badly misjudged.
+        var root = ShowplanParser.Parse(OneStatement("SELECT 1",
+            """<RelOp NodeId="0" PhysicalOp="Index Seek" LogicalOp="Index Seek" EstimateRows="1" EstimateRebinds="45" EstimateRewinds="4"><OutputList /><IndexScan /></RelOp>""")).Statements[0].Root!;
+
+        Assert.Equal(50, root.EstimatedRows);
+    }
+
+    [Fact]
+    public void Refuses_a_document_type_definition()
+    {
+        // Real plans never carry one; an entity that expands to megabytes would.
+        var bomb = """<?xml version="1.0"?><!DOCTYPE ShowPlanXML [<!ENTITY a "aaaaaaaaaa">]>""" + OneStatement("&a;", "");
+
+        Assert.Throws<FormatException>(() => ShowplanParser.Parse(bomb));
+    }
+
+    [Fact]
+    public void Merges_the_plans_an_actual_batch_returns_one_per_statement()
+    {
+        var node = """<RelOp NodeId="0" PhysicalOp="Constant Scan" LogicalOp="Constant Scan" EstimateRows="1"><OutputList /><ConstantScan /></RelOp>""";
+
+        var merged = ShowplanParser.Merge([OneStatement("SELECT 1", node), OneStatement("SELECT 2", node)]);
+        var document = ShowplanParser.Parse(merged);
+
+        Assert.Equal(["SELECT 1", "SELECT 2"], document.Statements.Select(s => s.Text));
+        Assert.Equal(merged, document.Raw);
+    }
+
+    [Fact]
+    public void Merging_one_plan_keeps_it_as_it_was()
+    {
+        Assert.Equal(Plan, ShowplanParser.Merge([Plan]));
+    }
 }

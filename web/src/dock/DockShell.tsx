@@ -653,6 +653,11 @@ export function DockShell() {
     api.current = event.api;
     buildDefaultLayout(event.api, centerGroup);
 
+    // A closed plan tab lets go of its plan, which can be megabytes.
+    event.api.onDidRemovePanel(panel => {
+      if (panel.id.startsWith("planfile-")) planFiles.drop(panel.id);
+    });
+
     event.api.onDidAddPopoutGroup(popout => {
       // dockview copies the stylesheets into a popout window but not Mantine's colour-scheme
       // attribute, so a panel popped out of a dark studio would open as a white rectangle.

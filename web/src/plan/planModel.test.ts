@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { describe, expect, it, vi } from "vitest";
 import type { PlanNodeDto } from "../api";
 import {
-  decodePlanBytes, encodePlanBytes,
+  decodePlanBytes, encodePlanBytes, savePlanFile,
   costShare, edgeWidth, filterProperties, flattenPlan, layoutPlan, operatorFamily, ownCost, rowsOut,
 } from "./planModel";
 
@@ -94,5 +95,23 @@ describe("planModel", () => {
     const bytes = encodePlanBytes("<a/>");
     expect([...bytes]).toEqual([0xff, 0xfe, 0x3c, 0, 0x61, 0, 0x2f, 0, 0x3e, 0]);
     expect(decodePlanBytes(bytes.buffer as ArrayBuffer)).toBe("<a/>");
+  });
+
+  it("keeps the download's URL alive until the browser has taken it", () => {
+    vi.useFakeTimers();
+    const revoke = vi.fn();
+    const create = vi.fn(() => "blob:plan");
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+
+    savePlanFile("<a/>", "q", "sqlplan");
+    // Revoking in the same tick cancels a large download in some browsers.
+    expect(click).toHaveBeenCalled();
+    expect(revoke).not.toHaveBeenCalled();
+
+    vi.runAllTimers();
+    expect(revoke).toHaveBeenCalledWith("blob:plan");
+    click.mockRestore();
+    vi.useRealTimers();
   });
 });

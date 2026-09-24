@@ -40,7 +40,7 @@ public static class AnalysisEndpoints
                     }
 
                     // The tree the rules and the old views read: the first statement that has one.
-                    var plan = document?.Statements.FirstOrDefault(s => s.Root is not null)?.Root;
+                    var plan = document?.Statements.FirstOrDefault(s => s.Root is not null)?.Root?.Bare();
 
                     var tables = await LoadTablesAsync(driver, session, body.Sql, ct);
                     var findings = new List<AnalyzeFinding>();
@@ -74,7 +74,7 @@ public static class AnalysisEndpoints
             try { document = ShowplanParser.Parse(text); }
             catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
 
-            var plan = document.Statements.FirstOrDefault(s => s.Root is not null)?.Root;
+            var plan = document.Statements.FirstOrDefault(s => s.Root is not null)?.Root?.Bare();
             return Results.Ok(new
             {
                 plan,

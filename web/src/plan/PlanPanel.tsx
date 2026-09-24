@@ -31,6 +31,8 @@ export function PlanPanel({ connectionId, sql, onRunStatement, onOpenPlan }: {
   // The plan before this one, kept so two runs of the same statement can be held against each
   // other: "what changed since it was fast" is the question people actually have.
   const [previous, setPrevious] = useState<PlanNodeDto | null>(null);
+  // Every answer is a new plan: its view starts without the last one's selection and search.
+  const [generation, setGeneration] = useState(0);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const open = (file: File) => openPlanFile(file)
@@ -47,6 +49,7 @@ export function PlanPanel({ connectionId, sql, onRunStatement, onOpenPlan }: {
       // What was on screen a moment ago becomes the "before" of the next comparison.
       setPrevious(result?.plan ?? null);
       setResult(answer);
+      setGeneration(g => g + 1);
     }
     catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setBusy(false); }
@@ -121,7 +124,7 @@ export function PlanPanel({ connectionId, sql, onRunStatement, onOpenPlan }: {
 
           {result.document && (
             <Tabs.Panel value="graph" style={{ flex: 1, minHeight: 0 }}>
-              <PlanDocumentView document={result.document} name="plan" onRunStatement={onRunStatement} />
+              <PlanDocumentView key={generation} document={result.document} name="plan" onRunStatement={onRunStatement} />
             </Tabs.Panel>
           )}
 

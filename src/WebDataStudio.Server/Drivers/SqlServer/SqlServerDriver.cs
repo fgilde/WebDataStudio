@@ -276,7 +276,7 @@ public sealed class SqlServerDriver : AdoDriverBase
         Analysis.SqlServerAnalyzer.RunAsync(session, target?.Path.FirstOrDefault(), ct);
 
     public override async Task<PlanNode> ExplainAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct) =>
-        (await ExplainDocumentAsync(session, sql, mode, ct)).Statements.FirstOrDefault(s => s.Root is not null)?.Root
+        (await ExplainDocumentAsync(session, sql, mode, ct)).Statements.FirstOrDefault(s => s.Root is not null)?.Root?.Bare()
         ?? new PlanNode("Plan", null, null, null, null, null, [], []);
 
     public override async Task<PlanDocument> ExplainDocumentAsync(IDbSession session, string sql, PlanMode mode, CancellationToken ct)
@@ -291,13 +291,13 @@ public sealed class SqlServerDriver : AdoDriverBase
             await on.ExecuteNonQueryAsync(ct);
         }
 
-        string? xml;
+        IReadOnlyList<string> plans;
         try
         {
             await using var cmd = session.Connection.CreateCommand();
             cmd.CommandText = sql;
             await using var reader = await cmd.ExecuteReaderAsync(ct);
-            xml = await ReadPlanXmlAsync(reader, ct);
+            plans = await ReadPlanXmlAsync(reader, ct);
         }
         finally
         {
@@ -306,24 +306,26 @@ public sealed class SqlServerDriver : AdoDriverBase
             await off.ExecuteNonQueryAsync(ct);
         }
 
-        if (xml is null) throw new InvalidOperationException("the server returned no execution plan");
-        return ShowplanParser.Parse(xml);
+        if (plans.Count == 0) throw new InvalidOperationException("the server returned no execution plan");
+        return ShowplanParser.Parse(ShowplanParser.Merge(plans));
     }
 
-    private static async Task<string?> ReadPlanXmlAsync(DbDataReader reader, CancellationToken ct)
+    /// Every Showplan result set: STATISTICS XML sends one after each statement it ran.
+    private static async Task<IReadOnlyList<string>> ReadPlanXmlAsync(DbDataReader reader, CancellationToken ct)
     {
+        var plans = new List<string>();
         do
         {
-            if (reader.FieldCount == 1 &&
-                reader.GetName(0).Contains("Showplan", StringComparison.OrdinalIgnoreCase) &&
-                await reader.ReadAsync(ct))
-                return reader.GetString(0);
+            var isPlan = reader.FieldCount == 1 &&
+                         reader.GetName(0).Contains("Showplan", StringComparison.OrdinalIgnoreCase);
 
-            while (await reader.ReadAsync(ct)) { /* skip the data rows of the query itself */ }
+            // A plan's own row is kept; the data rows of the query itself are skipped.
+            while (await reader.ReadAsync(ct))
+                if (isPlan) plans.Add(reader.GetString(0));
         }
         while (await reader.NextResultAsync(ct));
 
-        return null;
+        return plans;
     }
 
     protected override (int? Line, int? Column) LocateError(DbException exception, string sql) =>

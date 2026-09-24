@@ -46,7 +46,7 @@ public static class PlanRules
                 $"Row estimate is off{relation}",
                 $"The planner expected {Rows(estimated)} rows but got {Rows(actual)}. " +
                 "Stale statistics make the planner pick the wrong strategy.",
-                node.Detail is { Length: > 0 } ? $"ANALYZE {node.Detail};" : null));
+                StatisticsStatement(node)));
 
         // Spilling to disk is the engine saying it did not get the memory it wanted. It is in the
         // detail rather than in a warning, so nothing else here would notice it.
@@ -107,6 +107,20 @@ public static class PlanRules
 
     private static bool IsNestedLoop(PlanNode node) =>
         node.Operation.Contains("Nested Loop", StringComparison.OrdinalIgnoreCase);
+
+    /// SQL Server names the object it read ([dbo].[Lines].[IX] [l]), and its statistics belong to the
+    /// table; the other engines put the relation in the detail and speak ANALYZE.
+    private static string? StatisticsStatement(PlanNode node)
+    {
+        if (node.Object is { Length: > 0 } target)
+        {
+            var name = target.Split(' ')[0];
+            var parts = name.Split("].[");
+            var table = parts.Length >= 2 ? $"{parts[0]}].[{parts[1].TrimEnd(']')}]" : name;
+            return $"UPDATE STATISTICS {table};";
+        }
+        return node.Detail is { Length: > 0 } ? $"ANALYZE {node.Detail};" : null;
+    }
 }
 
 public static class PlanSummaryBuilder

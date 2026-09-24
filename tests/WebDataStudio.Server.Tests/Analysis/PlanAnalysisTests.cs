@@ -108,6 +108,17 @@ public class PlanRulesTests
         Assert.Equal(100, summary.MaxNodeCost);
         Assert.Equal("Hash Join", summary.Hottest!.Operation);
     }
+
+    [Fact]
+    public void Stale_statistics_on_sql_server_name_the_table_not_the_operator()
+    {
+        // SQL Server nodes carry their object; ANALYZE is PostgreSQL's word and "Index Seek" is no table.
+        var node = new PlanNode("Index Seek", "Index Seek", 1, 10, 5_000, null, [], [], Object: "[dbo].[Lines].[IX_Lines] [l]");
+
+        var finding = Assert.Single(PlanRules.Evaluate(node), f => f.Category == "stale-statistics");
+
+        Assert.Equal("UPDATE STATISTICS [dbo].[Lines];", finding.Statement);
+    }
 }
 
 public class PredicateExtractorTests

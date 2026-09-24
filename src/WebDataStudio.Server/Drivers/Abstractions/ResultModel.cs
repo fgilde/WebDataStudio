@@ -47,7 +47,12 @@ public sealed record PlanNode(
     /// What the node reads or writes: [schema].[table].[index].
     string? Object = null,
     /// Everything else the engine said about the node, as the tree a property grid shows.
-    IReadOnlyList<PlanProperty>? Properties = null);
+    IReadOnlyList<PlanProperty>? Properties = null)
+{
+    /// The tree without its property grid: what the rules, the index trial and the old views read,
+    /// at a fraction of the size. The document keeps the properties.
+    public PlanNode Bare() => this with { Properties = null, Children = Children.Select(c => c.Bare()).ToList() };
+}
 
 /// One row of a property grid: a value, a group of rows, or both.
 public sealed record PlanProperty(string Name, string? Value, IReadOnlyList<PlanProperty> Children);

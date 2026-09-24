@@ -26,11 +26,35 @@ public static partial class ShowplanParser
                && head.Contains(Ns.NamespaceName, StringComparison.Ordinal);
     }
 
+    /// An actual plan arrives as one Showplan document per statement; an estimated one as a single
+    /// document for the batch. One document either way, so the view and the export see the batch.
+    public static string Merge(IReadOnlyList<string> plans)
+    {
+        if (plans.Count == 1) return plans[0];
+
+        var documents = plans.Select(Load).ToList();
+        var target = documents[0].Descendants(Ns + "Statements").First();
+        foreach (var other in documents.Skip(1))
+            target.Add(other.Descendants(Ns + "Statements").SelectMany(s => s.Elements()).ToList());
+        return documents[0].ToString(SaveOptions.DisableFormatting);
+    }
+
+    /// No DTD: a real plan never has one, and an entity that expands to megabytes is the only thing
+    /// one would bring.
+    private static XDocument Load(string xml)
+    {
+        try
+        {
+            using var reader = XmlReader.Create(new StringReader(xml),
+                new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
+            return XDocument.Load(reader);
+        }
+        catch (XmlException e) { throw new FormatException($"this is not readable XML: {e.Message}", e); }
+    }
+
     public static PlanDocument Parse(string xml)
     {
-        XDocument document;
-        try { document = XDocument.Parse(xml); }
-        catch (XmlException e) { throw new FormatException($"this is not readable XML: {e.Message}", e); }
+        var document = Load(xml);
 
         var statements = document.Descendants()
             .Where(e => e.Name.Namespace == Ns && e.Name.LocalName.StartsWith("Stmt", StringComparison.Ordinal))
@@ -67,7 +91,11 @@ public static partial class ShowplanParser
     {
         var threads = relOp.Element(Ns + "RunTimeInformation")?.Elements(Ns + "RunTimeCountersPerThread").ToList() ?? [];
         var operation = (string?)relOp.Attribute("PhysicalOp") ?? "RelOp";
-        var estimatedRows = Number(relOp.Attribute("EstimateRows"));
+        // Per execution in the XML, but actual rows are counted over all of them: the inner side of
+        // a loop runs once per outer row. SSMS shows the same product ("for all executions").
+        var estimatedRows = Number(relOp.Attribute("EstimateRows"))
+                            * ((Number(relOp.Attribute("EstimateRebinds")) ?? 0)
+                               + (Number(relOp.Attribute("EstimateRewinds")) ?? 0) + 1);
 
         var warnings = Warnings(relOp.Element(Ns + "Warnings")).ToList();
         if (operation.Contains("Scan", StringComparison.OrdinalIgnoreCase) && estimatedRows > 1000)

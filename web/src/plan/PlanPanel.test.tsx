@@ -115,4 +115,27 @@ describe("PlanPanel", () => {
     await waitFor(() => expect(onOpenPlan).toHaveBeenCalledWith("slow", expect.anything()));
     expect(openPlanMock).toHaveBeenCalledWith("<ShowPlanXML/>");
   });
+
+  it("a fresh plan starts fresh: the search of the last one does not stay behind", async () => {
+    const withDocument = (operation: string) => ({
+      ...result,
+      document: {
+        engine: "sqlserver", raw: null, rawFormat: null,
+        statements: [{ text: "SELECT 1", type: "SELECT", cost: 1, properties: [], warnings: [], missingIndexes: [], root: node(operation, 1) }],
+      },
+    });
+    analyzeQuery.mockReset()
+      .mockResolvedValueOnce(withDocument("Seq Scan"))
+      .mockResolvedValueOnce(withDocument("Index Scan"));
+
+    draw();
+    fireEvent.click(screen.getByLabelText("Explain"));
+    const search = await screen.findByPlaceholderText("Find operator or object");
+    fireEvent.change(search, { target: { value: "seq" } });
+
+    fireEvent.click(screen.getByLabelText("Explain"));
+    await waitFor(() => expect(analyzeQuery).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect((screen.getByPlaceholderText("Find operator or object") as HTMLInputElement).value).toBe(""));
+  });
 });

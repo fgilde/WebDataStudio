@@ -79,4 +79,49 @@ public class PlanOpenEndpointTests : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+
+    private const string TwoIndexes = """
+        <ShowPlanXML xmlns="http://schemas.microsoft.com/sqlserver/2004/07/showplan" Version="1.6">
+          <BatchSequence><Batch><Statements>
+            <StmtSimple StatementText="SELECT 1" StatementType="SELECT" StatementSubTreeCost="0.1">
+              <QueryPlan>
+                <Warnings>
+                  <PlanAffectingConvert ConvertIssue="Cardinality Estimate" Expression="CONVERT(int,[a])" />
+                  <PlanAffectingConvert ConvertIssue="Cardinality Estimate" Expression="CONVERT(int,[b])" />
+                </Warnings>
+                <MissingIndexes>
+                  <MissingIndexGroup Impact="50"><MissingIndex Schema="[dbo]" Table="[A]"><ColumnGroup Usage="EQUALITY"><Column Name="[x]" /></ColumnGroup></MissingIndex></MissingIndexGroup>
+                  <MissingIndexGroup Impact="40"><MissingIndex Schema="[dbo]" Table="[B]"><ColumnGroup Usage="EQUALITY"><Column Name="[y]" /></ColumnGroup></MissingIndex></MissingIndexGroup>
+                </MissingIndexes>
+                <RelOp NodeId="0" PhysicalOp="Constant Scan" LogicalOp="Constant Scan" EstimateRows="1" EstimatedTotalSubtreeCost="0.1"><OutputList /><ConstantScan /></RelOp>
+              </QueryPlan>
+            </StmtSimple>
+          </Statements></Batch></BatchSequence>
+        </ShowPlanXML>
+        """;
+
+    [Fact]
+    public async Task Every_missing_index_and_every_warning_is_its_own_finding()
+    {
+        await using var factory = Factory();
+        var body = await (await factory.CreateClient().PostAsJsonAsync("/api/plans/open", new { text = TwoIndexes }))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var findings = body.GetProperty("findings").EnumerateArray().ToList();
+
+        Assert.Equal(2, findings.Count(f => f.GetProperty("category").GetString() == "missing-index"));
+        Assert.Equal(2, findings.Count(f => f.GetProperty("category").GetString() == "plan"));
+    }
+
+    [Fact]
+    public async Task The_tree_travels_once_with_its_properties()
+    {
+        await using var factory = Factory();
+        var body = await (await factory.CreateClient().PostAsJsonAsync("/api/plans/open", new { text = Plan }))
+            .Content.ReadFromJsonAsync<JsonElement>();
+
+        // `plan` is for the tree and the rules; the properties live in the document alone.
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("plan").GetProperty("properties").ValueKind);
+        Assert.Equal(JsonValueKind.Array, body.GetProperty("document").GetProperty("statements")[0]
+            .GetProperty("root").GetProperty("properties").ValueKind);
+    }
 }

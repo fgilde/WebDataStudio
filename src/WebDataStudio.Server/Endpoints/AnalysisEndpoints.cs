@@ -1,5 +1,6 @@
 using WebDataStudio.Server.Analysis;
 using WebDataStudio.Server.Drivers.Abstractions;
+using WebDataStudio.Server.Drivers.SqlServer;
 using WebDataStudio.Server.Services;
 
 namespace WebDataStudio.Server.Endpoints;
@@ -7,6 +8,7 @@ namespace WebDataStudio.Server.Endpoints;
 public static class AnalysisEndpoints
 {
     public record AnalyzeQueryRequest(string ConnectionId, string Sql, bool? Actual);
+    public record OpenPlanRequest(string? Text);
 
     public static void MapAnalysisEndpoints(this WebApplication app)
     {
@@ -58,6 +60,29 @@ public static class AnalysisEndpoints
             }
             catch (UnknownConnectionException e) { return Results.NotFound(new { message = e.Message }); }
             catch (Exception e) { return Results.Json(new { message = e.Message }, statusCode: 502); }
+        });
+
+        // A plan somebody saved — from SSMS, from Rider, from this studio. No connection: the file
+        // is the whole of it, and the findings read the file.
+        app.MapPost("/api/plans/open", (OpenPlanRequest body) =>
+        {
+            var text = body.Text ?? "";
+            if (!ShowplanParser.IsShowplan(text))
+                return Results.BadRequest(new { message = "this is not an execution plan this studio reads — it opens SQL Server plans (.sqlplan, or the XML SSMS saves)" });
+
+            PlanDocument document;
+            try { document = ShowplanParser.Parse(text); }
+            catch (FormatException e) { return Results.BadRequest(new { message = e.Message }); }
+
+            var plan = document.Statements.FirstOrDefault(s => s.Root is not null)?.Root;
+            return Results.Ok(new
+            {
+                plan,
+                document,
+                summary = plan is null ? null : PlanSummaryBuilder.Summarize(plan),
+                planError = (string?)null,
+                findings = Deduplicate(PlanFindings.From(document)),
+            });
         });
 
         app.MapGet("/api/analyze/{conn}", async (string conn, string? schema,

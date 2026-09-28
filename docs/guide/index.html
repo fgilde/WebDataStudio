@@ -20,6 +20,27 @@
   .markdown-section img { border: 1px solid #26304f; border-radius: 10px; }
   .lang-switch { padding: 8px 0 0 20px; font-size: 13px; }
   .lang-switch a { color: #9aa7c7; margin-right: 10px; }
+  /* The theme's grey controls, in the site's navy. */
+  .sidebar .search { border-bottom: 1px solid #26304f; }
+  .sidebar .search input {
+    background: #0f1428; color: #e8edfb; border: 1px solid #26304f; border-radius: 8px;
+  }
+  .sidebar .search input:focus { outline: none; border-color: #22d3c5; }
+  .sidebar-toggle { background: rgba(16, 22, 42, .9); }
+  .sidebar ul li a { color: #9aa7c7; }
+  .sidebar ul li.active > a { color: #22d3c5; font-weight: 600; }
+  .markdown-section h1, .markdown-section h2 { color: #e8edfb; }
+  .markdown-section h2 { border-bottom: 1px solid #26304f; padding-bottom: 6px; }
+  .markdown-section pre, .markdown-section code { background: #0f1428; }
+  .markdown-section pre { border: 1px solid #26304f; border-radius: 10px; }
+  .markdown-section p code, .markdown-section li code, .markdown-section td code {
+    color: #22d3c5; border: 1px solid rgba(34, 211, 197, .18); border-radius: 5px;
+  }
+  .markdown-section tr:nth-child(2n) { background: #111832; }
+  .markdown-section td, .markdown-section th { border-color: #26304f; }
+  .github-corner svg { fill: #22d3c5; color: #0d1120; }
+  /* The forms on the contact page: the site's font, and a gap between the two buttons. */
+  gilde-contact, gilde-support { font-family: inherit; margin: 0 8px 8px 0; }
 </style>
 </head>
 <body>
@@ -45,6 +66,7 @@
 </script>
 <script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
 <script type="module" src="https://connect.gilde.org/widgets/v1.js"></script>
+<script src="../assets/widgets.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-sql.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>

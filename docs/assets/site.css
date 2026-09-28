@@ -35,18 +35,26 @@ header.top {
 /* min-height, not height: the nav wraps on a narrow screen, and a fixed height would let it run
    out of the bar. */
 header.top .wrap {
-  display: flex; align-items: center; gap: 20px; min-height: 74px; padding: 8px 0;
+  display: flex; align-items: center; gap: 20px; min-height: 74px; padding-block: 8px;
 }
 header.top img { height: 55px; }
 header.top nav { margin-left: auto; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-header.top nav a { color: var(--muted); font-size: 15px; }
+header.top nav a { color: var(--muted); font-size: 15px; position: relative; }
 header.top nav a:hover { color: var(--ink); text-decoration: none; }
+/* The same gradient as the wordmark, drawn in from the middle under the link being pointed at. */
+header.top nav a::after {
+  content: ""; position: absolute; left: 50%; right: 50%; bottom: -4px; height: 2px;
+  background: var(--grad); border-radius: 2px; transition: left .2s, right .2s;
+}
+header.top nav a:hover::after { left: 0; right: 0; }
 
 /* Faint graph paper behind the hero — the ruled background of every schema drawing anybody has
    ever done on the back of a napkin. Fading out at the bottom keeps it out of the reading. */
-.hero {
-  padding: 72px 0 48px; text-align: center;
-  position: relative;
+.hero { padding: 72px 20px 56px; text-align: center; position: relative; isolation: isolate; }
+/* The grid and its fade live on a layer of their own: a mask on the hero itself faded the buttons
+   and the command below them along with the paper. */
+.hero::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background-image:
     linear-gradient(var(--line) 1px, transparent 1px),
     linear-gradient(90deg, var(--line) 1px, transparent 1px);
@@ -55,8 +63,15 @@ header.top nav a:hover { color: var(--ink); text-decoration: none; }
   -webkit-mask-image: radial-gradient(120% 80% at 50% 20%, #000 35%, transparent 78%);
   mask-image: radial-gradient(120% 80% at 50% 20%, #000 35%, transparent 78%);
 }
-/* The mask above dims the text with the grid, so the content sits on top of it instead. */
-.hero > * { position: relative; }
+/* A little light behind the headline, in the colours of the gradient it is written in. */
+.hero::after {
+  content: ""; position: absolute; z-index: -1; pointer-events: none;
+  left: 50%; top: 40px; width: min(820px, 100%); height: 340px; transform: translateX(-50%);
+  background:
+    radial-gradient(closest-side at 30% 50%, rgba(43, 140, 255, .18), transparent),
+    radial-gradient(closest-side at 70% 50%, rgba(139, 92, 246, .16), transparent);
+  filter: blur(20px);
+}
 
 .hero p.prompt {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -80,9 +95,12 @@ header.top nav a:hover { color: var(--ink); text-decoration: none; }
 .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .btn {
   display: inline-block; padding: 11px 22px; border-radius: 9px; font-weight: 600;
-  border: 1px solid var(--line); color: var(--ink);
+  border: 1px solid var(--line); color: var(--ink); background: rgba(23, 30, 53, .7);
+  transition: border-color .15s, transform .15s, background .15s;
 }
-.btn:hover { text-decoration: none; border-color: var(--teal); }
+.btn:hover {
+  text-decoration: none; border-color: var(--teal); transform: translateY(-1px); background: var(--card);
+}
 .btn.primary { background: var(--grad); color: #06101f; border: none; }
 
 /* QuickRun's own element: its logo, our button. The custom properties cover what it draws itself,
@@ -110,6 +128,7 @@ quickrun-btn:not(:defined) { display: none; }
 pre.run {
   margin: 30px auto 0; max-width: 760px; text-align: left; overflow-x: auto;
   background: #0a0e1b; border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 24px 60px -28px rgba(0, 0, 0, .8);
   padding: 16px 18px; font-size: 13.5px; color: #cdd7f2;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -122,7 +141,7 @@ pre.run.shell::before {
   user-select: none; -webkit-user-select: none;
 }
 
-.engines { padding: 34px 0 8px; }
+.engines { padding-block: 34px 8px; }
 .engines h2, section h2 { font-size: 26px; margin: 0 0 6px; }
 /* Every section heading reads like the line above a statement, because that is what they are. */
 .engines h2::before, section h2::before {
@@ -133,12 +152,14 @@ pre.run.shell::before {
 .engines p.sub, section p.sub { color: var(--muted); margin: 0 0 22px; }
 .engine-grid {
   display: grid; gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }
 .engine {
   display: flex; align-items: center; gap: 10px;
   background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+  transition: border-color .15s, transform .15s;
 }
+.engine:hover { border-color: var(--teal); transform: translateY(-2px); }
 .engine img { width: 26px; height: 26px; }
 .engine span { font-size: 14px; }
 /* The scheme is the part somebody types into WDS_CONN_*, so the card carries it rather than a
@@ -147,16 +168,33 @@ pre.run.shell::before {
 .engine-name code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px; color: var(--muted); opacity: .85;
-  overflow: hidden; text-overflow: ellipsis;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 section { padding: 44px 0; border-top: 1px solid var(--line); }
 
 .cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .card {
-  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px;
+  position: relative;
+  background: linear-gradient(180deg, #1a2240 0%, var(--card) 60%);
+  border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px;
+  transition: border-color .2s, transform .2s, box-shadow .2s;
 }
+/* The site's gradient as a hairline along the top, shown when the card is pointed at. */
+.card::before {
+  content: ""; position: absolute; left: 14px; right: 14px; top: -1px; height: 2px;
+  background: var(--grad); border-radius: 2px; opacity: 0; transition: opacity .2s;
+}
+.card:hover {
+  border-color: #34406a; transform: translateY(-3px);
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, .9);
+}
+.card:hover::before { opacity: 1; }
 .card h3 { margin: 0 0 8px; font-size: 17px; }
+@media (prefers-reduced-motion: reduce) {
+  .card, .engine, .btn { transition: none; }
+  .card:hover, .engine:hover, .btn:hover { transform: none; }
+}
 .card p { margin: 0; color: var(--muted); font-size: 15px; }
 /* An identifier in running text is an identifier, not emphasis. */
 .card code, .compare code, p code {
@@ -170,6 +208,7 @@ section { padding: 44px 0; border-top: 1px solid var(--line); }
 figure { margin: 22px 0 0; }
 figure img {
   width: 100%; border: 1px solid var(--line); border-radius: 12px; display: block;
+  box-shadow: 0 22px 50px -30px rgba(0, 0, 0, .9);
 }
 figure figcaption { color: var(--muted); font-size: 14px; margin-top: 8px; text-align: center; }
 
@@ -183,6 +222,7 @@ table.compare th, table.compare td {
   border: 1px solid var(--line); padding: 9px 12px; text-align: left;
 }
 table.compare th { background: var(--bg-soft); font-weight: 600; }
+table.compare tr:hover td { background: rgba(34, 211, 197, .04); }
 table.compare td.yes { color: #4ade80; }
 table.compare td.no { color: #f87171; }
 table.compare td.part { color: #fbbf24; }
@@ -228,8 +268,20 @@ figure.zoomable img:focus-visible { border-color: var(--teal); transform: transl
 .lightbox-nav:hover, .lightbox-close:hover { border-color: var(--teal); color: var(--teal); }
 
 @media (max-width: 700px) {
-  /* The wordmark gives up its size before the navigation gives up its place. */
+  /* The wordmark gives up its size before the navigation gives up its place, and the navigation
+     scrolls sideways rather than stacking three rows high. */
   header.top img { height: 34px; }
+  header.top .wrap { gap: 14px; min-height: 60px; }
+  header.top nav {
+    flex-wrap: nowrap; overflow-x: auto; gap: 16px; scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+    mask-image: linear-gradient(90deg, #000 85%, transparent);
+    padding: 6px 24px 6px 0;
+  }
+  header.top nav::-webkit-scrollbar { display: none; }
+  header.top nav a { white-space: nowrap; }
+  .hero { padding-top: 48px; }
+  .shots { grid-template-columns: 1fr; }
   .lightbox { padding: 12px; }
   .lightbox-nav { width: 36px; height: 52px; font-size: 22px; }
 }
@@ -242,14 +294,22 @@ footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
 footer .by { display: inline-flex; align-items: center; gap: 6px; }
 footer .by img { width: 18px; height: 18px; display: block; }
 footer .spacer { margin-left: auto; }
+/* On a phone the links simply follow the licence line instead of being pushed apart. */
+@media (max-width: 700px) { footer .spacer { display: none; } footer .wrap { gap: 10px 18px; } }
 
 @media (prefers-color-scheme: light) {
   /* The site keeps its dark palette on purpose: it shows the product in its default theme. */
 }
 
-/* The contact and support forms side by side, one above the other once there is no room. */
+/* The contact and support forms side by side, one above the other once there is no room. Both fill
+   their column: the widget's own width attribute would make two cards of two different sizes. */
 .connect {
-  display: grid; gap: 20px; justify-items: center;
+  display: grid; gap: 20px; align-items: start;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
 }
 .connect > * { max-width: 100%; }
+
+/* gilde.org's forms draw in a shadow root; the rest of their theme is in assets/widgets.js. What
+   the host element itself does is decided out here, and an outer rule beats the widget's :host. */
+gilde-contact, gilde-support { font-family: inherit; }
+.connect gilde-contact, .connect gilde-support { display: block; width: 100%; }

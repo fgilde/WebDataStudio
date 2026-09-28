@@ -14,7 +14,8 @@ auch die ohne Kürzel.
 | `Strg+Umschalt+C` | laufende Abfrage abbrechen |
 | `Strg+Umschalt+F` | SQL formatieren |
 | `Strg+N` | neuer Abfrage-Tab |
-| `Strg+S` | Abfrage speichern |
+| `Strg+S` | Abfrage speichern, oder die gespeicherte Abfrage überschreiben, die der Tab ist |
+| `Strg+Umschalt+S` | als neue Abfrage speichern |
 | `Strg+H` | Verlauf öffnen |
 | `Strg+Leertaste` | Vervollständigung und Snippets |
 
@@ -25,7 +26,7 @@ auch die ohne Kürzel.
 | `Strg+K` | Befehlspalette |
 | `Strg+Umschalt+O` | Objekt über den Namen finden |
 | `F6` | Explorer neu laden |
-| `F12` | Objekt unter dem Cursor öffnen |
+| `F12`, `Strg`+Klick | das Menü für die Tabelle oder View unter dem Cursor |
 | `?` | diese Liste |
 
 ## Werkzeuge und Ansicht
@@ -64,6 +65,12 @@ Kombination drücken, fertig; Escape behält die bisherige, und der Pfeil danebe
 eingebaute wieder her. Ein neu gebundener Befehl läuft von überall aus, und die eingebauten
 Bindungen für alles Unangetastete gelten weiter. Modifier stehen in einer festen Reihenfolge
 (`Ctrl+Alt+Shift+K`), und auf dem Mac zählt die Command-Taste als `Ctrl`.
+
+Jede Bindung gilt auch im Abfrage-Editor. Wo der Editor eine eigene Taste hat — `Strg+D` nimmt den
+nächsten Treffer dazu, `Strg+H` ist Ersetzen, `Strg+L` markiert die Zeile —, behält der Editor sie;
+der Befehl ist dann einen Klick in der Palette oder eine Neubelegung entfernt. Ein paar Tasten
+erreichen eine Webseite gar nicht: `Strg+N`, `Strg+T` und `Strg+W` behält der Browser, diese zwei
+Befehle brauchen also eine Neubelegung, um eine Taste zu haben.
 
 Der Editor ist Monaco, seine eigenen Bindungen gelten also auch: Mehrfachcursor mit `Alt+Klick`,
 Suchen und Ersetzen mit `Strg+F` und `Strg+H`, reguläre Ausdrücke inklusive.

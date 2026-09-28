@@ -16,6 +16,10 @@ export interface ShellEvents {
   "use-sql": string;
   /// Next theme.
   "cycle-theme": void;
+  /// Run, cancel or format in one query tab: the palette and the keys reach the tab this way.
+  "query-action": { tabId: string; action: "run" | "cancel" | "format" };
+  /// A saved query was added, changed or removed somewhere other than the Saved panel.
+  "saved-queries-changed": void;
 }
 
 const prefix = "wds:";

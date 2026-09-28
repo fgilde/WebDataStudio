@@ -1,6 +1,7 @@
 import { describeObject, listSchema, type SchemaNodeDto } from "../api";
 
-export interface TableRef { name: string; ref: string; schema: string }
+/// `kind` is the tree's: "Table" or "View", which is what decides the menu an object gets.
+export interface TableRef { name: string; ref: string; schema: string; kind: string }
 
 // Completion must not re-walk the schema on every keystroke; the tree is fetched once per
 // connection and dropped when the explorer refreshes.
@@ -42,7 +43,7 @@ export class SchemaCache {
 
     const walk = async (node: SchemaNodeDto, schema: string) => {
       if (node.kind === "Table" || node.kind === "View") {
-        out.push({ name: node.label, ref: node.ref, schema });
+        out.push({ name: node.label, ref: node.ref, schema, kind: node.kind });
         return;
       }
       if (!node.hasChildren) return;

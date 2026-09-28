@@ -14,7 +14,8 @@ every action — including the ones without a shortcut.
 | `Ctrl+Shift+C` | cancel the running query |
 | `Ctrl+Shift+F` | format the SQL |
 | `Ctrl+N` | new query tab |
-| `Ctrl+S` | save the query |
+| `Ctrl+S` | save the query, or overwrite the saved query the tab is |
+| `Ctrl+Shift+S` | save as a new query |
 | `Ctrl+H` | open the history |
 | `Ctrl+Space` | completion and snippets |
 
@@ -25,7 +26,7 @@ every action — including the ones without a shortcut.
 | `Ctrl+K` | command palette |
 | `Ctrl+Shift+O` | go to an object by name |
 | `F6` | refresh the explorer |
-| `F12` | open the object under the cursor |
+| `F12`, `Ctrl`+click | the menu for the table or view under the cursor |
 | `?` | this list |
 
 ## Tools and view
@@ -77,6 +78,12 @@ The **Keyboard** tab lists every command the palette knows. Click a binding, pre
 you want, and it is stored; Escape keeps the current one, and the arrow next to a changed binding
 puts the built-in one back. A rebound command works from anywhere in the studio, and the built-in
 bindings for everything you did not touch keep working as before.
+
+Every binding also works inside the query editor. Where the editor has a key of its own — `Ctrl+D`
+adds the next match, `Ctrl+H` is replace, `Ctrl+L` selects the line — the editor keeps it, and the
+command is a click in the palette or a rebinding away. A few keys never reach a web page at all:
+the browser keeps `Ctrl+N`, `Ctrl+T` and `Ctrl+W` for itself, so those two commands need a
+rebinding to have a key.
 
 Modifiers are written in one fixed order (`Ctrl+Alt+Shift+K`), and on a Mac the command key counts
 as `Ctrl` — the bindings are written that way throughout.

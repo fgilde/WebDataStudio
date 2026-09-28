@@ -8,6 +8,9 @@ import {
   authChoices, buildStorageUrl, emptyDraft, maskStorageUrl, storageProblems, suggestName,
   type StorageDraft, type StorageProvider,
 } from "./storageUrl";
+import { IconServer } from "@tabler/icons-react";
+import { ServerBrowser } from "./ServerBrowser";
+import { useAccess } from "./useAccess";
 
 const PROVIDERS: { value: StorageProvider; label: string }[] = [
   { value: "s3", label: "S3" },
@@ -36,6 +39,8 @@ export function StorageWizard({ opened, onClose, onCreated }: {
   onCreated?: () => void;
 }) {
   const [draft, setDraft] = useState<StorageDraft>(emptyDraft);
+  const [browsing, setBrowsing] = useState(false);
+  const access = useAccess();
   const [name, setName] = useState("");
   const [readOnly, setReadOnly] = useState(false);
   const [colour, setColour] = useState<string | null>(null);
@@ -88,6 +93,8 @@ export function StorageWizard({ opened, onClose, onCreated }: {
 
   return (
     <Modal opened={opened} onClose={onClose} size="lg" title="Add a bucket">
+      <ServerBrowser opened={browsing} onClose={() => setBrowsing(false)} mode="folder"
+        start={draft.container} onPickFolder={path => patch({ container: path })} />
       <Stack gap="sm">
         <SegmentedControl fullWidth data={PROVIDERS} value={draft.provider}
           onChange={value => {
@@ -100,8 +107,14 @@ export function StorageWizard({ opened, onClose, onCreated }: {
         <Text size="xs" c="dimmed">{ABOUT[draft.provider]}</Text>
 
         {folder
-          ? <TextInput size="xs" label="Path" placeholder="/data/incoming" value={draft.container}
-                       onChange={event => patch({ container: event.currentTarget.value })} />
+          ? <Group gap={4} align="flex-end" wrap="nowrap">
+              <TextInput size="xs" flex={1} label="Path" placeholder="/data/incoming" value={draft.container}
+                         onChange={event => patch({ container: event.currentTarget.value })} />
+              {access.mayBrowse && (
+                <Button size="xs" variant="default" leftSection={<IconServer size={14} />}
+                  onClick={() => setBrowsing(true)}>Browse…</Button>
+              )}
+            </Group>
           : <Group grow>
               {azure &&
                 <TextInput size="xs" label="Storage account" placeholder="myaccount"

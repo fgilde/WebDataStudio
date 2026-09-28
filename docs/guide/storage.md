@@ -23,6 +23,10 @@ greyed-out button with no reason.
 there — "reached lake: 3 object(s), 1 folder(s)" — or with what the provider said. Opening a storage
 connection alone proves nothing, so a green tick here means the bucket really answered.
 
+For a **Folder**, **Browse…** walks the folders the server may read (`WDS_FILE_ROOTS` and the data
+directory) and **Use this folder** takes the one that is open. An admin can make a new folder there
+first; it is made on the server, inside those roots and nowhere else.
+
 `Read-only` and a red colour both refuse every upload and delete afterwards, in the server rather than
 in the UI.
 

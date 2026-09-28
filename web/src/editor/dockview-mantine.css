@@ -57,3 +57,9 @@
   10% { opacity: 1; }
   100% { opacity: 0; }
 }
+
+/* A table or view name in the editor while Ctrl is held: a click opens its menu. */
+.monaco-editor .wds-object-link {
+  text-decoration: underline;
+  cursor: pointer;
+}

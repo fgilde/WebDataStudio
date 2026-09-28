@@ -18,9 +18,19 @@ globalThis.ResizeObserver ??= class {
 const createConnection = vi.fn();
 const testConnection = vi.fn();
 
+const makeServerFolder = vi.fn();
+
 vi.mock("../api", () => ({
   createConnection: (...args: unknown[]) => createConnection(...args),
   testConnection: (...args: unknown[]) => testConnection(...args),
+  me: vi.fn(async () => ({
+    anonymous: true, authenticated: true, username: null,
+    access: { scope: "Stored", mayAdd: true, mayUpload: true, mayBrowse: true },
+  })),
+  browseFiles: vi.fn(async (path?: string) => path === undefined
+    ? { path: null, roots: ["/data"], parent: null, directories: [], files: [] }
+    : { path, roots: ["/data"], parent: null, directories: [], files: [] }),
+  makeServerFolder: (...args: unknown[]) => makeServerFolder(...args),
 }));
 
 const { StorageWizard } = await import("./StorageWizard");
@@ -108,6 +118,25 @@ describe("StorageWizard", () => {
 
     expect(screen.getByText("file:///data/incoming")).toBeTruthy();
     expect(screen.queryByLabelText("Sign in with")).toBeNull();
+  });
+
+  it("picks the folder on the server, and makes a new one inside it on the way", async () => {
+    makeServerFolder.mockResolvedValue({ path: "/data/incoming" });
+
+    draw();
+    fireEvent.click(screen.getByText("Folder"));
+    fireEvent.click(screen.getByRole("button", { name: /Browse/ }));
+
+    fireEvent.click(await screen.findByText("/data"));
+    fireEvent.click(await screen.findByRole("button", { name: "New folder" }));
+    fireEvent.change(screen.getByPlaceholderText("folder name"), { target: { value: "incoming" } });
+    fireEvent.keyDown(screen.getByPlaceholderText("folder name"), { key: "Enter" });
+
+    await waitFor(() => expect(makeServerFolder).toHaveBeenCalledWith("/data", "incoming"));
+    await screen.findByText("/data/incoming");
+    fireEvent.click(screen.getByRole("button", { name: "Use this folder" }));
+
+    await waitFor(() => expect(screen.getByText("file:///data/incoming")).toBeTruthy());
   });
 
   it("reaches the bucket before anything is saved, and says what it found", async () => {

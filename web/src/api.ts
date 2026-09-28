@@ -296,6 +296,10 @@ export const browseFiles = (path?: string): Promise<BrowseDto> =>
   fetch(`${base}/connections/browse${path ? `?path=${encodeURIComponent(path)}` : ""}`)
     .then(r => ok<BrowseDto>(r));
 
+/// A folder made inside one the browser has open; an admin's call, fenced to the same roots.
+export const makeServerFolder = (path: string, name: string): Promise<{ path: string }> =>
+  fetch(`${base}/connections/browse/folder`, json("POST", { path, name })).then(r => ok<{ path: string }>(r));
+
 export const browseData = (conn: string, ref: string,
   params: { offset?: number; limit?: number; sort?: string; desc?: boolean;
             filterColumn?: string; filter?: string; reveal?: boolean;

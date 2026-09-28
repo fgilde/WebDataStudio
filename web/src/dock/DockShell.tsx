@@ -15,7 +15,10 @@ import { DashboardPanel } from "../dashboard/DashboardPanel";
 import { ArchiveDialog, type ArchiveTarget } from "../archive/KeepArchiveButton";
 import { NotebookPanel } from "../notebook/NotebookPanel";
 import { isAdmin, useRole } from "../auth/useRole";
-import { ExplorerTree, type ExplorerAction, type ExplorerSelection } from "../explorer/ExplorerTree";
+import { ContextMenu, ExplorerTree, type ExplorerAction, type ExplorerSelection } from "../explorer/ExplorerTree";
+import { actionsFor } from "../explorer/contextActions";
+import { useDriverCaps } from "../explorer/useDriverCaps";
+import type { TableRef } from "../editor/schemaCache";
 import type { DropKind } from "../explorer/dropTarget";
 import { ObjectDetailPanel } from "../explorer/ObjectDetailPanel";
 import { QueryTab } from "../query/QueryTab";
@@ -32,6 +35,7 @@ import { RedisPanel } from "../redis/RedisPanel";
 import { NotifyPanel } from "../notify/NotifyPanel";
 import { parseModel } from "../designer/buildSelect";
 import { SavedQueriesPanel } from "../query/SavedQueriesPanel";
+import { SaveQueryDialog } from "../query/SaveQueryDialog";
 import { SnippetManager } from "../editor/SnippetManager";
 import { CommandPalette, ShortcutsHelp } from "../shell/CommandPalette";
 import { ToolsMenu } from "../shell/ToolsMenu";
@@ -42,7 +46,7 @@ import { comboOf, loadPreferences, preferences } from "../shell/preferences";
 import { StudioTab, TabPinsProvider, type TabPins } from "./StudioTab";
 import { VersionBadge } from "../shell/VersionBadge";
 import { LayoutPresetsModal, presetForSlot, useLayoutPresets } from "../shell/LayoutPresets";
-import { buildCommands } from "../shell/commands";
+import { buildCommands, commandFor } from "../shell/commands";
 import { buildDeepLink, parseDeepLink } from "../shell/deepLink";
 import { GoToObject } from "../shell/GoToObject";
 import { NewDatabaseDialog, DropDatabaseDialog, type DatabaseTarget } from "../explorer/DatabaseDialogs";
@@ -57,8 +61,8 @@ import {
   applyDdl, archiveUrl, deleteObject, describeObject, listConnections, loadTabs, objectUrl,
   openFromUrl, previewObject,
   previewRename, previewComment, previewDrop, previewSchemaChange, previewTriggerState,
-  refreshStatement, saveTabs, uploadObject,
-  type Connection, type ForeignKeyDto, type DependencyReportDto,
+  refreshStatement, saveTabs, updateSavedQuery, uploadObject,
+  type Connection, type SavedQueryDto, type ForeignKeyDto, type DependencyReportDto,
   type AnalyzeResultDto,
 } from "../api";
 import { announce, parameterFrom, withoutParameter } from "../connections/openFromUrl";
@@ -78,6 +82,8 @@ import type { DialectId } from "../sql/splitStatements";
 
 interface TabState {
   id: string; connectionId: string; dialect: DialectId; engine: string; title: string; sql: string;
+  /// The saved query this tab was opened from or saved as: Ctrl+S overwrites it instead of asking.
+  saved?: { id: string; name: string; folder: string | null };
 }
 
 interface DesignerTabState {
@@ -97,11 +103,16 @@ interface ShellState {
   dataTabs: DataTabState[];
   designerTabs: DesignerTabState[];
   updateSql: (id: string, sql: string) => void;
-  openObject: (ref: string) => void;
+  /// Ctrl+click on a name in the editor: the explorer's menu for that object, at the pointer.
+  objectMenu: (connectionId: string, table: TableRef, at: { x: number; y: number }) => void;
   exportQuery: (connectionId: string, sql: string) => void;
   exportObject: (connectionId: string, objectRef: string, label: string) => void;
   followForeignKey: (from: DataTabState, fk: ForeignKeyDto, value: unknown) => void;
   runStatement: (connectionId: string, sql: string) => void;
+  /// The query tab last focused, which is what Save, Export and the palette's Run act on.
+  activeTab: TabState | undefined;
+  saveCurrent: (asNew?: boolean) => void;
+  openSaved: (query: SavedQueryDto) => void;
   /// A saved plan file, opened in a tab of its own.
   openPlanTab: (name: string, result: AnalyzeResultDto) => void;
   openData: (connectionId: string, objectRef: string, tableName: string,
@@ -169,7 +180,7 @@ function QueryPanel(props: IDockviewPanelProps<{ tabId: string }>) {
       engine={tab.engine}
       initialSql={seed.current}
       onSqlChange={shell.updateSql}
-      onOpenObject={shell.openObject}
+      onObjectMenu={shell.objectMenu}
       onExport={sql => shell.exportQuery(tab.connectionId, sql)} />
   );
 }
@@ -270,12 +281,10 @@ function HistoryDockPanel() {
 
 function SavedQueriesDockPanel() {
   const shell = useShell();
-  const current = shell.tabs[shell.tabs.length - 1];
 
   return (
-    <SavedQueriesPanel currentSql={current?.sql} currentConnectionId={current?.connectionId}
-      onOpen={query => shell.runStatement(
-        query.connectionId ?? current?.connectionId ?? "", query.sql)} />
+    <SavedQueriesPanel onOpen={shell.openSaved} onSaveCurrent={() => shell.saveCurrent()}
+      canSaveCurrent={!!shell.activeTab?.sql.trim()} />
   );
 }
 
@@ -531,6 +540,9 @@ export function DockShell() {
   const [selection, setSelection] = useState<ExplorerSelection | null>(null);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [tabs, setTabs] = useState<TabState[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  // The tab a Save dialog is open for, and what it will save.
+  const [saveTarget, setSaveTarget] = useState<{ tabId: string; draft: SavedQueryDto } | null>(null);
   const [dataTabs, setDataTabs] = useState<DataTabState[]>([]);
   const [designerTabs, setDesignerTabs] = useState<DesignerTabState[]>([]);
   const api = useRef<DockviewApi | null>(null);
@@ -618,11 +630,18 @@ export function DockShell() {
     setTabs(list => list.map(t => (t.id === id ? { ...t, sql } : t)));
   }, []);
 
-  const openObject = useCallback((ref: string) => {
-    // Landing on the object in the Structure panel is enough for now; the explorer keeps its own
-    // expansion state, and forcing it open from here would fight the user's navigation.
-    setSelection(s => (s ? { ...s, node: { ...s.node, ref } } : s));
-  }, []);
+  const [editorMenu, setEditorMenu] =
+    useState<{ selection: ExplorerSelection; at: { x: number; y: number } } | null>(null);
+  const editorMenuCaps = useDriverCaps(editorMenu?.selection.connectionId);
+
+  const objectMenu = useCallback((connectionId: string, table: TableRef, at: { x: number; y: number }) =>
+    setEditorMenu({
+      at,
+      selection: {
+        connectionId,
+        node: { ref: table.ref, kind: table.kind, label: table.name, hasChildren: false, detail: null },
+      },
+    }), []);
 
   // Query tabs always join the centre group; Structure and History keep their own column on the
   // right, otherwise the first panel created wins the middle and the editor ends up in a corner.
@@ -633,7 +652,7 @@ export function DockShell() {
     });
   }, []);
 
-  const newTab = useCallback((connectionId: string, sql = "") => {
+  const newTab = useCallback((connectionId: string, sql = "", saved?: TabState["saved"]) => {
     const connection = connections.find(c => c.id === connectionId) ?? connections[0];
     if (!connection) return;
 
@@ -642,8 +661,9 @@ export function DockShell() {
       connectionId: connection.id,
       dialect: dialectFor(connection.engine),
       engine: connection.engine,
-      title: `${connection.name} · query`,
+      title: saved?.name ?? `${connection.name} · query`,
       sql,
+      saved,
     };
     setTabs(list => [...list, tab]);
     addPanelFor(tab);
@@ -652,6 +672,12 @@ export function DockShell() {
   const onReady = (event: DockviewReadyEvent) => {
     api.current = event.api;
     buildDefaultLayout(event.api, centerGroup);
+
+    // Save, Export and Run follow the query tab last looked at; a side panel taking focus does not
+    // change which query that is.
+    event.api.onDidActivePanelChange(({ panel }) => {
+      if (panel?.api.component === "query") setActiveTabId(panel.id);
+    });
 
     // A closed plan tab lets go of its plan, which can be megabytes.
     event.api.onDidRemovePanel(panel => {
@@ -1276,6 +1302,42 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
   const runStatement = useCallback((connectionId: string, sql: string) => newTab(connectionId, sql), [newTab]);
 
+  const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[tabs.length - 1];
+
+  const openSaved = useCallback((query: SavedQueryDto) => newTab(
+    query.connectionId ?? activeTab?.connectionId ?? "", query.sql,
+    { id: query.id, name: query.name, folder: query.folder }), [newTab, activeTab?.connectionId]);
+
+  // The tab becomes the saved query: its title is the name, and the next Ctrl+S overwrites it.
+  const linkSaved = useCallback((tabId: string, query: SavedQueryDto) => {
+    setTabs(list => list.map(t => (t.id === tabId
+      ? { ...t, title: query.name, saved: { id: query.id, name: query.name, folder: query.folder } } : t)));
+    api.current?.getPanel(tabId)?.api.setTitle(query.name);
+    emit("saved-queries-changed");
+  }, []);
+
+  const saveCurrent = useCallback((asNew = false) => {
+    const tab = activeTab;
+    if (!tab?.sql.trim()) { focusPanel("saved"); return; }
+
+    const ask = () => {
+      focusPanel("saved");
+      setSaveTarget({ tabId: tab.id, draft: {
+        id: "", name: tab.saved?.name ?? "", folder: tab.saved?.folder ?? null, sql: tab.sql,
+        connectionId: tab.connectionId, updatedAt: "",
+      } });
+    };
+    if (!tab.saved || asNew) { ask(); return; }
+
+    updateSavedQuery(tab.saved.id, { ...tab.saved, sql: tab.sql, connectionId: tab.connectionId })
+      .then(query => {
+        linkSaved(tab.id, query);
+        notifications.show({ message: `Saved ${query.folder ? `${query.folder}/` : ""}${query.name}`, autoClose: 1500 });
+      })
+      // Deleted in the meantime: saving it again is a new query, and that needs a name and a folder.
+      .catch(ask);
+  }, [activeTab, focusPanel, linkSaved]);
+
   const exportQuery = useCallback((connectionId: string, sql: string) =>
     setExportTarget({ connectionId, sql, defaultName: "result", scopes: ["result"] }), []);
 
@@ -1375,11 +1437,9 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
   const commands = useMemo(() => buildCommands({
     newQuery: () => newTab(activeConnection),
-    runCurrent: () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "F5" })),
-    cancelCurrent: () => document.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "c", ctrlKey: true, shiftKey: true })),
-    formatCurrent: () => document.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "f", ctrlKey: true, shiftKey: true })),
+    runCurrent: () => activeTab && emit("query-action", { tabId: activeTab.id, action: "run" }),
+    cancelCurrent: () => activeTab && emit("query-action", { tabId: activeTab.id, action: "cancel" }),
+    formatCurrent: () => activeTab && emit("query-action", { tabId: activeTab.id, action: "format" }),
     openConnections: () => navigate("/connections"),
     addConnection: () => navigate("/connections?add=1"),
     refreshExplorer: () => setExplorerNonce(n => n + 1),
@@ -1408,19 +1468,18 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
 
       openTool(tool.component, tool.title, activeConnection, tool.tab, tool.requiresConnection);
     },
-    saveCurrentQuery: () => focusPanel("saved"),
+    saveCurrentQuery: () => saveCurrent(),
+    saveQueryAs: () => saveCurrent(true),
     activeConnection,
     engine: engineOf(activeConnection),
     admin: isAdmin(role),
     exportResult: () => {
-      const tab = tabs[tabs.length - 1];
-      if (tab) exportQuery(tab.connectionId, tab.sql);
+      if (activeTab) exportQuery(activeTab.connectionId, activeTab.sql);
     },
     openSnippets: () => setSnippetsOpen(true),
     showExplorer,
     openInBuilder: () => {
-      const tab = tabs[tabs.length - 1];
-      if (tab) openInBuilder(tab.connectionId, tab.sql);
+      if (activeTab) openInBuilder(activeTab.connectionId, activeTab.sql);
     },
     switchTheme: () => emit("cycle-theme"),
     saveLayout: () => setLayoutsOpen(true),
@@ -1434,7 +1493,8 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
     },
     showShortcuts: () => setShortcutsOpen(true),
     openPreferences: () => setPrefsOpen(true),
-  }), [activeConnection, focusPanel, newTab, openInBuilder, openPlanTab, openTool, resetLayout, selection, showExplorer, tabs, exportQuery]);
+  }), [activeConnection, activeTab, focusPanel, newTab, openInBuilder, openPlanTab, openTool, resetLayout,
+    saveCurrent, selection, showExplorer, exportQuery]);
 
   // Ctrl+K everywhere, "?" only outside a text field — otherwise it eats a question mark.
   useEffect(() => {
@@ -1442,16 +1502,13 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       const target = event.target as HTMLElement | null;
       const typing = target?.closest("input, textarea, .monaco-editor") !== null;
 
-      const rebound = Object.entries(preferences().shortcuts)
-        .find(([, combo]) => combo === comboOf(event))?.[0];
-
-      if (rebound && !(typing && !event.ctrlKey && !event.metaKey && !event.altKey)) {
-        const command = commands.find(entry => entry.id === rebound);
-        if (command && !command.disabled) {
-          event.preventDefault();
-          command.run();
-          return;
-        }
+      // Every command's key, the shipped one or a rebinding — Ctrl+S included, which would
+      // otherwise be the browser's "save page". Monaco sees a press first and keeps what it binds.
+      const command = commandFor(commands, preferences().shortcuts, event, comboOf(event), typing);
+      if (command) {
+        event.preventDefault();
+        command.run();
+        return;
       }
 
       // Ctrl+L opens the preset list and arms the chord: the digit that follows picks a layout, 0
@@ -1484,24 +1541,9 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         return;
       }
 
-      if ((event.ctrlKey || event.metaKey) && event.key === ",") {
-        event.preventDefault();
-        setPrefsOpen(true);
-        return;
-      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setPaletteOpen(true);
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "b") {
-        event.preventDefault();
-        showExplorer();
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "o") {
-        event.preventDefault();
-        setGotoOpen(true);
         return;
       }
       if (event.key === "?" && !typing) {
@@ -1558,8 +1600,8 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
   return (
     <ShellContext.Provider value={{
       connections,
-      selection, tabs, dataTabs, designerTabs, updateSql, openObject, exportQuery, followForeignKey,
-      runStatement, openData, dialectOf, exportObject, openPlanTab,
+      selection, tabs, dataTabs, designerTabs, updateSql, objectMenu, exportQuery, followForeignKey,
+      runStatement, openData, dialectOf, exportObject, openPlanTab, activeTab, saveCurrent, openSaved,
       explorer: {
         nonce: explorerNonce,
         activeConnection,
@@ -1643,6 +1685,13 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
         onPick={table => openData(activeConnection, table.ref, table.name)} />
       <CommandPalette commands={commands} opened={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <ShortcutsHelp commands={commands} opened={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <ContextMenu at={editorMenu?.at ?? null} onClose={() => setEditorMenu(null)}
+        items={editorMenu ? actionsFor(editorMenu.selection.node.kind, {
+          ddl: editorMenuCaps.ddl, fullTextIndexes: editorMenuCaps.fullTextIndexes,
+        }) : []}
+        onPick={action => { if (editorMenu) void handleAction(action, editorMenu.selection); }} />
+      <SaveQueryDialog draft={saveTarget?.draft ?? null} onClose={() => setSaveTarget(null)}
+        onSaved={query => { if (saveTarget) linkSaved(saveTarget.tabId, query); setSaveTarget(null); }} />
       <SnippetManager opened={snippetsOpen} onClose={() => setSnippetsOpen(false)} />
       <PreferencesModal commands={commands} opened={prefsOpen} onClose={() => setPrefsOpen(false)} />
       <LayoutPresetsModal opened={layoutsOpen} onClose={() => setLayoutsOpen(false)}

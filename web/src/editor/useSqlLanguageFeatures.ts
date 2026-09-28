@@ -1,16 +1,30 @@
 import { useEffect } from "react";
 import * as monaco from "monaco-editor";
 import { completionContext, SQL_KEYWORDS } from "./completion";
-import { schemaCache } from "./schemaCache";
+import { schemaCache, type TableRef } from "./schemaCache";
 import { allSnippets, type Snippet } from "./snippets";
 import type { DialectId } from "../sql/splitStatements";
 
-// Completion, hover and go-to-definition, all scoped to the connection the tab is bound to.
+// Completion and hover, both scoped to the connection the tab is bound to.
 // Registered per connection and disposed on change, so two tabs on two databases never mix schemas.
+/// The table or view named at a position. `sales.orders` picks the one in that schema; a bare name
+/// takes the first match, which is what the completion offers too.
+export async function tableAt(connectionId: string, model: monaco.editor.ITextModel,
+  position: monaco.IPosition): Promise<TableRef | undefined> {
+  const word = model.getWordAtPosition(position);
+  if (!word || !connectionId) return undefined;
+
+  const before = model.getLineContent(position.lineNumber).slice(0, word.startColumn - 1);
+  const schema = /["`\]]?(\w+)["`\]]?\.["`[]?$/.exec(before)?.[1]?.toLowerCase();
+  const name = word.word.toLowerCase();
+  const matches = (await schemaCache.tables(connectionId)).filter(t => t.name.toLowerCase() === name);
+
+  return matches.find(t => schema && t.schema.toLowerCase() === schema) ?? matches[0];
+}
+
 export function useSqlLanguageFeatures(
   connectionId: string,
   _dialect: DialectId,
-  onOpenObject?: (ref: string) => void,
   userSnippets: Snippet[] = [],
 ) {
   useEffect(() => {
@@ -79,22 +93,10 @@ export function useSqlLanguageFeatures(
       },
     });
 
-    const definition = monaco.languages.registerDefinitionProvider("sql", {
-      provideDefinition: async (model, position) => {
-        const word = model.getWordAtPosition(position);
-        if (!word || !onOpenObject) return null;
 
-        const tables = await schemaCache.tables(connectionId);
-        const table = tables.find(t => t.name.toLowerCase() === word.word.toLowerCase());
-        // Opening the object in the explorer is more useful than jumping inside the text buffer.
-        if (table) onOpenObject(table.ref);
-        return null;
-      },
-    });
-
-    return () => { completion.dispose(); hover.dispose(); definition.dispose(); };
+    return () => { completion.dispose(); hover.dispose(); };
     // The snippet list is compared by content: a new array of the same snippets must not
     // re-register the providers on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectionId, onOpenObject, JSON.stringify(userSnippets)]);
+  }, [connectionId, JSON.stringify(userSnippets)]);
 }

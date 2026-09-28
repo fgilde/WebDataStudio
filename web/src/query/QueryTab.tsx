@@ -7,7 +7,9 @@ import {
 } from "@tabler/icons-react";
 import { notifications } from "@mantine/notifications";
 import { AssistModal } from "../assist/AssistModal";
-import { QueryEditor } from "../editor/QueryEditor";
+import { QueryEditor, type EditorCommands } from "../editor/QueryEditor";
+import { onShell } from "../shell/bus";
+import type { TableRef } from "../editor/schemaCache";
 import { comparable, describeDiff, diffRows, type RunSnapshot } from "../grid/diffRows";
 import { ResultArea } from "./ResultArea";
 import { SplitPane } from "../dock/SplitPane";
@@ -33,7 +35,7 @@ export interface QueryTabState { connectionId: string; dialect: DialectId; sql: 
 const ALL_ROWS = 2_147_483_647;
 
 export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", initialSql = "",
-  onSqlChange, onOpenObject, onExport }: {
+  onSqlChange, onObjectMenu, onExport }: {
   tabId: string;
   connectionId: string;
   dialect: DialectId;
@@ -42,7 +44,7 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   // Must be referentially stable: this fires on every keystroke, and an inline closure here would
   // re-run the reporting effect on every render and loop through the parent's state.
   onSqlChange?: (tabId: string, sql: string) => void;
-  onOpenObject?: (ref: string) => void;
+  onObjectMenu?: (connectionId: string, table: TableRef, at: { x: number; y: number }) => void;
   onExport?: (sql: string) => void;
 }) {
   const [sql, setSql] = useState(initialSql);
@@ -74,7 +76,7 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   // The rows the last run produced, to diff the next one against. A ref rather than state: the
   // comparison happens inside a run, not during a render.
   const lastRun = useRef<RunSnapshot | null>(null);
-  const editorCommands = useRef<{ runCurrent: () => void } | null>(null);
+  const editorCommands = useRef<EditorCommands | null>(null);
   // What ran last, so "Fetch all" can run exactly that again without the cap.
   const lastRunArgs = useRef<{ text: string; parameters?: Record<string, string | null> } | null>(null);
   // What the pre-run read found, and the statement it was about.
@@ -82,6 +84,9 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
     useState<{ sql: string; findings: SqlFindingDto[] } | null>(null);
 
   useEffect(() => { onSqlChange?.(tabId, sql); }, [tabId, sql, onSqlChange]);
+
+  const objectMenu = useCallback((table: TableRef, at: { x: number; y: number }) =>
+    onObjectMenu?.(connectionId, table, at), [onObjectMenu, connectionId]);
 
   useEffect(() => {
     health().then(state => setAssistAvailable(state.assist === true)).catch(() => {});
@@ -253,6 +258,15 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
     setInspection({ sql: text, findings });
   }, [start, connectionId]);
 
+  // The palette's Run, Cancel and Format, and their keys pressed outside the editor.
+  useEffect(() => onShell("query-action", ({ tabId: target, action }) => {
+    if (target !== tabId) return;
+    if (action === "cancel") activeRun.current?.cancel();
+    else if (action === "format") editorCommands.current?.format();
+    else if (editorCommands.current) editorCommands.current.runCurrent();
+    else void execute(sql);
+  }), [tabId, execute, sql]);
+
   const firstError = result.statements.find(s => s.error)?.error ?? null;
 
   return (
@@ -362,7 +376,8 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
         top={
           <QueryEditor value={sql} dialect={dialect} connectionId={connectionId} error={firstError}
             language={engine === "mongodb" ? "javascript" : engine === "redis" || engine === "odata" ? "plaintext" : "sql"}
-            onChange={setSql} onRun={execute} onRunAll={execute} onOpenObject={onOpenObject}
+            onChange={setSql} onRun={execute} onRunAll={execute}
+            onObjectMenu={objectMenu}
             snippets={snippets} commands={editorCommands} />
         }
         bottom={

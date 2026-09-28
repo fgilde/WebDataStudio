@@ -72,11 +72,15 @@ remembered per tab.
 
 A `::text` cast, an `@@version` and a colon inside a string are not parameters and are left alone.
 
-## Completion, hover, go to definition
+## Completion, hover and the object menu
 
 Completion knows the schema of the connection the tab is bound to: tables, columns behind an
-alias, keywords and snippets. Hovering a table name lists its columns; `F12` on one opens it in the
-explorer.
+alias, keywords and snippets. Hovering a table name lists its columns.
+
+Hold `Ctrl` and a table or view name the studio knows is underlined; `Ctrl`+click on it — or `F12`
+with the cursor on it — opens the same menu the explorer has for that object, right where you
+clicked: open the data, a `SELECT *`, its structure or DDL, design it, script an `INSERT`, export it.
+`schema.table` picks the table in that schema.
 
 ## Snippets
 
@@ -103,7 +107,15 @@ browser, because how big the text is belongs to the screen it is on.
 ## Saved queries and history
 
 Every run is written to a searchable history that survives a restart. The **Saved** panel keeps
-named queries in folders; saving offers the current tab's SQL and remembers its connection.
+named queries in folders, and folders nest: `reports/monthly/finance`.
+
+- `Ctrl+S` saves the current tab. The first time it asks for a name and a folder — picked from the
+  tree, or made right there with the folder button, inside the one that is picked. After that the tab
+  *is* that saved query: it carries its name, and the next `Ctrl+S` overwrites it without asking.
+- `Ctrl+Shift+S` saves as a new query, whatever the tab was opened from.
+- In the panel: a new folder from the header, *New folder inside*, *Rename* and *Delete* on a
+  folder's menu, and drag a query or a whole folder onto another folder — or onto the empty space
+  for the top level. A folder is only deleted when it is empty; queries are never deleted with it.
 
 ## Saved queries that ship with the stack
 

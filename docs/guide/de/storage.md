@@ -24,6 +24,10 @@ sagt, was drin ist — „reached lake: 3 object(s), 1 folder(s)“ — oder was
 Eine Storage-Verbindung nur zu öffnen beweist nichts, ein grüner Haken hier heißt also, dass der Bucket
 wirklich geantwortet hat.
 
+Für einen **Ordner** geht **Browse…** durch die Ordner, die der Server lesen darf (`WDS_FILE_ROOTS`
+und das Datenverzeichnis), und **Use this folder** nimmt den geöffneten. Ein Admin kann dort vorher
+einen neuen Ordner anlegen; er entsteht auf dem Server, innerhalb dieser Wurzeln und nirgends sonst.
+
 `Read-only` und eine rote Farbe verweigern danach jeden Upload und jedes Löschen — im Server, nicht in
 der Oberfläche.
 

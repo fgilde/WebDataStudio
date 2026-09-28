@@ -199,5 +199,38 @@ public static class ConnectionFileEndpoints
                     .ToList(),
             });
         });
+
+        // A folder for a bucket that is a folder: picked where the server can see it, and made
+        // there when it is not there yet. Writing to the server's disk is an admin's call, and it
+        // stays inside the same roots the listing is fenced to.
+        app.MapPost("/api/connections/browse/folder",
+            (NewFolderRequest body, FileRoots roots, StudioAccess access, CurrentUser current) =>
+        {
+            if (!access.MayBrowse || !access.MayAdd)
+                return Results.Json(new { message = "this studio does not let its users browse the server's folders" },
+                    statusCode: StatusCodes.Status403Forbidden);
+
+            // Null is a studio without accounts, where whoever is here runs it.
+            if (current.User is { IsAdmin: false })
+                return Results.Json(new { message = "making a folder on the server needs the admin role" },
+                    statusCode: StatusCodes.Status403Forbidden);
+
+            var name = body.Name?.Trim() ?? "";
+            if (name is "" or "." or ".." || name.IndexOfAny([.. Path.GetInvalidFileNameChars(), '/', '\\']) >= 0)
+                return Results.BadRequest(new { message = "a folder name is one name, without slashes" });
+
+            if (roots.Resolve(body.Path ?? "") is not { } parent || !Directory.Exists(parent)
+                || roots.Resolve(Path.Combine(parent, name)) is not { } target)
+                return Results.Json(new { message = "this folder is not one this studio may write to" },
+                    statusCode: StatusCodes.Status403Forbidden);
+
+            if (Directory.Exists(target) || File.Exists(target))
+                return Results.Conflict(new { message = $"{name} is already there" });
+
+            Directory.CreateDirectory(target);
+            return Results.Ok(new { path = target });
+        });
     }
+
+    public record NewFolderRequest(string? Path, string? Name);
 }

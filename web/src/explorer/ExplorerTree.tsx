@@ -28,7 +28,7 @@ const OBJECT_KINDS = ["Table", "View", "MaterializedView", "StorageObject"];
 
 /// The menu opens where the pointer is. Anchoring it to the row would put it at the row's right
 /// edge — the full width of the explorer away from the click that asked for it.
-function ContextMenu({ items, at, onClose, onPick }: {
+export function ContextMenu({ items, at, onClose, onPick }: {
   items: ContextItem[];
   at: { x: number; y: number } | null;
   onClose: () => void;

@@ -27,6 +27,8 @@ export interface CommandContext {
   /// list of tools grew four times and the callbacks did not keep up.
   openTool: (tool: ToolDefinition) => void;
   saveCurrentQuery: () => void;
+  /// Always asks for a name and a folder, even for a tab that already is a saved query.
+  saveQueryAs: () => void;
   exportResult: () => void;
   openSnippets: () => void;
   showExplorer: () => void;
@@ -63,6 +65,7 @@ export function buildCommands(context: CommandContext): Command[] {
     { id: "query.cancel", label: "Cancel running query", group: "Query", shortcut: "Ctrl+Shift+C", run: context.cancelCurrent },
     { id: "query.format", label: "Format SQL", group: "Query", shortcut: "Ctrl+Shift+F", run: context.formatCurrent },
     { id: "query.save", label: "Save query", group: "Query", shortcut: "Ctrl+S", run: context.saveCurrentQuery },
+    { id: "query.saveAs", label: "Save query as…", group: "Query", shortcut: "Ctrl+Shift+S", run: context.saveQueryAs },
     { id: "query.snippets", label: "Manage snippets", group: "Query", run: context.openSnippets },
     // Only does something for a statement the builder produced, which is where the model lives.
     { id: "query.toBuilder", label: "Open this query in the builder", group: "Query", run: context.openInBuilder },
@@ -100,3 +103,18 @@ export const filterCommands = (commands: Command[], search: string): Command[] =
     c.group.toLowerCase().includes(needle) ||
     c.id.toLowerCase().includes(needle));
 };
+
+/// The command a key press means: a rebinding from the preferences, else the shortcut the command
+/// ships with. A press some other handler already took — Monaco's own Ctrl+D, say — is left alone,
+/// so the editor wins where the two overlap. In a text field a bare key is typing, not a command;
+/// function keys are the exception, because nobody types F6.
+export function commandFor(commands: Command[], bindings: Record<string, string>, event: {
+  defaultPrevented: boolean; ctrlKey: boolean; metaKey: boolean; altKey: boolean; key: string;
+}, combo: string, typing: boolean): Command | undefined {
+  if (event.defaultPrevented || !combo) return undefined;
+  if (typing && !event.ctrlKey && !event.metaKey && !event.altKey && !/^F\d{1,2}$/.test(event.key))
+    return undefined;
+
+  return commands.find(command =>
+    !command.disabled && (bindings[command.id] ?? command.shortcut) === combo);
+}

@@ -54,16 +54,31 @@ await page.locator(".monaco-editor").first().click();
 await page.keyboard.type("SELECT id, city FROM people ORDER BY id");
 
 const name = `smoke-${Date.now()}`;
-await page.getByRole("button", { name: "Saved queries" }).click();
+const folder = `smoke-folder-${Date.now()}`;
 try {
-  await page.getByRole("button", { name: "Save current query" }).click();
-  await page.getByLabel("Name").fill(name);
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  // Ctrl+S from inside the editor: our dialog, not the browser's "save page".
+  await page.keyboard.press("Control+s");
+  const dialog = page.getByRole("dialog", { name: "Save query" });
+  await dialog.waitFor({ timeout: 10000 });
+  await dialog.getByLabel("Name").fill(name);
+  await dialog.getByRole("button", { name: "New folder" }).click();
+  await dialog.getByPlaceholder("folder name").fill(folder);
+  await page.keyboard.press("Enter");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByText(folder).first().waitFor({ timeout: 10000 });
   await page.getByText(name).first().waitFor({ timeout: 10000 });
+
+  // The tab is that saved query now: a second Ctrl+S overwrites it without asking.
+  await page.locator(".monaco-editor").first().click();
+  await page.keyboard.press("End");
+  await page.keyboard.type(" ");
+  await page.keyboard.press("Control+s");
+  await page.getByText(`Saved ${folder}/${name}`).waitFor({ timeout: 10000 });
 } catch (e) { await fail("saved", e); }
 
 // --- chart view ----------------------------------------------------------------
-await page.getByRole("tab", { name: /query/i }).last().click().catch(() => {});
+// The tab is named after the saved query now.
+await page.getByRole("tab", { name }).last().click().catch(() => {});
 await page.locator(".monaco-editor").first().click();
 await page.keyboard.press("F5");
 try {

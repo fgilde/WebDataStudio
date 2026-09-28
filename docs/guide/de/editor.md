@@ -76,11 +76,16 @@ sich der Tab.
 Ein `::text`-Cast, ein `@@version` und ein Doppelpunkt in einer Zeichenkette sind keine Parameter
 und bleiben unangetastet.
 
-## Vervollständigung, Hover, Gehe zu Definition
+## Vervollständigung, Hover und das Objektmenü
 
 Die Vervollständigung kennt das Schema der Verbindung, an der der Tab hängt: Tabellen, Spalten
 hinter einem Alias, Schlüsselwörter und Snippets. Der Hover über einem Tabellennamen listet die
-Spalten; `F12` öffnet das Objekt im Explorer.
+Spalten.
+
+Mit gedrückter `Strg`-Taste wird ein Tabellen- oder View-Name, den das Studio kennt, unterstrichen;
+`Strg`+Klick darauf — oder `F12` mit dem Cursor darauf — öffnet genau an der Stelle dasselbe Menü,
+das der Explorer für dieses Objekt hat: Daten öffnen, `SELECT *`, Struktur oder DDL, entwerfen, ein
+`INSERT` skripten, exportieren. `schema.tabelle` nimmt die Tabelle in diesem Schema.
 
 ## Snippets
 
@@ -109,8 +114,17 @@ Browser gespeichert: wie groß der Text ist, gehört zum Bildschirm, auf dem er 
 ## Gespeicherte Abfragen und Verlauf
 
 Jeder Lauf landet in einem durchsuchbaren Verlauf, der einen Neustart übersteht. Das Panel **Saved**
-hält benannte Abfragen in Ordnern; beim Speichern wird das SQL des aktuellen Tabs vorgeschlagen und
-seine Verbindung gemerkt.
+hält benannte Abfragen in Ordnern, und Ordner lassen sich verschachteln: `berichte/monatlich/finanzen`.
+
+- `Strg+S` speichert den aktuellen Tab. Beim ersten Mal fragt es nach Name und Ordner — aus dem Baum
+  gewählt oder direkt dort mit dem Ordner-Knopf angelegt, innerhalb des gewählten. Danach *ist* der
+  Tab diese gespeicherte Abfrage: er trägt ihren Namen, und das nächste `Strg+S` überschreibt sie
+  ohne Nachfrage.
+- `Strg+Umschalt+S` speichert als neue Abfrage, egal woher der Tab kommt.
+- Im Panel: neuer Ordner im Kopf, *New folder inside*, *Rename* und *Delete* im Menü eines Ordners,
+  und eine Abfrage oder ein ganzer Ordner lässt sich auf einen anderen Ordner ziehen — oder auf die
+  freie Fläche für die oberste Ebene. Gelöscht wird ein Ordner nur, wenn er leer ist; Abfragen gehen
+  dabei nie mit.
 
 ## Was dieses Studio ausgeführt hat
 

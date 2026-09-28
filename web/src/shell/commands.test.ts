@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildCommands, filterCommands, type CommandContext } from "./commands";
+import { buildCommands, commandFor, filterCommands, type CommandContext } from "./commands";
 import { TOOLS, visibleTools } from "./tools";
 
 const context = (patch: Partial<CommandContext> = {}): CommandContext => ({
@@ -7,7 +7,7 @@ const context = (patch: Partial<CommandContext> = {}): CommandContext => ({
   openConnections: vi.fn(), addConnection: vi.fn(), addBucket: vi.fn(), importFile: vi.fn(),
   openPlanFile: vi.fn(),
   refreshExplorer: vi.fn(),
-  goToObject: vi.fn(), openTool: vi.fn(), saveCurrentQuery: vi.fn(), exportResult: vi.fn(),
+  goToObject: vi.fn(), openTool: vi.fn(), saveCurrentQuery: vi.fn(), saveQueryAs: vi.fn(), exportResult: vi.fn(),
   openSnippets: vi.fn(), showExplorer: vi.fn(), openInBuilder: vi.fn(), switchTheme: vi.fn(),
   saveLayout: vi.fn(), resetLayout: vi.fn(), copyLink: vi.fn(), showShortcuts: vi.fn(),
   openPreferences: vi.fn(),
@@ -131,5 +131,33 @@ describe("TOOLS", () => {
     expect(visibleTools({ admin: true }).map(tool => tool.id)).not.toContain("tool.redis");
     expect(visibleTools({ admin: true, engine: "redis" }).map(tool => tool.id))
       .toContain("tool.redis");
+  });
+});
+
+describe("commandFor", () => {
+  const commands = buildCommands(context());
+  const press = (key: string, patch: Partial<KeyboardEvent> = {}) => ({
+    defaultPrevented: false, ctrlKey: false, metaKey: false, altKey: false, key, ...patch,
+  });
+
+  it("fires a shipped shortcut nobody rebound, from inside the editor too", () => {
+    expect(commandFor(commands, {}, press("s", { ctrlKey: true }), "Ctrl+S", true)?.id).toBe("query.save");
+  });
+
+  it("leaves a press alone that the editor already handled", () => {
+    expect(commandFor(commands, {}, press("s", { ctrlKey: true, defaultPrevented: true }), "Ctrl+S", true))
+      .toBeUndefined();
+  });
+
+  it("prefers the rebinding and forgets the old key", () => {
+    const bindings = { "query.save": "Ctrl+Alt+S" };
+    expect(commandFor(commands, bindings, press("s", { ctrlKey: true, altKey: true }), "Ctrl+Alt+S", false)?.id)
+      .toBe("query.save");
+    expect(commandFor(commands, bindings, press("s", { ctrlKey: true }), "Ctrl+S", false)).toBeUndefined();
+  });
+
+  it("treats a bare key in a text field as typing, but not a function key", () => {
+    expect(commandFor(commands, { "query.save": "S" }, press("s"), "S", true)).toBeUndefined();
+    expect(commandFor(commands, {}, press("F6"), "F6", true)?.id).toBe("explorer.refresh");
   });
 });

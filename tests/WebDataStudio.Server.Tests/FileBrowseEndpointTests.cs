@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -27,13 +28,21 @@ public class FileBrowseEndpointTests : IDisposable
 
     public void Dispose() => TestDirectory.Remove(_dir);
 
-    private WebApplicationFactory<Program> Factory() =>
+    private WebApplicationFactory<Program> Factory(params (string Key, string Value)[] extra) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(b =>
-            b.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?>
+            b.ConfigureAppConfiguration((_, c) =>
             {
-                ["DB_PATH"] = Path.Combine(_dir, "data", "wds.db"),
-                ["WDS_FILE_ROOTS"] = _mounted,
-            })));
+                var settings = new Dictionary<string, string?>
+                {
+                    ["DB_PATH"] = Path.Combine(_dir, "data", "wds.db"),
+                    ["WDS_FILE_ROOTS"] = _mounted,
+                };
+                foreach (var (key, value) in extra) settings[key] = value;
+                c.AddInMemoryCollection(settings);
+            }));
+
+    private static Task<HttpResponseMessage> MakeFolderAsync(HttpClient client, string path, string name) =>
+        client.PostAsJsonAsync("/api/connections/browse/folder", new { path, name }, Ct);
 
     private async Task<JsonDocument> BrowseAsync(HttpClient client, string? path = null) =>
         JsonDocument.Parse(await client.GetStringAsync(
@@ -146,5 +155,64 @@ public class FileBrowseEndpointTests : IDisposable
             $"/api/connections/browse?path={Uri.EscapeDataString(Path.Combine(_mounted, "never"))}", Ct);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_new_folder_is_made_inside_the_folder_that_was_open()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        var response = await MakeFolderAsync(client, Path.Combine(_mounted, "reports"), "2026");
+
+        response.EnsureSuccessStatusCode();
+        Assert.True(Directory.Exists(Path.Combine(_mounted, "reports", "2026")));
+    }
+
+    [Fact]
+    public async Task A_folder_is_never_made_outside_the_roots_nor_with_a_path_for_a_name()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await MakeFolderAsync(client, _outside, "x")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await MakeFolderAsync(client, _mounted, "../outside/x")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await MakeFolderAsync(client, _mounted, "..")).StatusCode);
+        Assert.False(Directory.Exists(Path.Combine(_outside, "x")));
+    }
+
+    [Fact]
+    public async Task A_folder_that_is_there_already_is_a_conflict()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Conflict, (await MakeFolderAsync(client, _mounted, "reports")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Only_an_admin_makes_folders_on_the_server()
+    {
+        using var factory = Factory(("WDS_USERS",
+            $"ada:admin:{Server.Services.UserStore.Hash("one")};bob:editor:{Server.Services.UserStore.Hash("two")}"));
+
+        var editor = factory.CreateClient();
+        (await editor.PostAsJsonAsync("/api/auth/login", new { username = "bob", password = "two" }, Ct))
+            .EnsureSuccessStatusCode();
+        Assert.Equal(HttpStatusCode.Forbidden, (await MakeFolderAsync(editor, _mounted, "bob")).StatusCode);
+
+        var admin = factory.CreateClient();
+        (await admin.PostAsJsonAsync("/api/auth/login", new { username = "ada", password = "one" }, Ct))
+            .EnsureSuccessStatusCode();
+        (await MakeFolderAsync(admin, _mounted, "ada")).EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task A_studio_that_closed_browsing_makes_no_folders_either()
+    {
+        using var factory = Factory(("WDS_ALLOW_FILE_BROWSE", "false"));
+        using var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await MakeFolderAsync(client, _mounted, "x")).StatusCode);
     }
 }

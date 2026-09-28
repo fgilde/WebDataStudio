@@ -64,7 +64,9 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
 
   // A tunnel without a host is not a tunnel: a browser filling the SSH fields with a saved login
   // would otherwise send one, and the server would fail it for the missing user.
-  const complete = (): ConnectionInput => ({ ...value, tunnel: tunnel?.host.trim() ? tunnel : null });
+  // The header says "on" by the same rule, or an autofilled password shows a tunnel nobody set up.
+  const tunnelOn = !!tunnel?.host.trim();
+  const complete = (): ConnectionInput => ({ ...value, tunnel: tunnelOn ? tunnel : null });
 
   const test = async () => {
     setBusy(true);
@@ -137,7 +139,7 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
 
         <Accordion.Item value="ssh">
           <Accordion.Control>
-            <Text size="sm">SSH tunnel {tunnel ? "· on" : ""}</Text>
+            <Text size="sm">SSH tunnel {tunnelOn ? "· on" : ""}</Text>
           </Accordion.Control>
           <Accordion.Panel>
             <Stack gap="xs">
@@ -147,9 +149,11 @@ export function ConnectionForm({ initial, onSubmit, onCancel, onCreated }: {
                 <NumberInput size="xs" label="Port" min={1} max={65535} value={tunnel?.port ?? 22}
                   onChange={v => patchTunnel({ port: Number(v) || 22 })} />
               </Group>
-              <TextInput size="xs" label="SSH user" autoComplete="off" value={tunnel?.user ?? ""}
+              <TextInput size="xs" label="SSH user" autoComplete="off"
+                data-1p-ignore data-lpignore="true" data-bwignore value={tunnel?.user ?? ""}
                 onChange={e => patchTunnel({ user: e.currentTarget.value })} />
-              <PasswordInput size="xs" label="SSH password" autoComplete="new-password" value={tunnel?.password ?? ""}
+              <PasswordInput size="xs" label="SSH password" autoComplete="new-password"
+                data-1p-ignore data-lpignore="true" data-bwignore value={tunnel?.password ?? ""}
                 onChange={e => patchTunnel({ password: e.currentTarget.value || null })} />
               {/* A key wins over a password; both would just confuse the server. */}
               <Textarea size="xs" label="Private key" autosize minRows={2} maxRows={6}

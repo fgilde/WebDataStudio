@@ -1,8 +1,10 @@
 <Project>
 
-  <!-- One version for everything the repository builds. The patch number is the CI run number, so
-       it counts up without anybody editing a file; a local build stays 1.1.0-dev, which is how you
-       tell a hand-built binary from a published one. The commit rides in the informational version,
+  <!-- One version for everything the repository builds. A build from master is the last release
+       plus the CI run number — 1.8.0.125 is the 125th build, made after 1.8.0 — so it counts up
+       without anybody editing a file and still says which release it is newer than. It used to be a
+       fixed 1.2.<run>, which read as an old version long after 1.8 was out. A local build is
+       <base>-dev, which is how you tell a hand-built binary from a published one. The commit rides in the informational version,
        because "is the image running the fix I just pushed" is otherwise unanswerable from the
        studio itself. -->
   <PropertyGroup>
@@ -12,16 +14,19 @@
 
     <WdsBuild Condition="'$(WdsBuild)' == ''">0</WdsBuild>
     <WdsCommit Condition="'$(WdsCommit)' == ''">local</WdsCommit>
+    <!-- The last release tag, without its v; CI reads it with git describe. -->
+    <WdsBase Condition="'$(WdsBase)' == ''">0.0.0</WdsBase>
 
     <!-- A release is built from a tag, and then the tag is the version: v1.1.0 has to produce
          1.1.0, not 1.1.<whatever the run number happened to be>. Without this the download said one
          thing and the image it was built from said another. -->
     <VersionPrefix Condition="'$(WdsVersion)' != ''">$(WdsVersion)</VersionPrefix>
-    <VersionPrefix Condition="'$(WdsVersion)' == ''">1.2.$(WdsBuild)</VersionPrefix>
+    <VersionPrefix Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' != '0'">$(WdsBase).$(WdsBuild)</VersionPrefix>
+    <VersionPrefix Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' == '0'">$(WdsBase)</VersionPrefix>
     <VersionSuffix Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' == '0'">dev</VersionSuffix>
     <InformationalVersion Condition="'$(WdsVersion)' != ''">$(WdsVersion)+$(WdsCommit)</InformationalVersion>
-    <InformationalVersion Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' == '0'">1.2.0-dev+$(WdsCommit)</InformationalVersion>
-    <InformationalVersion Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' != '0'">1.2.$(WdsBuild)+$(WdsCommit)</InformationalVersion>
+    <InformationalVersion Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' == '0'">$(WdsBase)-dev+$(WdsCommit)</InformationalVersion>
+    <InformationalVersion Condition="'$(WdsVersion)' == '' AND '$(WdsBuild)' != '0'">$(WdsBase).$(WdsBuild)+$(WdsCommit)</InformationalVersion>
   </PropertyGroup>
 
 </Project>

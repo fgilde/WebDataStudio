@@ -26,8 +26,8 @@ curl -s http://localhost:8080/api/health
 {"status":"ok","version":"1.1.42+9f3c1ab…","commit":"9f3c1ab…","built":"2026-08-19T18:57:46Z"}
 ```
 
-Published images count the patch number up on their own; a version reading `1.1.0-dev` was built
-by hand rather than pulled.
+Published images from `master` read as the last release plus a build number (`1.8.0.125`); a
+version ending in `-dev` was built by hand rather than pulled.
 
 ## Making it look like yours
 

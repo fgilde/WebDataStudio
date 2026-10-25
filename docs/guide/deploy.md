@@ -120,9 +120,9 @@ database somebody else owns, so put it behind whatever your proxy offers for tha
 The version sits in the bottom right corner of the window, and its tooltip carries the commit and
 build time; `/api/health` returns the same three values.
 
-- A version reading `1.1.0-dev` was built by hand rather than pulled.
-- An image from `master` counts its patch number up on its own: `1.1.57` is the fifty-seventh
-  published build, whatever it contains.
+- A version ending in `-dev` (`1.8.0-dev`) was built by hand rather than pulled.
+- An image from `master` is the last release plus the build number: `1.8.0.125` is the 125th
+  published build, made after 1.8.0 — newer than the release, not the release itself.
 - A **tagged** build takes its version from the tag, so the download on the releases page, the image
   tagged the same way and the number the studio shows itself are one and the same. `v1.1.0` is
   `1.1.0` everywhere.

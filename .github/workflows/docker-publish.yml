@@ -27,6 +27,13 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: echo "WDS_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
+      # A build from master is the last release plus the run number, so the studio's About says
+      # which release it is newer than.
+      - name: Last release
+        run: |
+          base=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || echo v0.0.0)
+          echo "WDS_BASE=${base#v}" >> "$GITHUB_ENV"
+
       - uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
@@ -65,3 +72,4 @@ jobs:
             WDS_BUILD=${{ github.run_number }}
             WDS_COMMIT=${{ github.sha }}
             WDS_VERSION=${{ env.WDS_VERSION }}
+            WDS_BASE=${{ env.WDS_BASE }}

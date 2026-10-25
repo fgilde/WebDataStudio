@@ -12,10 +12,12 @@ ARG WDS_BUILD=0
 ARG WDS_COMMIT=local
 # Set when the image is built from a tag: then the tag is the version, not the run number.
 ARG WDS_VERSION=
+# The last release, for a build that is not one: 1.8.0 makes run 125 into 1.8.0.125.
+ARG WDS_BASE=
 
 WORKDIR /src
 COPY . .
-RUN dotnet publish src/WebDataStudio.Server -c Release -o /app     -p:WdsBuild=$WDS_BUILD -p:WdsCommit=$WDS_COMMIT -p:WdsVersion=$WDS_VERSION
+RUN dotnet publish src/WebDataStudio.Server -c Release -o /app     -p:WdsBuild=$WDS_BUILD -p:WdsCommit=$WDS_COMMIT -p:WdsVersion=$WDS_VERSION -p:WdsBase=$WDS_BASE
 
 # ---- runtime --------------------------------------------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime

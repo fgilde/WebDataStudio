@@ -3,7 +3,11 @@ export type CompletionContext =
   | { kind: "tables" }
   | { kind: "any" };
 
-const FROM_JOIN = /\b(?:from|join|update|into)\s+(?:([A-Za-z_][\w$]*)\.)?([A-Za-z_][\w$]*)(?:\s+(?:as\s+)?([A-Za-z_][\w$]*))?/gi;
+// A name bare or quoted the way any engine here quotes it: "Brands", `Brands`, [Brands].
+const NAME = /(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[A-Za-z_][\w$]*)/.source;
+const FROM_JOIN = new RegExp(
+  `\\b(?:from|join|update|into)\\s+(?:(${NAME})\\.)?(${NAME})(?:\\s+(?:as\\s+)?([A-Za-z_][\\w$]*))?`, "gi");
+const unquote = (name: string) => (/^["`[]/.test(name) ? name.slice(1, -1) : name);
 
 const KEYWORDS = new Set([
   "on", "where", "group", "order", "having", "limit", "offset", "set", "values",
@@ -15,7 +19,7 @@ const KEYWORDS = new Set([
 export function collectAliases(sql: string): Map<string, string> {
   const aliases = new Map<string, string>();
   for (const match of sql.matchAll(FROM_JOIN)) {
-    const table = match[2];
+    const table = match[2] && unquote(match[2]);
     const alias = match[3];
     if (!table) continue;
     aliases.set(table.toLowerCase(), table);

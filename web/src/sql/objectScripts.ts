@@ -8,7 +8,31 @@ const quote = (engine: ScriptEngine, name: string): string => {
   return '"' + name.replace(/"/g, '""') + '"';
 };
 
-export const dropColumn = (engine: ScriptEngine, table: string, column: string) =>
+// ponytail: the words people actually name tables after, not every engine's full reserved list.
+const RESERVED = new Set([
+  "all", "and", "as", "asc", "check", "column", "default", "desc", "from", "grant", "group", "index",
+  "key", "limit", "not", "null", "offset", "or", "order", "primary", "references", "select", "table",
+  "to", "user", "where",
+]);
+
+/// A name as the engine reads it back, quoted only where leaving it bare would change it.
+/// PostgreSQL folds a bare name to lower case and Oracle to upper case, so `app.Brands` reaches
+/// PostgreSQL as `app.brands` — a different table. Everything else only needs quotes for a name
+/// that is not a plain identifier or is a keyword.
+export function quoteIfNeeded(engine: ScriptEngine, name: string): string {
+  const plain =
+    engine === "postgresql" ? /^[a-z_][a-z0-9_$]*$/.test(name)
+    : engine === "oracle" ? /^[A-Z][A-Z0-9_$#]*$/.test(name)
+    : /^[A-Za-z_][A-Za-z0-9_$]*$/.test(name);
+
+  return plain && !RESERVED.has(name.toLowerCase()) ? name : quote(engine, name);
+}
+
+/// `schema.table` (or just `table`), each part quoted only if it has to be.
+export const qualifiedName = (engine: ScriptEngine, ...parts: string[]): string =>
+  parts.filter(Boolean).map(part => quoteIfNeeded(engine, part)).join(".");
+
+export const dropColumn =(engine: ScriptEngine, table: string, column: string) =>
   `ALTER TABLE ${table}\n  DROP COLUMN ${quote(engine, column)};`;
 
 export const selectColumn = (engine: ScriptEngine, table: string, column: string) =>

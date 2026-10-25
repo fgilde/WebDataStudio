@@ -55,7 +55,7 @@ import { DataDictionaryModal } from "../explorer/DataDictionaryModal";
 import { GrantDialog, type GrantTarget } from "../explorer/GrantDialog";
 import {
   dropColumn, dropConstraint, dropIndex, executeRoutine, rebuildIndex,
-  selectColumn,
+  qualifiedName, quoteIfNeeded, selectColumn,
 } from "../sql/objectScripts";
 import {
   applyDdl, archiveUrl, deleteObject, describeObject, listConnections, loadTabs, objectUrl,
@@ -788,16 +788,20 @@ export function DockShell() {
   // Following a foreign key lands on the referenced row itself, not on the whole table.
   const followForeignKey = useCallback((from: DataTabState, fk: ForeignKeyDto, value: unknown) => {
     const literal = typeof value === "number" ? String(value) : "'" + String(value).replace(/'/g, "''") + "'";
+    const engine = connections.find(c => c.id === from.connectionId)?.engine ?? "postgresql";
     newTab(from.connectionId,
-      "SELECT * FROM " + fk.referencedTable + " WHERE " + fk.referencedColumns[0] + " = " + literal);
-  }, [newTab]);
+      `SELECT * FROM ${qualifiedName(engine, fk.referencedSchema, fk.referencedTable)}`
+      + ` WHERE ${quoteIfNeeded(engine, fk.referencedColumns[0])} = ${literal}`);
+  }, [newTab, connections]);
 
   // Qualifies an object the way its engine expects, so a generated SELECT runs as-is.
   const qualify = useCallback((connectionId: string, ref: string) => {
     const parsed = ref.split(":", 2)[1]?.split("/") ?? [];
     const connection = connections.find(c => c.id === connectionId);
     const multiSchema = connection && !["sqlite", "duckdb"].includes(connection.engine);
-    return multiSchema && parsed.length > 1 ? `${parsed[0]}.${parsed[parsed.length - 1]}` : parsed[parsed.length - 1];
+    const engine = connection?.engine ?? "postgresql";
+    const table = parsed[parsed.length - 1];
+    return multiSchema && parsed.length > 1 ? qualifiedName(engine, parsed[0], table) : qualifiedName(engine, table);
   }, [connections]);
 
   /// The table a column, index, key or trigger node belongs to: its own path without the last part.
@@ -1145,8 +1149,8 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
       case "script-delete":
       case "script-truncate": {
         const detail = await describeObject(s.connectionId, s.node.ref).catch(() => null);
-        const columns = detail?.columns.map(c => c.name) ?? [];
-        const keys = detail?.columns.filter(c => c.isPrimaryKey).map(c => c.name) ?? [];
+        const columns = detail?.columns.map(c => quoteIfNeeded(engine, c.name)) ?? [];
+        const keys = detail?.columns.filter(c => c.isPrimaryKey).map(c => quoteIfNeeded(engine, c.name)) ?? [];
         const where = (keys.length > 0 ? keys : columns.slice(0, 1))
           .map(c => `${c} = ?`).join(" AND ") || "1 = 0";
 

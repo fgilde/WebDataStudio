@@ -16,6 +16,11 @@ describe("collectAliases", () => {
   it("maps a schema-qualified table to its bare name", () =>
     expect(collectAliases("SELECT * FROM public.users u").get("u")).toBe("users"));
 
+  it("reads a quoted name the way the completion now writes it", () => {
+    expect(collectAliases('SELECT * FROM app."Brands" b').get("b")).toBe("Brands");
+    expect(collectAliases("SELECT * FROM [dbo].[Order Lines] l").get("l")).toBe("Order Lines");
+  });
+
   it("maps a table to itself so an unaliased dot completes", () =>
     expect(collectAliases("SELECT * FROM users").get("users")).toBe("users"));
 

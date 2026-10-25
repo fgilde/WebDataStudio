@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   dropColumn, dropConstraint, dropIndex, executeRoutine, rebuildIndex,
-  selectColumn,
+  qualifiedName, quoteIfNeeded, selectColumn,
 } from "./objectScripts";
 
 describe("object scripts", () => {
@@ -45,5 +45,23 @@ describe("object scripts", () => {
   });
 
   it("refreshes a materialized view only where that exists", () => {
+  });
+});
+
+describe("quoteIfNeeded", () => {
+  it("quotes a PostgreSQL name with capitals, which a bare name would fold to lower case", () => {
+    expect(qualifiedName("postgresql", "app", "Brands")).toBe('app."Brands"');
+    expect(qualifiedName("postgresql", "public", "people")).toBe("public.people");
+  });
+
+  it("quotes an Oracle name in lower case, which a bare name would fold to upper case", () => {
+    expect(quoteIfNeeded("oracle", "PEOPLE")).toBe("PEOPLE");
+    expect(quoteIfNeeded("oracle", "people")).toBe('"people"');
+  });
+
+  it("leaves case alone where the engine ignores it, and quotes what is not an identifier", () => {
+    expect(quoteIfNeeded("sqlserver", "Brands")).toBe("Brands");
+    expect(quoteIfNeeded("sqlserver", "order lines")).toBe("[order lines]");
+    expect(quoteIfNeeded("mysql", "user")).toBe("`user`");
   });
 });

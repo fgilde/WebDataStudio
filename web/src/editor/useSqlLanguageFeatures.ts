@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import * as monaco from "monaco-editor";
 import { completionContext, SQL_KEYWORDS } from "./completion";
 import { schemaCache, type TableRef } from "./schemaCache";
+import { quoteIfNeeded } from "../sql/objectScripts";
 import { allSnippets, type Snippet } from "./snippets";
 import type { DialectId } from "../sql/splitStatements";
 
@@ -24,7 +25,7 @@ export async function tableAt(connectionId: string, model: monaco.editor.ITextMo
 
 export function useSqlLanguageFeatures(
   connectionId: string,
-  _dialect: DialectId,
+  dialect: DialectId,
   userSnippets: Snippet[] = [],
 ) {
   useEffect(() => {
@@ -38,6 +39,9 @@ export function useSqlLanguageFeatures(
 
         const item = (label: string, kind: monaco.languages.CompletionItemKind, detail?: string) =>
           ({ label, kind, insertText: label, range, detail });
+        // A table or column goes in the way the engine reads it back: `"Brands"` on PostgreSQL.
+        const name = (label: string, kind: monaco.languages.CompletionItemKind, detail?: string) =>
+          ({ ...item(label, kind, detail), insertText: quoteIfNeeded(dialect, label) });
 
         const context = completionContext(model.getValue(), offset);
 
@@ -45,13 +49,13 @@ export function useSqlLanguageFeatures(
           const columns = await schemaCache.columns(connectionId, context.table);
           return {
             suggestions: columns.map(c =>
-              item(c, monaco.languages.CompletionItemKind.Field, context.table)),
+              name(c, monaco.languages.CompletionItemKind.Field, context.table)),
           };
         }
 
         const tables = await schemaCache.tables(connectionId);
         const tableItems = tables.map(t =>
-          item(t.name, monaco.languages.CompletionItemKind.Struct, t.schema));
+          name(t.name, monaco.languages.CompletionItemKind.Struct, t.schema));
         if (context.kind === "tables") return { suggestions: tableItems };
 
         // Snippets come first: a three-letter prefix like `sel` should not be buried under
@@ -98,5 +102,5 @@ export function useSqlLanguageFeatures(
     // The snippet list is compared by content: a new array of the same snippets must not
     // re-register the providers on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connectionId, JSON.stringify(userSnippets)]);
+  }, [connectionId, dialect, JSON.stringify(userSnippets)]);
 }

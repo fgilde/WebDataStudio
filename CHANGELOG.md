@@ -8,6 +8,57 @@ A section here is the body of that release: the release workflow reads the one t
 (`scripts/release-notes.mjs`) and the generated commit list follows it. So a new version is written
 down here *before* it is tagged — a tag with no section still publishes, with the commit list alone.
 
+## 1.9.0
+
+Saved queries in folders, a query builder that knows OR, and the fixes the issue tracker asked for.
+
+### Saved queries and the editor
+
+- **Folders, nested as deep as you like**, in the saved-queries panel: new folder, subfolder,
+  rename, delete when empty, and drag queries and whole folders around. The save dialog picks the
+  folder from that tree.
+- **Ctrl+S** asks for a name and folder the first time; after that the tab *is* that query and
+  Ctrl+S overwrites it. Ctrl+Shift+S saves a new one.
+- **Every shortcut works in the editor too**, not only the ones somebody had rebound. Run, Cancel
+  and Format from the palette reach the active tab.
+- **Ctrl+click or F12 on a table name** opens the explorer's menu for that object, right there.
+- **Names are quoted the way the engine reads them back**: `app."Brands"` on PostgreSQL rather than
+  `app.Brands`, which folded to lower case and failed on every table EF Core created.
+
+### Query builder
+
+- **AND or OR** per filter, with the usual precedence; an EXISTS after an OR still applies to all.
+- **Filter values reach the query tab.** The SQL keeps its parameters, and the tab's parameter
+  dialog opens with the builder's values filled in — nothing typed lands in the SQL text or history.
+- **Joins in an order the engine accepts**: every ON names only tables already joined, whatever
+  order the joins were drawn in. A second link between two joined tables becomes an extra condition.
+- **Searchable column pickers**, dropdowns as wide as their longest name, and long table names that
+  show in full on hover.
+
+### Data and explorer
+
+- **Filters on several columns narrow each other** in a table's data tab, instead of the last one
+  replacing the rest.
+- **Find a value in any table can be cancelled**, and stops on the server too.
+- **Edit a connection** from the connections page. A session connection keeps its SSH tunnel.
+- **Long names in the explorer are cut off**, instead of shrinking the icon and the text.
+
+### The desktop build
+
+- **The Windows executable has the studio's icon** rather than a blank one.
+
+### Safety
+
+- **An open studio says so out loud.** With no accounts the whole API is open — on purpose, on a
+  laptop — and the start now logs a warning when it listens on anything but loopback.
+  `WDS_REQUIRE_AUTH=true` refuses to start without accounts, for deployments that want the guarantee.
+
+### Fixed
+
+- A closed query tab no longer comes back on the next start.
+- The statistics and the runs list refresh after every run, not only when the window changes.
+- A browser's saved password no longer shows "SSH tunnel · on" for a connection without one.
+
 ## 1.8.0
 
 Execution plans you can read like SSMS, and a query editor that runs what you meant.

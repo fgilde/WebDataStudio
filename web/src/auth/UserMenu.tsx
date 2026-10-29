@@ -55,7 +55,7 @@ export function UserMenu() {
             <Text size="xs" c="dimmed">Who may sign in, and as what</Text>
           </Menu.Item>
         ) : (
-          <Menu.Item component="a" href="https://fgilde.github.io/WebDataStudio/guide/#/safety"
+          <Menu.Item component="a" href="https://webdatastudio.de/guide/#/safety"
             target="_blank" rel="noreferrer">
             <Text size="xs">How accounts and roles work</Text>
           </Menu.Item>

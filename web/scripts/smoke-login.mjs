@@ -45,7 +45,7 @@ try {
 
   const hrefs = await page.locator("a").evaluateAll(links => links.map(a => a.getAttribute("href")));
   for (const expected of ["https://www.gilde.org", "https://github.com/fgilde/WebDataStudio",
-    "https://fgilde.github.io/WebDataStudio/guide/"]) {
+    "https://webdatastudio.de/guide/"]) {
     if (!hrefs.includes(expected)) throw new Error(`no link to ${expected}: ${hrefs.join(", ")}`);
   }
 } catch (e) { await fail("screen", e); }
@@ -98,7 +98,7 @@ try {
     .locator("a").evaluateAll(links => links.map(a => a.getAttribute("href")));
 
   for (const expected of ["https://www.gilde.org", "https://github.com/fgilde/WebDataStudio",
-    "https://fgilde.github.io/WebDataStudio"]) {
+    "https://webdatastudio.de"]) {
     if (!drawer.includes(expected)) throw new Error(`no link to ${expected}: ${drawer.join(", ")}`);
   }
 

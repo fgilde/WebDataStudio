@@ -55,9 +55,9 @@ describe("the about drawer", () => {
 
     await waitFor(() => expect(screen.getByRole("link", { name: /documentation/i })).toBeTruthy());
 
-    expect(href(/documentation/i)).toContain("fgilde.github.io/WebDataStudio/guide");
+    expect(href(/documentation/i)).toContain("webdatastudio.de/guide");
     expect(href(/github/i)).toBe("https://github.com/fgilde/WebDataStudio");
-    expect(href(/^website$/i)).toBe("https://fgilde.github.io/WebDataStudio");
+    expect(href(/^website$/i)).toBe("https://webdatastudio.de");
     expect(href(/gilde\.org/i)).toBe("https://www.gilde.org");
   });
 

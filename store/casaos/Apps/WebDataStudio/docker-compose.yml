@@ -106,7 +106,7 @@ x-casaos:
   port_map: "8095"
   scheme: http
   version: "1.9.0"
-  website: https://fgilde.github.io/WebDataStudio/
+  website: https://webdatastudio.de/
   repo: https://github.com/fgilde/WebDataStudio
   support: https://github.com/fgilde/WebDataStudio/issues
-  docs: https://fgilde.github.io/WebDataStudio/guide/
+  docs: https://webdatastudio.de/guide/

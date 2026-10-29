@@ -10,12 +10,12 @@
 </p>
 
 <p>
-  <img src="https://fgilde.github.io/WebDataStudio/assets/screenshots/chart-dark.png"/>
+  <img src="https://webdatastudio.de/assets/screenshots/chart-dark.png"/>
 </p>
 
 <p align="center">
-  <a href="https://fgilde.github.io/WebDataStudio/">Documentation</a> ·
-  <a href="https://fgilde.github.io/WebDataStudio/#/de/">Dokumentation (Deutsch)</a> ·
+  <a href="https://webdatastudio.de/">Documentation</a> ·
+  <a href="https://webdatastudio.de/#/de/">Dokumentation (Deutsch)</a> ·
   <a href="https://github.com/fgilde/WebDataStudio/pkgs/container/webdatastudio">Container image</a> ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>

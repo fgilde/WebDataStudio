@@ -20,5 +20,5 @@
 - [Entwicklung](/de/development.md)
 - [Kontakt und Unterstützung](/de/contact.md)
 
-- [Webseite](https://fgilde.github.io/WebDataStudio/de/)
+- [Webseite](https://webdatastudio.de/de/)
 - [Funktionsmatrix](../../features.md)

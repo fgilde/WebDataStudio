@@ -58,7 +58,7 @@ describe("DataSearchPanel", () => {
     // One row is a row, not "1 rows".
     expect(screen.getByText("1 row")).toBeTruthy();
     expect(screen.getByText(/12 tables searched, 2 skipped/)).toBeTruthy();
-    expect(searchData).toHaveBeenCalledWith("c1", "4711", { schema: "public", exact: false });
+    expect(searchData).toHaveBeenCalledWith("c1", "4711", { schema: "public", exact: false, signal: expect.any(AbortSignal) });
   });
 
   it("searches on Enter as well, because that is what a search box does", async () => {
@@ -80,7 +80,7 @@ describe("DataSearchPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
 
     await waitFor(() => expect(searchData)
-      .toHaveBeenCalledWith("c1", "ORD-4711", { schema: "public", exact: true }));
+      .toHaveBeenCalledWith("c1", "ORD-4711", { schema: "public", exact: true, signal: expect.any(AbortSignal) }));
   });
 
   it("opens the table a hit is in, filtered on the column that matched", async () => {
@@ -115,5 +115,23 @@ describe("DataSearchPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
 
     await waitFor(() => expect(screen.getByText("stopped at the table limit")).toBeTruthy());
+  });
+
+  it("cancels a running search, and saying so is not an error", async () => {
+    let signal: AbortSignal | undefined;
+    searchData.mockImplementation((_c: string, _v: string, options: { signal: AbortSignal }) => {
+      signal = options.signal;
+      return new Promise((_, reject) => signal!.addEventListener("abort",
+        () => reject(new DOMException("aborted", "AbortError"))));
+    });
+
+    draw();
+    type("4711");
+    fireEvent.click(screen.getByRole("button", { name: "Search" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    expect(signal?.aborted).toBe(true);
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull());
+    expect(screen.queryByText("aborted")).toBeNull();
   });
 });

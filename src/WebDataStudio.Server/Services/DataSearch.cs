@@ -70,7 +70,9 @@ public static class DataSearch
 
                 searched++;
             }
-            catch (DbException e)
+            // Some providers report a cancelled command as a DbException: that is the search
+            // stopping, not a table that could not be read.
+            catch (DbException e) when (!ct.IsCancellationRequested)
             {
                 skipped++;
                 notes.Add($"{Name(table.Key.Schema, table.Key.Table)}: {e.Message}");

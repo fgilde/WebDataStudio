@@ -167,7 +167,7 @@ public static class DataEndpoints
         });
 
         app.MapGet("/api/data/{conn}", async (string conn, [FromQuery(Name = "ref")] string objectRef,
-            int? offset, int? limit, string? sort, bool? desc, string? filterColumn, string? filter,
+            int? offset, int? limit, string? sort, bool? desc, string[]? filterColumn, string[]? filter,
             bool? reveal, [FromQuery(Name = "lookup")] string[]? lookup, string? options,
             SessionFactory factory, MaskPolicyStore policies, CancellationToken ct) =>
         {
@@ -193,10 +193,19 @@ public static class DataEndpoints
                     // find().sort().skip().limit(), a Redis database is its keys, a Redis key is its
                     // own contents. Asked before anything else, because none of what follows -
                     // a FROM clause, a WHERE, an ORDER BY - exists for them.
+                    // These engines filter on one column; a second one is said, not dropped.
                     if (await driver.PageAsync(session, target,
-                            new PageQuery(skip, take, sort, desc == true, filterColumn, filter, options), ct)
+                            new PageQuery(skip, take, sort, desc == true,
+                                filterColumn?.FirstOrDefault(), filter?.FirstOrDefault(), options), ct)
                         is { } built)
                     {
+                        if (filterColumn?.Length > 1)
+                            built = built with
+                            {
+                                Note = (built.Note is { Length: > 0 } note ? $"{note}; " : "")
+                                       + $"only the filter on {filterColumn[0]} applies here",
+                            };
+
                         var hidden = reveal == true
                             ? []
                             : Masking.IndexesOf(built.Columns, policies.For(conn));
@@ -240,28 +249,7 @@ public static class DataEndpoints
                     // Filter values are parameterised; only identifiers are interpolated, and those
                     // are checked against the real column list before they go anywhere near SQL.
                     var columnNames = detail.Columns.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-                    var where = "";
-                    var parameters = new Dictionary<string, object?>();
-
-                    if (filterColumn is { Length: > 0 } && columnNames.Contains(filterColumn)
-                        && filter is { Length: > 0 })
-                    {
-                        // The filter is a small language rather than a substring: see
-                        // FilterExpression. A plain word still means "contains", which is what it
-                        // meant before.
-                        var column = detail.Columns
-                            .First(c => c.Name.Equals(filterColumn, StringComparison.OrdinalIgnoreCase));
-
-                        var condition = FilterExpression.Build(driver.Dialect,
-                            Address(driver, alias, column.Name),
-                            FilterExpression.KindOf(column.DataType), filter, "f");
-
-                        if (!condition.IsEmpty)
-                        {
-                            where = $" WHERE {condition.Sql}";
-                            foreach (var (key, value) in condition.Parameters) parameters[key] = value;
-                        }
-                    }
+                    var (where, parameters) = Filters(driver, detail, filterColumn, filter, alias, "f");
 
                     var order = sort is { Length: > 0 } && columnNames.Contains(sort)
                         ? $" ORDER BY {Address(driver, alias, sort)}{(desc == true ? " DESC" : "")}"
@@ -325,7 +313,7 @@ public static class DataEndpoints
                         // which is what /count is for.
                         totalEstimate = detail.RowCount,
                         totalIsEstimate = true,
-                        filtered = filter is { Length: > 0 } && filterColumn is { Length: > 0 },
+                        filtered = where.Length > 0,
                         // Which of the columns came from another table. They are read-only: an
                         // edit here would be an update to a row this grid is not addressing.
                         lookups = lookups.Select(l => l.Name),
@@ -411,7 +399,7 @@ public static class DataEndpoints
         // 12,345" out of a number the catalogue guessed and a filter it never saw. Asked for
         // deliberately, because on a large table this is a scan.
         app.MapGet("/api/data/{conn}/count", async (string conn,
-            [FromQuery(Name = "ref")] string objectRef, string? filterColumn, string? filter,
+            [FromQuery(Name = "ref")] string objectRef, string[]? filterColumn, string[]? filter,
             SessionFactory factory, CancellationToken ct) =>
         {
             try
@@ -429,31 +417,9 @@ public static class DataEndpoints
                     var target = SchemaEndpoints.ParseObjectRef(objectRef);
                     var detail = await driver.DescribeAsync(session, target, ct);
 
-                    var columnNames = detail.Columns
-                        .Select(c => c.Name)
-                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-                    var parameters = new Dictionary<string, object?>();
-                    var where = "";
-
-                    // The same filter the page was built with, or the count would answer a different
+                    // The same filters the page was built with, or the count would answer a different
                     // question than the one on screen.
-                    if (filterColumn is { Length: > 0 } && columnNames.Contains(filterColumn)
-                        && filter is { Length: > 0 })
-                    {
-                        var column = detail.Columns
-                            .First(c => c.Name.Equals(filterColumn, StringComparison.OrdinalIgnoreCase));
-
-                        var condition = FilterExpression.Build(driver.Dialect,
-                            driver.Dialect.QuoteIdentifier(column.Name),
-                            FilterExpression.KindOf(column.DataType), filter, "c");
-
-                        if (!condition.IsEmpty)
-                        {
-                            where = $" WHERE {condition.Sql}";
-                            foreach (var (key, value) in condition.Parameters) parameters[key] = value;
-                        }
-                    }
+                    var (where, parameters) = Filters(driver, detail, filterColumn, filter, null, "c");
 
                     var sql = $"SELECT count(*) FROM {driver.FromClause(session, target)}{where}";
                     long? total = null;
@@ -941,6 +907,35 @@ public static class DataEndpoints
         alias is null
             ? driver.Dialect.QuoteIdentifier(column)
             : $"{alias}.{driver.Dialect.QuoteIdentifier(column)}";
+
+    /// The column filters of a browse, one `filterColumn`/`filter` pair each, ANDed: a filter on a
+    /// second column narrows the first rather than replacing it. Values are parameterised; a column
+    /// the table does not have is skipped, so only checked identifiers reach the SQL.
+    private static (string Where, Dictionary<string, object?> Parameters) Filters(IDbDriver driver,
+        ObjectDetail detail, string[]? filterColumn, string[]? filter, string? alias, string prefix)
+    {
+        var conditions = new List<string>();
+        var parameters = new Dictionary<string, object?>();
+
+        for (var i = 0; i < Math.Min(filterColumn?.Length ?? 0, filter?.Length ?? 0); i++)
+        {
+            if (filter![i] is not { Length: > 0 } text) continue;
+            if (detail.Columns.FirstOrDefault(c =>
+                    c.Name.Equals(filterColumn![i], StringComparison.OrdinalIgnoreCase)) is not { } column)
+                continue;
+
+            // The filter is a small language rather than a substring: see FilterExpression. The
+            // prefix carries the pair's index, so two columns' parameters cannot collide.
+            var condition = FilterExpression.Build(driver.Dialect, Address(driver, alias, column.Name),
+                FilterExpression.KindOf(column.DataType), text, $"{prefix}{i}_");
+
+            if (condition.IsEmpty) continue;
+            conditions.Add(condition.Sql);
+            foreach (var (key, value) in condition.Parameters) parameters[key] = value;
+        }
+
+        return (conditions.Count == 0 ? "" : $" WHERE {string.Join(" AND ", conditions)}", parameters);
+    }
 
     /// Turns `customer_id.name` into a join and a column. Anything that does not name a real
     /// single-column foreign key and a real column on the other side is dropped: this comes from a

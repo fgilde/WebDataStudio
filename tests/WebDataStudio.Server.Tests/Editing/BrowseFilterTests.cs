@@ -148,6 +148,23 @@ public class BrowseFilterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Filters_on_two_columns_narrow_each_other()
+    {
+        using var factory = Factory();
+        var client = factory.CreateClient();
+        var conn = await IdAsync(client);
+
+        // Issue #10: the second column's filter used to replace the first.
+        const string filters = "&filterColumn=customer_id&filter=1&filterColumn=total&filter=%3E50";
+
+        using var page = await GetAsync(client, $"/api/data/{conn}?ref={Orders}{filters}");
+        Assert.Equal(["2"], Column(page, 0));
+
+        using var count = await GetAsync(client, $"/api/data/{conn}/count?ref={Orders}{filters}");
+        Assert.Equal(1, count.RootElement.GetProperty("total").GetInt64());
+    }
+
+    [Fact]
     public async Task A_value_in_the_filter_cannot_become_sql()
     {
         using var factory = Factory();

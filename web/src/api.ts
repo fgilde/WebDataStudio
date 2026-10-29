@@ -169,9 +169,10 @@ export const listSchema = (conn: string, parent?: string): Promise<SchemaNodeDto
 /// rather than a path segment: a reverse proxy — Envoy in front of Azure Container Apps, among
 /// others — turns %2F back into a real slash before routing, and the request then matches no route
 /// at all. Everything that addresses an object goes through refQuery for that reason.
+/// Appended, not set: a key may repeat — one `filterColumn`/`filter` pair per column, one `lookup` each.
 const refQuery = (ref: string, extra?: URLSearchParams) => {
   const query = new URLSearchParams({ ref });
-  extra?.forEach((value, key) => query.set(key, value));
+  extra?.forEach((value, key) => query.append(key, value));
   return query.toString();
 };
 
@@ -303,6 +304,8 @@ export const makeServerFolder = (path: string, name: string): Promise<{ path: st
 export const browseData = (conn: string, ref: string,
   params: { offset?: number; limit?: number; sort?: string; desc?: boolean;
             filterColumn?: string; filter?: string; reveal?: boolean;
+            /// One filter per column, ANDed by the server: column name to filter text.
+            filters?: Record<string, string>;
             /// "customer_id.name": a column from the table that foreign key points at.
             lookups?: string[];
             /// What an engine's own query builder put together, in that engine's language: the
@@ -310,22 +313,31 @@ export const browseData = (conn: string, ref: string,
             options?: string } = {}): Promise<DataPageDto> => {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (key === "lookups") continue;
+    if (key === "lookups" || key === "filters") continue;
     if (value !== undefined && value !== "") query.set(key, String(value));
   }
   // Repeated rather than joined: each one is its own value, and a column name may hold a comma.
   for (const lookup of params.lookups ?? []) query.append("lookup", lookup);
+  appendFilters(query, params.filters);
   return fetch(`${base}/data/${conn}?${refQuery(ref, query)}`).then(r => ok<DataPageDto>(r));
+};
+
+/// Each column filter as its own `filterColumn`/`filter` pair, so a second column narrows the
+/// first instead of replacing it.
+const appendFilters = (query: URLSearchParams, filters: Record<string, string> = {}) => {
+  for (const [column, value] of Object.entries(filters)) {
+    if (value === "") continue;
+    query.append("filterColumn", column);
+    query.append("filter", value);
+  }
 };
 
 /// How many rows there really are, filter included. A scan on a large table, so it is asked for
 /// rather than shown by itself.
 export const countRows = (conn: string, ref: string,
-  params: { filterColumn?: string; filter?: string } = {}): Promise<{ total: number | null }> => {
+  params: { filters?: Record<string, string> } = {}): Promise<{ total: number | null }> => {
   const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== "") query.set(key, String(value));
-  }
+  appendFilters(query, params.filters);
   return fetch(`${base}/data/${conn}/count?${refQuery(ref, query)}`)
     .then(r => ok<{ total: number | null }>(r));
 };
@@ -1136,14 +1148,17 @@ export interface DataSearchDto {
 
 /// "Find this value in any table", server-side and type-aware.
 export const searchData = (
-  conn: string, value: string, options?: { schema?: string; exact?: boolean; maxTables?: number },
+  conn: string, value: string,
+  options?: { schema?: string; exact?: boolean; maxTables?: number; signal?: AbortSignal },
 ): Promise<DataSearchDto> => {
   const query = new URLSearchParams({ value });
   if (options?.schema) query.set("schema", options.schema);
   if (options?.exact) query.set("exact", "true");
   if (options?.maxTables) query.set("maxTables", String(options.maxTables));
 
-  return fetch(`${base}/search/${conn}/data?${query}`).then(r => ok<DataSearchDto>(r));
+  // Aborting drops the request, and the server's request token stops the scan with it.
+  return fetch(`${base}/search/${conn}/data?${query}`, { signal: options?.signal })
+    .then(r => ok<DataSearchDto>(r));
 };
 
 export interface TableSizeDto {

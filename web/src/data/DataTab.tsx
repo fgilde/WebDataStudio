@@ -108,7 +108,18 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
   // Sorting and filtering happen on the server: a page holds 200 of possibly millions of rows, so
   // doing either in the browser would order and filter the wrong set.
   const [sort, setSort] = useState<{ column: string; desc: boolean } | null>(null);
-  const [filter, setFilter] = useState<{ column: string; value: string } | null>(initialFilter);
+  // One filter per column, all of them at once: a filter on a second column narrows the first.
+  const [filters, setFilters] = useState<Record<string, string>>(
+    () => initialFilter ? { [initialFilter.column]: initialFilter.value } : {});
+  const setFilter = (column: string, value: string) => {
+    setFilters(f => {
+      const next = { ...f };
+      if (value) next[column] = value; else delete next[column];
+      return next;
+    });
+    setPageIndex(1);
+  };
+  const filtered = Object.keys(filters);
   // What the server says could be taken back on this table, and whether its script is open.
   const [undoState, setUndoState] = useState<UndoStateDto | null>(null);
   const [undoOpen, setUndoOpen] = useState(false);
@@ -201,7 +212,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
     browseData(connectionId, objectRef, {
       offset: (pageIndex - 1) * pageSize, limit: pageSize, lookups,
       sort: sort?.column, desc: sort?.desc,
-      filterColumn: filter?.column, filter: filter?.value,
+      filters,
       reveal: reveal || undefined,
       options: options || undefined,
     })
@@ -218,11 +229,11 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
       })
       .catch(e => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [connectionId, objectRef, pageIndex, pageSize, nonce, sort, filter, reveal, lookups, options]);
+  }, [connectionId, objectRef, pageIndex, pageSize, nonce, sort, filters, reveal, lookups, options]);
 
-  // A counted total describes one filter on one table. Anything that changes what is being read
-  // makes it a number about something else.
-  useEffect(() => setExactTotal(null), [connectionId, objectRef, filter, nonce, options]);
+  // A counted total describes one set of filters on one table. Anything that changes what is
+  // being read makes it a number about something else.
+  useEffect(() => setExactTotal(null), [connectionId, objectRef, filters, nonce, options]);
 
   // Re-read after every apply: what can be undone changes with the data, not with the render.
   useEffect(() => {
@@ -455,7 +466,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
         <Text size="xs" c="dimmed" ml="auto">
           {page.rows.length} rows
           {page.totalEstimate ? ` of ~${page.totalEstimate}` : ""}
-          {filter ? ` · filtered on ${filter.column}` : ""}
+          {filtered.length > 0 ? ` · filtered on ${filtered.join(", ")}` : ""}
           {sort ? ` · sorted by ${sort.column}` : ""}
           {changeSet.isDirty && ` · ${changeSet.changes.length} pending`}
           {page.note ? ` · ${page.note}` : ""}
@@ -518,7 +529,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                         {fkForColumn(c.name) && <IconArrowRight size={11} />}
                         {sort?.column === c.name && (sort.desc
                           ? <IconSortDescending size={12} /> : <IconSortAscending size={12} />)}
-                        {filter?.column === c.name && <IconFilter size={12} />}
+                        {filters[c.name] && <IconFilter size={12} />}
                       </Group>
                     </Menu.Target>
                     <Menu.Dropdown>
@@ -530,17 +541,13 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                       </Menu.Item>
                       <Menu.Item disabled={sort === null} onClick={() => setSort(null)}>Clear sort</Menu.Item>
                       <Menu.Divider />
-                      {/* One column at a time: that is what the endpoint filters by, and a
-                          pretend multi-column filter would silently ignore all but one. The input
+                      {/* Each column keeps its own filter and the server ANDs them. The input
                           lives outside a Menu.Item — inside one it is a button's child and never
                           takes the focus — and it debounces, because this filter is a round trip. */}
                       <MenuFilterInput placeholder={`Filter ${c.name}`} debounceMs={350}
-                        value={filter?.column === c.name ? filter.value : ""}
-                        onChange={value => {
-                          setFilter(value ? { column: c.name, value } : null);
-                          setPageIndex(1);
-                        }} />
-                      <Menu.Item disabled={filter === null} onClick={() => setFilter(null)}>
+                        value={filters[c.name] ?? ""}
+                        onChange={value => setFilter(c.name, value)} />
+                      <Menu.Item disabled={!filters[c.name]} onClick={() => setFilter(c.name, "")}>
                         Clear filter
                       </Menu.Item>
                       {/* A JSON column is one cell of text in the grid. This says what is inside
@@ -560,7 +567,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
                         <Menu.Divider />
                         <DistinctValues connectionId={connectionId} objectRef={objectRef}
                           column={c.name}
-                          onPick={value => { setFilter({ column: c.name, value }); setPageIndex(1); }} />
+                          onPick={value => setFilter(c.name, value)} />
                       </>}
 
                       {/* A column from the other side of the key, shown here rather than reached by
@@ -712,7 +719,7 @@ export function DataTab({ connectionId, objectRef, tableName, foreignKeys = [], 
           setCounting(true);
           try {
             const answer = await countRows(connectionId, objectRef,
-              { filterColumn: filter?.column, filter: filter?.value });
+              { filters });
             setExactTotal(answer.total);
           } catch { /* the number stays what it was; the grid is not the place for this error */ }
           finally { setCounting(false); }

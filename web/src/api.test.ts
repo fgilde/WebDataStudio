@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { listConnections, login } from "./api";
+import { browseData, countRows, listConnections, login } from "./api";
 
 describe("api", () => {
   beforeEach(() => vi.restoreAllMocks());
@@ -19,5 +19,22 @@ describe("api", () => {
       JSON.stringify({ message: "invalid credentials" }), { status: 401 })));
 
     await expect(login("a", "b")).rejects.toThrow("invalid credentials");
+  });
+
+  // One pair per column, so the server ANDs them; an emptied filter is not sent at all.
+  it("sends each column filter as its own pair", async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ total: 1 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    const filters = { total: ">50", customer_id: "1", note: "" };
+
+    await countRows("c1", "main.orders", { filters });
+    await browseData("c1", "main.orders", { filters }).catch(() => {});
+
+    for (const [url] of fetch.mock.calls as unknown as [string][]) {
+      const query = new URLSearchParams(url.split("?")[1]);
+      expect(query.getAll("filterColumn")).toEqual(["total", "customer_id"]);
+      expect(query.getAll("filter")).toEqual([">50", "1"]);
+    }
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

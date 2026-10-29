@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert, Badge, Button, Group, Loader, ScrollArea, Stack, Switch, Table, Text, TextInput,
 } from "@mantine/core";
@@ -21,16 +21,28 @@ export function DataSearchPanel({ connectionId, schema, onOpen }: {
   const [result, setResult] = useState<DataSearchDto | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const running = useRef<AbortController | null>(null);
+
+  // A panel closed mid-search should not leave the server scanning tables for nobody.
+  useEffect(() => () => running.current?.abort(), []);
 
   const search = () => {
     if (!value.trim()) return;
 
+    // Enter while one runs starts over rather than racing it.
+    running.current?.abort();
+    const controller = new AbortController();
+    running.current = controller;
     setBusy(true);
     setError(null);
-    searchData(connectionId, value, { schema, exact })
+    searchData(connectionId, value, { schema, exact, signal: controller.signal })
       .then(setResult)
-      .catch(e => { setResult(null); setError(e.message); })
-      .finally(() => setBusy(false));
+      .catch(e => {
+        setResult(null);
+        // Cancelled on purpose: nothing went wrong, so nothing to say.
+        if (!controller.signal.aborted) setError(e.message);
+      })
+      .finally(() => { if (running.current === controller) setBusy(false); });
   };
 
   return (
@@ -45,6 +57,10 @@ export function DataSearchPanel({ connectionId, schema, onOpen }: {
         <Button size="compact-xs" onClick={search} loading={busy} disabled={!value.trim()}>
           Search
         </Button>
+        {busy &&
+          <Button size="compact-xs" variant="default" onClick={() => running.current?.abort()}>
+            Cancel
+          </Button>}
       </Group>
 
       {error && <Alert color="yellow" variant="light">{error}</Alert>}

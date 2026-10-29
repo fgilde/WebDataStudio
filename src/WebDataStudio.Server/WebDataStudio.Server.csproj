@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- The Windows executable's own icon; rendered from the brand SVG by web/scripts/icons.mjs. -->
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <!-- Set by the release workflow. A desktop build stores its data next to the binary and

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSelect, buildSelectWithModel, emptyModel, filterParameters, parseModel, type QueryModel,
 } from "./buildSelect";
+import { askedFor } from "../editor/parameters";
 
 const base = (): QueryModel => ({
   ...emptyModel(),
@@ -60,6 +61,95 @@ describe("buildSelect", () => {
 
     expect(buildSelect(model, "postgresql")).toContain('WHERE "a"."name" IS NULL');
     expect(filterParameters(model)).toEqual({});
+  });
+
+  it("numbers a parameter by its filter, even after a null check", () => {
+    const model: QueryModel = {
+      ...base(),
+      filters: [
+        { table: "a", column: "name", operator: "IS NULL", value: "" },
+        { table: "a", column: "id", operator: "=", value: "7" },
+      ],
+    };
+
+    expect(buildSelect(model, "postgresql")).toContain('"a"."id" = :p2');
+    expect(filterParameters(model)).toEqual({ p2: "7" });
+  });
+
+  it("combines filters with the connector each one names", () => {
+    const sql = buildSelect({
+      ...base(),
+      filters: [
+        { table: "a", column: "name", operator: "=", value: "x", connector: "OR" },
+        { table: "a", column: "name", operator: "=", value: "y", connector: "OR" },
+        { table: "a", column: "id", operator: ">", value: "1" },
+      ],
+    }, "postgresql");
+
+    expect(sql).toContain(' WHERE "a"."name" = :p1\n    OR "a"."name" = :p2\n   AND "a"."id" > :p3');
+  });
+
+  it("keeps an OR from swallowing the EXISTS after it", () => {
+    const sql = buildSelect({
+      ...base(),
+      filters: [
+        { table: "a", column: "name", operator: "=", value: "x" },
+        { table: "a", column: "name", operator: "=", value: "y", connector: "OR" },
+      ],
+      exists: [{ name: "orders", outerTable: "a", outerColumn: "id", column: "person_id", negated: true }],
+    }, "postgresql");
+
+    expect(sql).toContain(' WHERE ("a"."name" = :p1\n    OR "a"."name" = :p2)\n   AND NOT EXISTS');
+  });
+
+  // The joins come in the order they were drawn; the FROM needs each ON to name placed tables only.
+  it("orders the joins so every condition names a table already joined", () => {
+    const sql = buildSelect({
+      ...base(),
+      tables: [{ name: "people", alias: "a" }, { name: "orders", alias: "b" }, { name: "lines", alias: "c" }],
+      joins: [
+        { left: "b", right: "c", leftColumn: "id", rightColumn: "order_id", kind: "INNER" },
+        { left: "a", right: "b", leftColumn: "id", rightColumn: "person_id", kind: "INNER" },
+      ],
+    }, "postgresql");
+
+    expect(sql).toContain('FROM "people" "a"\n  INNER JOIN "orders" "b" ON "a"."id" = "b"."person_id"\n'
+      + '  INNER JOIN "lines" "c" ON "b"."id" = "c"."order_id"');
+  });
+
+  it("turns a join drawn towards the first table around", () => {
+    const sql = buildSelect({
+      ...base(),
+      tables: [{ name: "people", alias: "a" }, { name: "orders", alias: "b" }],
+      joins: [{ left: "b", right: "a", leftColumn: "person_id", rightColumn: "id", kind: "LEFT" }],
+    }, "postgresql");
+
+    expect(sql).toContain('RIGHT JOIN "orders" "b" ON "b"."person_id" = "a"."id"');
+    expect(sql).not.toContain('JOIN "people"');
+  });
+
+  it("adds a second join between placed tables to the ON, not the table twice", () => {
+    const sql = buildSelect({
+      ...base(),
+      tables: [{ name: "people", alias: "a" }, { name: "orders", alias: "b" }],
+      joins: [
+        { left: "a", right: "b", leftColumn: "id", rightColumn: "person_id", kind: "INNER" },
+        { left: "a", right: "b", leftColumn: "tenant", rightColumn: "tenant", kind: "INNER" },
+      ],
+    }, "postgresql");
+
+    expect(sql).toContain('ON "a"."id" = "b"."person_id" AND "a"."tenant" = "b"."tenant"');
+    expect(sql.match(/"orders"/g)).toHaveLength(1);
+  });
+
+  it("cross joins an unconnected first table before the joins that follow", () => {
+    const sql = buildSelect({
+      ...base(),
+      tables: [{ name: "config", alias: "a" }, { name: "orders", alias: "b" }, { name: "lines", alias: "c" }],
+      joins: [{ left: "c", right: "b", leftColumn: "order_id", rightColumn: "id", kind: "INNER" }],
+    }, "postgresql");
+
+    expect(sql).toContain('CROSS JOIN "orders" "b"\n  INNER JOIN "lines" "c" ON "c"."order_id" = "b"."id"');
   });
 
   it("groups by the columns that are not aggregated", () => {
@@ -156,8 +246,47 @@ describe("aggregates, HAVING and DISTINCT", () => {
     }, "postgresql");
 
     expect(sql).not.toContain("secret-value");
+    expect(sql).toContain(`WHERE "a"."total" > :p1`);
     expect(parseModel(sql)!.filters[0].value).toBe("");
   });
+
+  it("keeps an alias that would close the comment from closing it", () => {
+    const sql = buildSelectWithModel({
+      ...base(),
+      columns: [{ table: "a", column: "total", alias: "x */ y" }],
+    }, "postgresql");
+
+    expect(parseModel(sql)!.columns[0].alias).toBe("x */ y");
+  });
+
+  it("hands the filter values over beside the SQL, named like its parameters", () => {
+    expect(filterParameters({
+      ...base(),
+      columns: [{ table: "a", column: "total" }],
+      filters: [
+        { table: "a", column: "note", operator: "IS NULL", value: "" },
+        { table: "a", column: "id", operator: "IN", value: "1, 2" },
+      ],
+    })).toEqual({ p2: "1, 2" });
+  });
+
+  // The query tab asks for what its own scanner finds; a marker it does not read would run the
+  // statement unbound instead of offering the builder's values.
+  it.each(["postgresql", "sqlserver", "mysql", "sqlite", "duckdb", "oracle"] as const)(
+    "names its parameters the way the %s query tab asks for them", dialect => {
+      const model: QueryModel = {
+        ...base(),
+        columns: [{ table: "a", column: "total" }],
+        filters: [
+          { table: "a", column: "total", operator: ">", value: "50" },
+          { table: "a", column: "id", operator: "IS NULL", value: "" },
+          { table: "a", column: "note", operator: "=", value: "x" },
+        ],
+      };
+
+      expect(askedFor(buildSelectWithModel(model, dialect), dialect))
+        .toEqual(Object.keys(filterParameters(model)));
+    });
 
   it("adds no comment to a query the builder cannot produce", () => {
     expect(buildSelectWithModel(emptyModel(), "postgresql")).toBe("");

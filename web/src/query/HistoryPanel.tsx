@@ -5,6 +5,7 @@ import {
 import { IconAlertTriangle, IconPhoto, IconSearch } from "@tabler/icons-react";
 import { historySnapshot, listHistory, type HistoryEntryDto, type ResultSnapshot } from "../api";
 import { ResultGrid } from "../grid/ResultGrid";
+import { onShell } from "../shell/bus";
 import { StatementStatsPanel } from "./StatementStatsPanel";
 
 export function HistoryPanel({ onOpen, connectionId, onOpenSql }: {
@@ -18,6 +19,10 @@ export function HistoryPanel({ onOpen, connectionId, onOpenSql }: {
   const [search, setSearch] = useState("");
   const [shown, setShown] = useState<{ entry: HistoryEntryDto; snapshot: ResultSnapshot } | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  // Bumped when a run lands in the history, so the list shows it without a search keystroke.
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => onShell("history-changed", () => setVersion(v => v + 1)), []);
 
   const openSnapshot = (entry: HistoryEntryDto) => {
     setFailure(null);
@@ -31,7 +36,7 @@ export function HistoryPanel({ onOpen, connectionId, onOpenSql }: {
       listHistory({ search: search || undefined, limit: 200 }).then(setEntries).catch(() => setEntries([]));
     }, 200);
     return () => clearTimeout(timer);
-  }, [search]);
+  }, [search, version]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>

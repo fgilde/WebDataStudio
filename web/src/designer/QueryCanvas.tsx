@@ -24,9 +24,11 @@ function QueryTableNode({ data }: NodeProps) {
     }}>
       <Handle type="target" position={Position.Left} />
       <Group gap={6} px={8} py={4} bg="var(--mantine-color-default)" wrap="nowrap" justify="space-between">
-        <Group gap={6} wrap="nowrap">
-          <Text size="xs" fw={700}>{node.label}</Text>
-          <Text size="10px" c="dimmed">{node.alias}</Text>
+        {/* A long name ends in an ellipsis and shows in full on hover, rather than being clipped
+            by the card or pushing the remove button out. */}
+        <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
+          <Text size="xs" fw={700} truncate title={node.label}>{node.label}</Text>
+          <Text size="10px" c="dimmed" style={{ flexShrink: 0 }}>{node.alias}</Text>
         </Group>
         <ActionIcon size="xs" variant="subtle" color="red" aria-label={`Remove ${node.label}`}
           onClick={() => (node.onRemove as (() => void) | undefined)?.()}>

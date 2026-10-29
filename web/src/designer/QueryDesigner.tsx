@@ -46,6 +46,13 @@ const newExists = (node: { ref: string; label: string }, outer: { alias: string;
   negated: true,
 });
 
+/// Column pickers: a wide table needs typing to find a column, and a long name must not be cut off
+/// by a dropdown only as wide as its narrow input.
+const COLUMN_PICKER = {
+  searchable: true,
+  comboboxProps: { width: "max-content", position: "bottom-start" },
+} as const;
+
 /// A Select needs a value for "no aggregate", and an em dash reads as empty.
 const NO_AGGREGATE = "\u2014";
 const AGGREGATES = [NO_AGGREGATE, "count", "sum", "avg", "min", "max"];
@@ -58,7 +65,8 @@ interface TableColumns extends LoadedTable { ref: string }
 export function QueryDesigner({ connectionId, dialect, onOpenInTab, initialModel }: {
   connectionId: string;
   dialect: DialectId;
-  onOpenInTab: (sql: string) => void;
+  /// The SQL keeps its parameters; the filter values come along to answer them.
+  onOpenInTab: (sql: string, parameters: Record<string, string>) => void;
   /// A model recovered from a generated statement, so a query can come back into the builder.
   initialModel?: QueryModel;
 }) {
@@ -238,7 +246,7 @@ export function QueryDesigner({ connectionId, dialect, onOpenInTab, initialModel
             <div key={table.alias} style={{ padding: "4px 6px" }}>
               <Group gap={6} wrap="nowrap">
                 <Text size="xs" fw={700}>{table.alias}</Text>
-                <Text size="xs" truncate>{table.name}</Text>
+                <Text size="xs" truncate title={table.name}>{table.name}</Text>
                 <Text size="10px" c="dimmed" ml="auto">
                   {model.columns.filter(c => c.table === table.alias).length}/{table.columns.length}
                 </Text>
@@ -271,13 +279,15 @@ export function QueryDesigner({ connectionId, dialect, onOpenInTab, initialModel
                 <Group key={index} gap={4} wrap="nowrap">
                   <Select size="xs" w={60} data={loaded.map(t => t.alias)} value={join.left}
                     onChange={v => patchJoin(index, { left: v ?? join.left })} />
-                  <Select size="xs" w={130} data={columnsOf(loaded, join.left)} value={join.leftColumn}
+                  <Select size="xs" w={130} {...COLUMN_PICKER} title={join.leftColumn}
+                    data={columnsOf(loaded, join.left)} value={join.leftColumn}
                     onChange={v => patchJoin(index, { leftColumn: v ?? join.leftColumn })} />
                   <Select size="xs" w={90} data={["INNER", "LEFT", "RIGHT", "FULL"]} value={join.kind}
                     onChange={v => patchJoin(index, { kind: (v ?? "INNER") as JoinKind })} />
                   <Select size="xs" w={60} data={loaded.map(t => t.alias)} value={join.right}
                     onChange={v => patchJoin(index, { right: v ?? join.right })} />
-                  <Select size="xs" w={130} data={columnsOf(loaded, join.right)} value={join.rightColumn}
+                  <Select size="xs" w={130} {...COLUMN_PICKER} title={join.rightColumn}
+                    data={columnsOf(loaded, join.right)} value={join.rightColumn}
                     onChange={v => patchJoin(index, { rightColumn: v ?? join.rightColumn })} />
                   <ActionIcon size="sm" variant="subtle" color="red" aria-label="Remove join"
                     onClick={() => setModel(m => ({ ...m, joins: m.joins.filter((_, i) => i !== index) }))}>
@@ -295,9 +305,15 @@ export function QueryDesigner({ connectionId, dialect, onOpenInTab, initialModel
             }))}>
               {model.filters.map((filter, index) => (
                 <Group key={index} gap={4} wrap="nowrap">
+                  {/* AND binds tighter than OR, as in the SQL it writes: a OR b AND c is a OR (b AND c). */}
+                  {index === 0
+                    ? <Text size="xs" c="dimmed" w={64}>WHERE</Text>
+                    : <Select size="xs" w={64} data={["AND", "OR"]} value={filter.connector ?? "AND"}
+                        onChange={v => patchFilter(index, { connector: v === "OR" ? "OR" : "AND" })} />}
                   <Select size="xs" w={60} data={loaded.map(t => t.alias)} value={filter.table}
                     onChange={v => patchFilter(index, { table: v ?? filter.table })} />
-                  <Select size="xs" w={150} data={columnsOf(loaded, filter.table)} value={filter.column}
+                  <Select size="xs" w={150} {...COLUMN_PICKER} title={filter.column}
+                    data={columnsOf(loaded, filter.table)} value={filter.column}
                     onChange={v => patchFilter(index, { column: v ?? filter.column })} />
                   <Select size="xs" w={110} data={OPERATORS} value={filter.operator}
                     onChange={v => patchFilter(index, { operator: v ?? "=" })} />
@@ -325,19 +341,21 @@ export function QueryDesigner({ connectionId, dialect, onOpenInTab, initialModel
                   <Select size="xs" w={110} data={["EXISTS", "NOT EXISTS"]}
                     value={entry.negated ? "NOT EXISTS" : "EXISTS"}
                     onChange={v => patchExists(index, { negated: v === "NOT EXISTS" })} />
-                  <Select size="xs" w={140} searchable
+                  <Select size="xs" w={140} {...COLUMN_PICKER} title={entry.name}
                     data={available.map(node => node.label)} value={entry.name}
                     onChange={v => {
                       const node = available.find(candidate => candidate.label === v);
                       if (node) patchExists(index, subqueryOf(node, entry));
                     }} />
-                  <Select size="xs" w={130} data={subqueryColumns[entry.name] ?? [entry.column]}
+                  <Select size="xs" w={130} {...COLUMN_PICKER} title={entry.column}
+                    data={subqueryColumns[entry.name] ?? [entry.column]}
                     value={entry.column}
                     onChange={v => patchExists(index, { column: v ?? entry.column })} />
                   <Text size="10px" c="dimmed">=</Text>
                   <Select size="xs" w={60} data={loaded.map(t => t.alias)} value={entry.outerTable}
                     onChange={v => patchExists(index, { outerTable: v ?? entry.outerTable })} />
-                  <Select size="xs" w={130} data={columnsOf(loaded, entry.outerTable)}
+                  <Select size="xs" w={130} {...COLUMN_PICKER} title={entry.outerColumn}
+                    data={columnsOf(loaded, entry.outerTable)}
                     value={entry.outerColumn}
                     onChange={v => patchExists(index, { outerColumn: v ?? entry.outerColumn })} />
                   <ActionIcon size="sm" variant="subtle" color="red" aria-label="Remove exists"
@@ -366,7 +384,8 @@ export function QueryDesigner({ connectionId, dialect, onOpenInTab, initialModel
                       onChange={v => patchHaving(index, { aggregate: v ?? "sum" })} />
                     <Select size="xs" w={60} data={loaded.map(t => t.alias)} value={entry.table}
                       onChange={v => patchHaving(index, { table: v ?? entry.table })} />
-                    <Select size="xs" w={130} data={columnsOf(loaded, entry.table)} value={entry.column}
+                    <Select size="xs" w={130} {...COLUMN_PICKER} title={entry.column}
+                      data={columnsOf(loaded, entry.table)} value={entry.column}
                       onChange={v => patchHaving(index, { column: v ?? entry.column })} />
                     <Select size="xs" w={110} data={OPERATORS} value={entry.operator}
                       onChange={v => patchHaving(index, { operator: v ?? ">" })} />
@@ -437,7 +456,7 @@ export function QueryDesigner({ connectionId, dialect, onOpenInTab, initialModel
             <Text size="xs" c="dimmed">Generated SQL</Text>
             <Tooltip label="Hand the statement to a query tab for editing">
               <Button size="compact-xs" disabled={!sql}
-                onClick={() => onOpenInTab(buildSelectWithModel(model, dialect))}>
+                onClick={() => onOpenInTab(buildSelectWithModel(model, dialect), filterParameters(model))}>
                 Open in query tab
               </Button>
             </Tooltip>

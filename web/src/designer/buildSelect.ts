@@ -1,4 +1,5 @@
 import type { DialectId } from "../sql/splitStatements";
+import { markerFor } from "../editor/parameters";
 
 export type JoinKind = "INNER" | "LEFT" | "RIGHT" | "FULL";
 
@@ -9,6 +10,9 @@ export interface QueryJoin {
 export interface QueryColumn { table: string; column: string; aggregate?: string; alias?: string }
 export interface QueryFilter {
   table: string; column: string; operator: string; value: string;
+  /// How this condition joins the one before it. Absent means AND, which is all older models knew;
+  /// the first filter's is ignored.
+  connector?: "AND" | "OR";
   /// Set on a HAVING entry: the condition applies to the aggregate, not the column.
   aggregate?: string;
 }
@@ -154,47 +158,86 @@ export function buildSelect(model: QueryModel, dialect: DialectId): string {
     return column.alias ? `${body} AS ${q(column.alias)}` : body;
   });
 
-  const [first, ...rest] = model.tables;
-  const from = [`${qualified(first)} ${q(first.alias)}`];
+  const tableOf = (alias: string) => model.tables.find(t => t.alias === alias)!;
+  const pending = model.joins.filter(join => join.left !== join.right
+    && model.tables.some(t => t.alias === join.left) && model.tables.some(t => t.alias === join.right));
 
-  // A table with no join is a cross join; spelling it out beats a silent cartesian product.
-  const joined = new Set([first.alias]);
+  // Each table's line in the FROM, so a later condition between two placed tables finds its ON.
+  const from: string[] = [];
+  const placed = new Map<string, number>();
+  const place = (alias: string, line: string) => { placed.set(alias, from.length); from.push(line); };
 
-  for (const join of model.joins) {
-    const target = model.tables.find(t => t.alias === join.right);
-    if (!target) continue;
+  const first = model.tables[0];
+  place(first.alias, `${qualified(first)} ${q(first.alias)}`);
 
-    from.push(`${join.kind} JOIN ${qualified(target)} ${q(target.alias)} ` +
-      `ON ${q(join.left)}.${q(join.leftColumn)} = ${q(join.right)}.${q(join.rightColumn)}`);
-    joined.add(join.right);
+  // The order joins were drawn in is not one the engine accepts: an ON clause may only name tables
+  // already in the FROM. So every step takes the first join that reaches a placed table, and only
+  // when none does is the next table cross joined — spelled out, not a silent cartesian product.
+  for (;;) {
+    const index = pending.findIndex(join => placed.has(join.left) || placed.has(join.right));
+
+    if (index === -1) {
+      const next = model.tables.find(t => !placed.has(t.alias));
+      if (!next) break;
+      place(next.alias, `CROSS JOIN ${qualified(next)} ${q(next.alias)}`);
+      continue;
+    }
+
+    const [join] = pending.splice(index, 1);
+    const on = `${q(join.left)}.${q(join.leftColumn)} = ${q(join.right)}.${q(join.rightColumn)}`;
+
+    // Both sides already there: a second condition between them, not the same table twice. The
+    // later of the two came in through a join, so its line has an ON to extend.
+    if (placed.has(join.left) && placed.has(join.right)) {
+      from[Math.max(placed.get(join.left)!, placed.get(join.right)!)] += ` AND ${on}`;
+      continue;
+    }
+
+    // A join drawn towards a table already placed brings in its left side instead, and "keep every
+    // row of the left" then reads the other way round.
+    const reversed = placed.has(join.right);
+    const alias = reversed ? join.left : join.right;
+    const kind = !reversed ? join.kind
+      : join.kind === "LEFT" ? "RIGHT"
+      : join.kind === "RIGHT" ? "LEFT"
+      : join.kind;
+
+    place(alias, `${kind} JOIN ${qualified(tableOf(alias))} ${q(alias)} ON ${on}`);
   }
-
-  for (const table of rest)
-    if (!joined.has(table.alias)) from.push(`CROSS JOIN ${qualified(table)} ${q(table.alias)}`);
 
   const lines = [
     `SELECT ${model.distinct ? "DISTINCT " : ""}${select.join(", ")}`,
     `  FROM ${from.join("\n  ")}`,
   ];
 
-  if (model.filters.length > 0) {
-    const conditions = model.filters.map((filter, index) => {
-      const column = reference(filter);
-      if (filter.operator === "IS NULL" || filter.operator === "IS NOT NULL")
-        return `${column} ${filter.operator}`;
+  // A parameter, not a literal: the designer must not build an injection for the user. The values
+  // travel beside the SQL (filterParameters), into the preview and the query tab's parameter dialog.
+  // The editor's own marker, or the query tab would not recognise these as parameters to ask for
+  // (SQLite and DuckDB use `$`). ClickHouse's is a typed `{name:Type}` the designer cannot fill in.
+  const marker = dialect === "clickhouse" ? ":" : markerFor(dialect);
+  const condition =(column: string, entry: QueryFilter, name: string) => {
+    if (entry.operator === "IS NULL" || entry.operator === "IS NOT NULL")
+      return `${column} ${entry.operator}`;
 
-      // A parameter, not a literal: the designer must not build an injection for the user.
-      const marker = dialect === "sqlserver" || dialect === "mysql" ? "@" : ":";
-      return `${column} ${filter.operator} ${marker}p${index + 1}`;
-    });
+    return entry.operator === "IN"
+      ? `${column} IN (${marker}${name})`
+      : `${column} ${entry.operator} ${marker}${name}`;
+  };
 
-    lines.push(` WHERE ${conditions.join("\n   AND ")}`);
-  }
+  const filtered = model.filters.length > 0;
+  const where = model.filters
+    .map((filter, index) => (index === 0 ? "" : `\n${filter.connector === "OR" ? "    OR" : "   AND"} `)
+      + condition(reference(filter), filter, `p${index + 1}`))
+    .join("");
 
   // EXISTS after the plain conditions, whether or not there were any: a query can consist of
   // nothing but "and there is no order for this customer".
   const existing = (model.exists ?? [])
     .filter(entry => entry.name && entry.column && entry.outerColumn);
+
+  // AND binds tighter than OR: an EXISTS after "x OR y" would otherwise only apply to y.
+  const ored = model.filters.slice(1).some(filter => filter.connector === "OR");
+  if (filtered) lines.push(` WHERE ${ored && existing.length > 0 ? `(${where})` : where}`);
 
   if (existing.length > 0) {
     const conditions = existing.map((entry, index) => {
@@ -206,7 +249,7 @@ export function buildSelect(model: QueryModel, dialect: DialectId): string {
         + ` WHERE ${q(inner)}.${q(entry.column)} = ${q(entry.outerTable)}.${q(entry.outerColumn)})`;
     });
 
-    lines.push(model.filters.length > 0
+    lines.push(filtered
       ? `   AND ${conditions.join("\n   AND ")}`
       : ` WHERE ${conditions.join("\n   AND ")}`);
   }
@@ -219,17 +262,9 @@ export function buildSelect(model: QueryModel, dialect: DialectId): string {
   }
 
   if (model.having && model.having.length > 0) {
-    const marker = dialect === "sqlserver" || dialect === "mysql" ? "@" : ":";
-    const conditions = model.having.map((entry, index) => {
-      const column = entry.aggregate
-        ? `${entry.aggregate.toUpperCase()}(${reference(entry)})`
-        : reference(entry);
-
-      if (entry.operator === "IS NULL" || entry.operator === "IS NOT NULL")
-        return `${column} ${entry.operator}`;
-
-      return `${column} ${entry.operator} ${marker}h${index + 1}`;
-    });
+    const conditions = model.having.map((entry, index) => condition(
+      entry.aggregate ? `${entry.aggregate.toUpperCase()}(${reference(entry)})` : reference(entry),
+      entry, `h${index + 1}`));
 
     lines.push(` HAVING ${conditions.join("\n    AND ")}`);
   }
@@ -248,7 +283,8 @@ export function buildSelect(model: QueryModel, dialect: DialectId): string {
 /// The live preview uses plain `buildSelect`, because a comment in every preview is noise.
 ///
 /// Filter values are stripped from the comment. They are user input that would otherwise be
-/// copied into the SQL text, into the history and into anything the query is pasted in to.
+/// copied into the SQL text, into the history and into anything the query is pasted in to; the
+/// query tab gets them separately, as the parameter dialog's first answers.
 export function buildSelectWithModel(model: QueryModel, dialect: DialectId): string {
   const sql = buildSelect(model, dialect);
   if (!sql) return sql;
@@ -259,7 +295,8 @@ export function buildSelectWithModel(model: QueryModel, dialect: DialectId): str
     having: model.having?.map(entry => ({ ...entry, value: "" })),
   };
 
-  return `${sql}\n/* wds:model ${JSON.stringify(withoutValues)} */`;
+  // An alias containing "*/" would close the comment early; "*\/" is the same JSON.
+  return `${sql}\n/* wds:model ${JSON.stringify(withoutValues).replace(/\*\//g, "*\\/")} */`;
 }
 
 const MODEL_COMMENT = /\/\* wds:model (\{[\s\S]*?\}) \*\//;
@@ -277,12 +314,11 @@ export function parseModel(sql: string): QueryModel | null {
   }
 }
 
-/// The values for the parameters buildSelect emitted, in the same order.
-export const filterParameters = (model: QueryModel): Record<string, string> => ({
-  ...Object.fromEntries(model.filters
-    .filter(f => f.operator !== "IS NULL" && f.operator !== "IS NOT NULL")
-    .map((f, index) => [`p${index + 1}`, f.value])),
-  ...Object.fromEntries((model.having ?? [])
-    .filter(f => f.operator !== "IS NULL" && f.operator !== "IS NOT NULL")
-    .map((f, index) => [`h${index + 1}`, f.value])),
-});
+/// The values for the parameters buildSelect emitted, named by position. A null check takes no
+/// parameter but still counts, or every name after it would be off by one.
+export const filterParameters = (model: QueryModel): Record<string, string> => {
+  const valuesOf = (entries: QueryFilter[], prefix: string) => entries.flatMap((f, index) =>
+    f.operator === "IS NULL" || f.operator === "IS NOT NULL" ? [] : [[`${prefix}${index + 1}`, f.value]]);
+
+  return Object.fromEntries([...valuesOf(model.filters, "p"), ...valuesOf(model.having ?? [], "h")]);
+};

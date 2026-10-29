@@ -7,6 +7,7 @@ const historyStats = vi.fn();
 vi.mock("../api", () => ({ historyStats: (...args: unknown[]) => historyStats(...args) }));
 
 const { StatementStatsPanel } = await import("./StatementStatsPanel");
+const { emit } = await import("../shell/bus");
 
 const report = {
   days: 30, runs: 42,
@@ -92,6 +93,16 @@ describe("StatementStatsPanel", () => {
 
     await waitFor(() => expect(historyStats)
       .toHaveBeenLastCalledWith({ connectionId: "c1", days: 7 }));
+  });
+
+  it("asks again when a run lands in the history", async () => {
+    historyStats.mockResolvedValue(report);
+
+    draw();
+
+    await waitFor(() => expect(historyStats).toHaveBeenCalledTimes(1));
+    emit("history-changed");
+    await waitFor(() => expect(historyStats).toHaveBeenCalledTimes(2));
   });
 
   it("says when nothing ran rather than showing an empty table", async () => {

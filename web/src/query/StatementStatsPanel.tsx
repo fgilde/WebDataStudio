@@ -4,6 +4,7 @@ import {
 } from "@mantine/core";
 import { IconTrendingDown, IconTrendingUp } from "@tabler/icons-react";
 import { historyStats, type StatementStatsDto } from "../api";
+import { onShell } from "../shell/bus";
 
 /// What this connection spends its time on, and what changed.
 ///
@@ -19,10 +20,13 @@ export function StatementStatsPanel({ connectionId, onOpen }: {
   const [statements, setStatements] = useState<StatementStatsDto[] | null>(null);
   const [runs, setRuns] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Bumped when a run lands in the history, so the numbers include the query that just finished.
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => onShell("history-changed", () => setVersion(v => v + 1)), []);
 
   useEffect(() => {
     let cancelled = false;
-    setStatements(null);
 
     historyStats({ connectionId, days: Number(days) })
       .then(report => {
@@ -33,7 +37,7 @@ export function StatementStatsPanel({ connectionId, onOpen }: {
       .catch(e => { if (!cancelled) setError(e.message); });
 
     return () => { cancelled = true; };
-  }, [connectionId, days]);
+  }, [connectionId, days, version]);
 
   return (
     <Stack gap={4} p={4} h="100%">

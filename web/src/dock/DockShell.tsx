@@ -84,6 +84,9 @@ interface TabState {
   id: string; connectionId: string; dialect: DialectId; engine: string; title: string; sql: string;
   /// The saved query this tab was opened from or saved as: Ctrl+S overwrites it instead of asking.
   saved?: { id: string; name: string; folder: string | null };
+  /// First answers for the parameter dialog, from the query builder's filters. Never saved: they
+  /// are what somebody typed, and the workspace is not where that belongs.
+  parameters?: Record<string, string>;
 }
 
 interface DesignerTabState {
@@ -108,7 +111,7 @@ interface ShellState {
   exportQuery: (connectionId: string, sql: string) => void;
   exportObject: (connectionId: string, objectRef: string, label: string) => void;
   followForeignKey: (from: DataTabState, fk: ForeignKeyDto, value: unknown) => void;
-  runStatement: (connectionId: string, sql: string) => void;
+  runStatement: (connectionId: string, sql: string, parameters?: Record<string, string>) => void;
   /// The query tab last focused, which is what Save, Export and the palette's Run act on.
   activeTab: TabState | undefined;
   saveCurrent: (asNew?: boolean) => void;
@@ -179,6 +182,7 @@ function QueryPanel(props: IDockviewPanelProps<{ tabId: string }>) {
       dialect={tab.dialect}
       engine={tab.engine}
       initialSql={seed.current}
+      initialParameters={tab.parameters}
       onSqlChange={shell.updateSql}
       onObjectMenu={shell.objectMenu}
       onExport={sql => shell.exportQuery(tab.connectionId, sql)} />
@@ -299,7 +303,7 @@ function QueryDesignerDockPanel(
   return (
     <QueryDesigner connectionId={connection} dialect={shell.dialectOf(connection)}
       initialModel={initialModel}
-      onOpenInTab={sql => shell.runStatement(connection, sql)} />
+      onOpenInTab={(sql, parameters) => shell.runStatement(connection, sql, parameters)} />
   );
 }
 
@@ -652,7 +656,8 @@ export function DockShell() {
     });
   }, []);
 
-  const newTab = useCallback((connectionId: string, sql = "", saved?: TabState["saved"]) => {
+  const newTab = useCallback((connectionId: string, sql = "", saved?: TabState["saved"],
+    parameters?: Record<string, string>) => {
     const connection = connections.find(c => c.id === connectionId) ?? connections[0];
     if (!connection) return;
 
@@ -664,6 +669,7 @@ export function DockShell() {
       title: saved?.name ?? `${connection.name} · query`,
       sql,
       saved,
+      parameters,
     };
     setTabs(list => [...list, tab]);
     addPanelFor(tab);
@@ -682,6 +688,14 @@ export function DockShell() {
     // A closed plan tab lets go of its plan, which can be megabytes.
     event.api.onDidRemovePanel(panel => {
       if (panel.id.startsWith("planfile-")) planFiles.drop(panel.id);
+
+      // A closed query tab leaves the remembered tabs too, or the next start opens it again. Checked
+      // a moment later: loading a layout removes every panel and puts its own back, and a popped-out
+      // tab is put back by the popout handling below.
+      if (panel.api.component !== "query" || poppedOut.current.has(panel.id)) return;
+      window.setTimeout(() => {
+        if (!api.current?.getPanel(panel.id)) setTabs(list => list.filter(t => t.id !== panel.id));
+      });
     });
 
     event.api.onDidAddPopoutGroup(popout => {
@@ -740,7 +754,7 @@ export function DockShell() {
   // Persist tabs, debounced: every keystroke would otherwise be a round trip.
   useEffect(() => {
     if (!restored.current) return;
-    const timer = setTimeout(() => { saveTabs(tabs).catch(() => {}); }, 500);
+    const timer = setTimeout(() => { saveTabs(tabs.map(tab => ({ ...tab, parameters: undefined }))).catch(() => {}); }, 500);
     return () => clearTimeout(timer);
   }, [tabs]);
 
@@ -1304,7 +1318,8 @@ Used by: ${preview.dependencies.usedBy.join(", ") || "nothing found"}`))
   }, [focusPanel, newTab, openData, openDesigner, openRedisKey, qualify, engineOf, parentTableRef,
     connections]);
 
-  const runStatement = useCallback((connectionId: string, sql: string) => newTab(connectionId, sql), [newTab]);
+  const runStatement = useCallback((connectionId: string, sql: string, parameters?: Record<string, string>) =>
+    newTab(connectionId, sql, undefined, parameters), [newTab]);
 
   const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[tabs.length - 1];
 

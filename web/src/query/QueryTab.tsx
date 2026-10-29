@@ -8,7 +8,7 @@ import {
 import { notifications } from "@mantine/notifications";
 import { AssistModal } from "../assist/AssistModal";
 import { QueryEditor, type EditorCommands } from "../editor/QueryEditor";
-import { onShell } from "../shell/bus";
+import { emit, onShell } from "../shell/bus";
 import type { TableRef } from "../editor/schemaCache";
 import { comparable, describeDiff, diffRows, type RunSnapshot } from "../grid/diffRows";
 import { ResultArea } from "./ResultArea";
@@ -35,12 +35,14 @@ export interface QueryTabState { connectionId: string; dialect: DialectId; sql: 
 const ALL_ROWS = 2_147_483_647;
 
 export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", initialSql = "",
-  onSqlChange, onObjectMenu, onExport }: {
+  initialParameters, onSqlChange, onObjectMenu, onExport }: {
   tabId: string;
   connectionId: string;
   dialect: DialectId;
   engine?: string;
   initialSql?: string;
+  /// What the parameter dialog offers first — the query builder's filter values.
+  initialParameters?: Record<string, string>;
   // Must be referentially stable: this fires on every keystroke, and an inline closure here would
   // re-run the reporting effect on every render and loop through the parent's state.
   onSqlChange?: (tabId: string, sql: string) => void;
@@ -54,7 +56,7 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
   const [pending, setPending] =
     useState<{ sql: string; names: string[]; initial: Record<string, string> } | null>(null);
   // Remembered per tab: re-running the same query with a different id is the common case.
-  const [lastValues, setLastValues] = useState<Record<string, string>>({});
+  const [lastValues, setLastValues] = useState<Record<string, string>>(initialParameters ?? {});
   const [snippets] = useUserSnippets();
   // The visual builder over an OData request. Open on a fresh tab, because a URL with query
   // options is what the builder is for; the text stays the one source of truth either way.
@@ -163,7 +165,7 @@ export function QueryTab({ tabId, connectionId, dialect, engine = "postgresql", 
         rowCount: last?.rows.length ?? null,
         error: last?.error?.text ?? null,
         snapshot,
-      }).catch(() => {});
+      }).then(() => emit("history-changed")).catch(() => {});
     }
   }, [connectionId, transactional, continueOnError, held]);
 

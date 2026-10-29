@@ -20,6 +20,8 @@ export interface ShellEvents {
   "query-action": { tabId: string; action: "run" | "cancel" | "format" };
   /// A saved query was added, changed or removed somewhere other than the Saved panel.
   "saved-queries-changed": void;
+  /// A run was written to the history: the runs list and the statistics are stale.
+  "history-changed": void;
 }
 
 const prefix = "wds:";

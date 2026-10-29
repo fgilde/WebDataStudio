@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
 import { MemoryRouter } from "react-router-dom";
 
@@ -17,6 +17,7 @@ globalThis.ResizeObserver ??= class {
 } as unknown as typeof ResizeObserver;
 
 const listConnections = vi.fn();
+const updateConnection = vi.fn();
 
 /// What the studio allows. Permissive unless a test says otherwise, which is also the default the
 /// server answers with.
@@ -37,6 +38,8 @@ vi.mock("../api", () => ({
   listConnections: () => listConnections(),
   createConnection: vi.fn(),
   deleteConnection: vi.fn(),
+  updateConnection: (...args: unknown[]) => updateConnection(...args),
+  revealConnectionString: () => Promise.resolve("Host=db;Password=pw"),
   testConnection: vi.fn(),
   connectionPresets: () => Promise.resolve([]),
   entraStatus: vi.fn(),
@@ -96,6 +99,27 @@ describe("ConnectionsPage", () => {
     await waitFor(() => expect(screen.getByText("LAKE")).toBeTruthy());
     expect(screen.queryByLabelText("Connection string")).toBeNull();
     expect(screen.queryByText(/anything else speaking S3/)).toBeNull();
+  });
+
+  it("edits a stored connection in the form it was made in", async () => {
+    const shop = {
+      id: "c2", name: "SHOP", engine: "postgresql", readOnly: false, color: null, group: null,
+      source: "Stored", summary: "db/shop", tunnelled: false, interactive: false,
+    };
+    listConnections.mockResolvedValue([shop]);
+    updateConnection.mockResolvedValue({ ...shop, name: "SHOP2" });
+    draw("");
+
+    fireEvent.click(await screen.findByLabelText("Edit SHOP"));
+    const name = await screen.findByDisplayValue("SHOP");
+    expect(screen.getByDisplayValue("Host=db;Password=pw")).toBeTruthy();
+
+    fireEvent.change(name, { target: { value: "SHOP2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(updateConnection).toHaveBeenCalledWith("c2",
+      expect.objectContaining({ name: "SHOP2", connectionString: "Host=db;Password=pw" })));
+    await waitFor(() => expect(screen.getByText("SHOP2")).toBeTruthy());
   });
 
   /// What this deployment allows decides what the page offers: a button for a closed door would

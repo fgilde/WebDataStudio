@@ -98,7 +98,8 @@ public static class ConnectionEndpoints
                     ReadOnly = body.ReadOnly,
                     Color = body.Color,
                     Group = body.Group,
-                    Tunnel = body.Tunnel,
+                    // Same as a stored one below: the edit form never gets the tunnel back.
+                    Tunnel = body.Tunnel ?? existing.Tunnel,
                 });
 
                 await pool.EvictAsync(id);

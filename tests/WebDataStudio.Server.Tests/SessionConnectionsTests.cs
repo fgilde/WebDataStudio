@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
@@ -147,6 +148,30 @@ public class SessionConnectionsTests : IDisposable
 
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
         Assert.Empty(sessions.For(sessions.Keys.First()));
+    }
+
+    /// The edit form never gets a tunnel back, so an edit that sends none keeps the one there is
+    /// rather than quietly dropping it.
+    [Fact]
+    public async Task Editing_it_keeps_its_tunnel()
+    {
+        using var factory = Factory();
+        using var client = factory.CreateClient();
+        await client.GetAsync("/api/connections", Ct);
+
+        var sessions = factory.Services.GetRequiredService<SessionConnections>();
+        var key = sessions.Keys.First();
+        sessions.Add(key, Spec("from-link", "LINK") with { Tunnel = new TunnelSpec("bastion", 22, "me") });
+
+        var edited = await client.PutAsJsonAsync("/api/connections/from-link", new
+        {
+            name = "RENAMED", engine = "sqlite", connectionString = "Data Source=:memory:", readOnly = true,
+        }, Ct);
+
+        Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
+        var connection = sessions.For(key).Single();
+        Assert.Equal("RENAMED", connection.Name);
+        Assert.Equal("bastion", connection.Tunnel?.Host);
     }
 
     /// And nobody else's browser may: it does not exist for them, which is a 404 rather than a

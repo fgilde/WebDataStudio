@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ActionIcon, Badge, Button, Group, Modal, Stack, Table, Text, Title } from "@mantine/core";
-import { IconBucket, IconEraser, IconKey, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconBucket, IconEraser, IconKey, IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import {
-  createConnection, deleteConnection, forgetSession, listConnections, type Connection,
+  createConnection, deleteConnection, forgetSession, listConnections, revealConnectionString,
+  updateConnection, type Connection, type ConnectionInput,
 } from "../api";
 import { BringYourOwn } from "./BringYourOwn";
 import { ConnectionForm } from "./ConnectionForm";
@@ -14,6 +15,7 @@ import { useAccess } from "./useAccess";
 export function ConnectionsPage() {
   const [items, setItems] = useState<Connection[]>([]);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<{ id: string; initial: ConnectionInput } | null>(null);
   const [signingIn, setSigningIn] = useState<Connection | null>(null);
   const [addingBucket, setAddingBucket] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +24,15 @@ export function ConnectionsPage() {
   const [query, setQuery] = useSearchParams();
 
   const refresh = () => listConnections().then(setItems).catch(e => setError(e.message));
+
+  // The list never carries the connection string, so the form asks for it once it is opened.
+  // No tunnel goes in: its key never comes back, and an edit without one keeps the stored tunnel.
+  const edit = (c: Connection) => revealConnectionString(c.id)
+    .then(connectionString => setEditing({ id: c.id, initial: {
+      name: c.name, engine: c.engine, connectionString, readOnly: c.readOnly,
+      color: c.color, group: c.group,
+    } }))
+    .catch(e => setError(e.message));
   useEffect(() => { refresh(); }, []);
 
   // "Add connection" and "Add a bucket" in the palette navigate here and say which form to open.
@@ -99,8 +110,13 @@ export function ConnectionsPage() {
                     <IconKey size={16} />
                   </ActionIcon>
                 )}
-                {/* Both are this studio's to drop: a stored one for everybody, a session one for
-                    the browser that made it. Only the environment's are somebody else's. */}
+                {/* Both are this studio's to change or drop: a stored one for everybody, a session
+                    one for the browser that made it. Only the environment's are somebody else's. */}
+                {c.source !== "Environment" && (
+                  <ActionIcon variant="subtle" aria-label={`Edit ${c.name}`} onClick={() => edit(c)}>
+                    <IconPencil size={16} />
+                  </ActionIcon>
+                )}
                 {c.source !== "Environment" && (
                   <ActionIcon variant="subtle" color="red" aria-label={`Delete ${c.name}`}
                     onClick={() => deleteConnection(c.id).then(refresh).catch(e => setError(e.message))}>
@@ -137,6 +153,21 @@ export function ConnectionsPage() {
             catch (e) { setError(e instanceof Error ? e.message : String(e)); }
           }} />
       </Modal>
+
+      {editing && (
+        <Modal opened onClose={() => setEditing(null)} title="Edit connection">
+          <ConnectionForm initial={editing.initial}
+            onCancel={() => setEditing(null)}
+            onSubmit={async value => {
+              try {
+                const updated = await updateConnection(editing.id, value);
+                setItems(list => list.map(c => (c.id === updated.id ? updated : c)));
+                setEditing(null);
+              }
+              catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+            }} />
+        </Modal>
+      )}
     </Stack>
   );
 }

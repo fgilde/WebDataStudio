@@ -168,10 +168,12 @@ function TreeLevel({ conn, parent, depth, caps, refresh, onSelect, onAction, onD
             }}>
             <Group gap={4} wrap="nowrap">
               {node.hasChildren
-                ? (open[node.ref] ? <IconChevronDown size={12} /> : <IconChevronRight size={12} />)
-                : <span style={{ width: 12 }} />}
+                ? (open[node.ref]
+                  ? <IconChevronDown size={12} style={{ flexShrink: 0 }} />
+                  : <IconChevronRight size={12} style={{ flexShrink: 0 }} />)
+                : <span style={{ width: 12, flexShrink: 0 }} />}
               {nodeIcon(node.kind)}
-              <Text size="xs" truncate>{node.label}</Text>
+              <Text size="xs" truncate title={node.label}>{node.label}</Text>
               {node.detail
                 ? <Text size="10px" c="dimmed" truncate>{node.detail}</Text>
                 : null}

@@ -8,6 +8,7 @@
 | `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | flags for the connection of the same name |
 | `WDS_USER`, `WDS_PASSWORD` | when **both** are set, a login screen guards the app; the account is an admin |
 | `WDS_USERS` | several accounts: `name:role:secret[:conn,conn]` entries separated by `;`. Read-only in the studio; an admin makes further accounts in the panel — see [Safety](safety.md#accounts-an-admin-makes) |
+| `WDS_REQUIRE_AUTH` | `true` refuses to start when no account can sign in — for packaged deployments that want the guarantee. Without it, a studio with no accounts is open, the admin surface included, and logs a warning when it listens on more than loopback |
 | `WDS_TITLE` | a name for this studio, shown in the header, on the login screen and in the browser tab |
 | `WDS_ICON` | this deployment's own icon: a URL, or a file mounted into the container, which the studio then serves itself. Used in the header, on the login screen and in the browser tab; without it the shipped icon stays |
 | `WDS_THEME` | the theme the studio comes up in, by id (`ocean`, `aspire`, `nord`, …). A person who picks another one keeps their choice; an id the studio does not have is ignored |

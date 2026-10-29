@@ -69,6 +69,34 @@ public class AuthEndpointTests : IDisposable
     }
 
     [Fact]
+    public void Requiring_auth_without_accounts_refuses_to_start()
+    {
+        using var factory = Factory(("WDS_REQUIRE_AUTH", "true"));
+        var e = Assert.Throws<InvalidOperationException>(() => factory.CreateClient());
+        Assert.Contains("WDS_REQUIRE_AUTH", e.Message);
+    }
+
+    [Fact]
+    public async Task Requiring_auth_with_accounts_starts()
+    {
+        using var factory = Factory(("WDS_REQUIRE_AUTH", "true"), ("WDS_USER", "admin"), ("WDS_PASSWORD", "s3cret"));
+        var response = await factory.CreateClient()
+            .GetAsync("/api/connections", TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("http://localhost:8080", true)]
+    [InlineData("http://127.0.0.1:8080;http://[::1]:8080", true)]
+    [InlineData("http://0.0.0.0:8080", false)]
+    [InlineData("http://+:8080", false)]
+    [InlineData("http://*:8080", false)]
+    [InlineData("http://localhost:8080;http://192.168.1.5:8080", false)]
+    public void Loopback_only_is_told_apart_from_a_published_port(string? urls, bool loopback) =>
+        Assert.Equal(loopback, ListenAddresses.LoopbackOnly(urls));
+
+    [Fact]
     public async Task Protected_endpoint_returns_401_without_login()
     {
         using var factory = Factory(("WDS_USER", "admin"), ("WDS_PASSWORD", "s3cret"));

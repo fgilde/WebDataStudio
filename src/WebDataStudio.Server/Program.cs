@@ -311,6 +311,23 @@ var startupLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger(
 // offer it, and this is the only place that says why.
 if (app.Services.GetRequiredService<OidcOptions>().Problem is { } oidcProblem)
     startupLog.LogWarning("the identity provider is not being offered: {Problem}", oidcProblem);
+
+// No account can sign in, so nothing is guarded — /api/admin included. Fine on a laptop, not on a
+// published port; a packaged deployment that wants the guarantee asks for it with WDS_REQUIRE_AUTH.
+if (app.Services.GetRequiredService<UserStore>().Anonymous)
+{
+    if (string.Equals(app.Configuration["WDS_REQUIRE_AUTH"], "true", StringComparison.OrdinalIgnoreCase))
+        throw new InvalidOperationException(
+            "WDS_REQUIRE_AUTH is set, but no account can sign in: set WDS_USERS, WDS_USER and WDS_PASSWORD, " +
+            "or an identity provider (WDS_OIDC_*)");
+
+    if (!ListenAddresses.LoopbackOnly(app.Configuration["urls"]))
+        startupLog.LogWarning(
+            "no accounts are configured and the studio listens on {Urls}: whoever reaches that port has " +
+            "every connection and the admin surface, without signing in. Set WDS_USERS or WDS_USER and " +
+            "WDS_PASSWORD, or put it behind an authenticating proxy", app.Configuration["urls"]);
+}
+
 var connectionStore = app.Services.GetRequiredService<ConnectionStore>();
 var workspaceStore = app.Services.GetRequiredService<WorkspaceStore>();
 
@@ -448,8 +465,11 @@ app.Use(async (ctx, next) =>
     // The administration surface kills sessions and reads server-wide state, so it belongs to
     // admins. Everything else is bounded by which connections the account may see, and a viewer's
     // connections are read-only wherever they are opened.
+    //
+    // An open studio (no accounts at all) has nobody to ask, so the admin surface is as open as the
+    // rest of it — on purpose, and only safe on loopback; the startup log says so when it is not.
     var current = ctx.RequestServices.GetRequiredService<CurrentUser>().User;
-    if (current is not null && !current.IsAdmin && path.StartsWithSegments("/api/admin"))
+    if (!users.Anonymous && current is not { IsAdmin: true } && path.StartsWithSegments("/api/admin"))
     {
         ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
         await ctx.Response.WriteAsJsonAsync(new { message = "this needs the admin role" });

@@ -8,6 +8,7 @@
 | `WDS_CONN_<NAME>_READONLY`, `_GROUP`, `_COLOR` | Flags für die gleichnamige Verbindung |
 | `WDS_USER`, `WDS_PASSWORD` | sind **beide** gesetzt, schützt ein Login-Bildschirm die Anwendung |
 | `WDS_USERS` | mehrere Konten: Einträge `Name:Rolle:Geheimnis[:VERB,VERB]`, getrennt durch `;`. Diese Konten sind im Studio nur lesbar; weitere legt eine Administratorin im Panel an — siehe [Administration](administration.md) |
+| `WDS_REQUIRE_AUTH` | `true` verweigert den Start, wenn sich kein Konto anmelden kann — für paketierte Deployments, die die Garantie wollen. Ohne ist ein Studio ohne Konten offen, die Administration eingeschlossen, und warnt beim Start, wenn es auf mehr als Loopback lauscht |
 | `WDS_TITLE` | ein Name für dieses Studio; steht in der Kopfleiste, auf dem Login-Bildschirm und im Browser-Tab |
 | `WDS_ICON` | das eigene Icon dieser Bereitstellung: eine URL oder eine in den Container eingebundene Datei, die das Studio dann selbst ausliefert. Erscheint in der Kopfleiste, auf dem Login-Bildschirm und im Browser-Tab; ohne die Variable bleibt das mitgelieferte Icon |
 | `WDS_THEME` | das Theme, mit dem das Studio startet, per Id (`ocean`, `aspire`, `nord`, …). Wer selbst eines wählt, behält seine Wahl; eine unbekannte Id wird ignoriert |
